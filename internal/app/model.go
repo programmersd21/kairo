@@ -1,0 +1,831 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/programmersd21/kairo/internal/config"
+	"github.com/programmersd21/kairo/internal/core"
+	"github.com/programmersd21/kairo/internal/plugins"
+	"github.com/programmersd21/kairo/internal/search"
+	"github.com/programmersd21/kairo/internal/storage"
+	ksync "github.com/programmersd21/kairo/internal/sync"
+	"github.com/programmersd21/kairo/internal/ui/detail"
+	"github.com/programmersd21/kairo/internal/ui/editor"
+	"github.com/programmersd21/kairo/internal/ui/help"
+	"github.com/programmersd21/kairo/internal/ui/keymap"
+	"github.com/programmersd21/kairo/internal/ui/palette"
+	"github.com/programmersd21/kairo/internal/ui/styles"
+	"github.com/programmersd21/kairo/internal/ui/tasklist"
+	"github.com/programmersd21/kairo/internal/ui/theme"
+	"github.com/programmersd21/kairo/internal/ui/theme_menu"
+	"github.com/programmersd21/kairo/internal/util"
+)
+
+type Mode int
+
+const (
+	ModeList Mode = iota
+	ModeDetail
+	ModeEditor
+	ModePalette
+	ModeConfirmDelete
+	ModeHelp
+	ModeThemeMenu
+)
+
+type Model struct {
+	ctx context.Context
+
+	cfg   config.Config
+	repo  *storage.Repository
+	km    keymap.Keymap
+	theme theme.Theme
+	s     styles.Styles
+
+	width  int
+	height int
+
+	mode Mode
+
+	views     []core.View
+	activeIdx int
+	tagParam  string
+	priParam  *core.Priority
+
+	list tasklist.Model
+	pal  palette.Model
+	det  detail.Model
+	edit *editor.Model
+	hlp  help.Model
+	tm   theme_menu.Model
+
+	tasks []core.Task
+	all   []core.Task
+	tags  []string
+
+	errText string
+
+	syncEngine *ksync.Engine
+
+	plugHost *plugins.Host
+	plugCh   chan struct{}
+}
+
+func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.Model, error) {
+	th := applyThemeOverride(theme.ByName(cfg.App.Theme), cfg.Theme)
+	s := styles.New(th)
+	km := keymap.FromConfig(cfg.Keymap)
+
+	m := &Model{
+		ctx:   ctx,
+		cfg:   cfg,
+		repo:  repo,
+		km:    km,
+		theme: th,
+		s:     s,
+		mode:  ModeList,
+	}
+	m.list = tasklist.New(m.s, cfg.App.VimMode)
+	m.pal = palette.New(m.s)
+	m.det = detail.New(m.s)
+	m.hlp = help.New(m.s, m.km)
+	m.tm = theme_menu.New(m.s)
+
+	// Sync.
+	if cfg.Sync.Enabled && strings.TrimSpace(cfg.Sync.RepoPath) != "" {
+		m.syncEngine = ksync.New(repo, cfg.Sync.RepoPath, cfg.Sync.Remote, cfg.Sync.Branch, ksync.Strategy(cfg.Sync.Strategy), cfg.Sync.AutoPush)
+	}
+
+	// Plugins.
+	if cfg.Plugins.Enabled {
+		dir := strings.TrimSpace(cfg.Plugins.Dir)
+		if dir == "" {
+			stateDir, err := util.AppStateDir("kairo")
+			if err == nil {
+				dir = filepath.Join(stateDir, "plugins")
+			}
+		}
+		if dir != "" {
+			_ = os.MkdirAll(dir, 0o755)
+			m.plugHost = plugins.New(repo, dir)
+			_ = m.plugHost.LoadAll()
+			m.plugCh = make(chan struct{}, 8)
+			_ = m.plugHost.Watch(ctx, func() {
+				select {
+				case m.plugCh <- struct{}{}:
+				default:
+				}
+			})
+		}
+	}
+
+	m.rebuildViews()
+	m.activeIdx = 0
+	return m, nil
+}
+
+func applyThemeOverride(t theme.Theme, o config.ThemeConfig) theme.Theme {
+	set := func(cur lipgloss.Color, v string) lipgloss.Color {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return cur
+		}
+		return lipgloss.Color(v)
+	}
+	t.Bg = set(t.Bg, o.Bg)
+	t.Fg = set(t.Fg, o.Fg)
+	t.Muted = set(t.Muted, o.Muted)
+	t.Border = set(t.Border, o.Border)
+	t.Accent = set(t.Accent, o.Accent)
+	t.Good = set(t.Good, o.Good)
+	t.Warn = set(t.Warn, o.Warn)
+	t.Bad = set(t.Bad, o.Bad)
+	t.Overlay = set(t.Overlay, o.Overlay)
+	return t
+}
+
+func (m *Model) Init() tea.Cmd {
+	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd()}
+	if m.plugCh != nil {
+		cmds = append(cmds, m.listenPluginsCmd())
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch x := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = x.Width, x.Height
+		m.list.SetSize(m.width, m.height-4)
+		m.pal.SetSize(m.width, m.height)
+		m.det.SetSize(m.width, m.height-4)
+		m.hlp.SetSize(m.width, m.height)
+		m.tm.SetSize(m.width, m.height)
+		if m.edit != nil {
+			m.edit.SetSize(m.width, m.height)
+		}
+		return m, nil
+
+	case errMsg:
+		m.errText = x.Err.Error()
+		return m, nil
+
+	case tasksLoadedMsg:
+		m.tasks = x.Tasks
+		m.list.SetTasks(m.tasks)
+		m.rebuildPaletteIndex()
+		return m, nil
+
+	case tagsLoadedMsg:
+		m.tags = x.Tags
+		m.rebuildPaletteIndex()
+		return m, nil
+
+	case allTasksLoadedMsg:
+		m.all = x.Tasks
+		m.rebuildPaletteIndex()
+		return m, nil
+
+	case palette.CloseMsg:
+		if m.mode == ModePalette {
+			m.mode = ModeList
+		}
+		return m, nil
+
+	case help.CloseMsg:
+		if m.mode == ModeHelp {
+			m.mode = ModeList
+		}
+		return m, nil
+
+	case theme_menu.CloseMsg:
+		if m.mode == ModeThemeMenu {
+			m.mode = ModeList
+		}
+		return m, nil
+
+	case theme_menu.SelectMsg:
+		m.theme = x.Theme
+		m.cfg.App.Theme = x.Theme.Name
+		_ = m.cfg.Save()
+		m.refreshStyles()
+		m.mode = ModeList
+		return m, nil
+
+	case palette.SelectMsg:
+		if m.mode != ModePalette {
+			return m, nil
+		}
+		m.mode = ModeList
+		switch x.Item.Kind {
+		case search.KindTask:
+			return m, m.fetchOpenTaskCmd(x.Item.ID)
+		case search.KindTag:
+			m.tagParam = x.Item.ID
+			m.setActiveView(core.ViewTag)
+			return m, m.loadTasksCmd()
+		case search.KindCommand:
+			return m, m.runCommand(x.Item.ID)
+		}
+		return m, nil
+
+	case editor.CloseMsg:
+		if m.mode == ModeEditor {
+			m.edit = nil
+			m.mode = ModeList
+		}
+		return m, nil
+
+	case editor.SaveNewMsg:
+		return m, tea.Batch(m.createTaskCmd(x.Task), func() tea.Msg { return editor.CloseMsg{} })
+
+	case editor.SavePatchMsg:
+		return m, tea.Batch(m.updateTaskCmd(x.ID, x.Patch), func() tea.Msg { return editor.CloseMsg{} })
+
+	case taskCreatedMsg:
+		return m, tea.Batch(m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
+
+	case taskUpdatedMsg:
+		return m, tea.Batch(m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
+
+	case taskDeletedMsg:
+		return m, tea.Batch(m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
+
+	case openTaskMsg:
+		m.det.SetTask(x.Task)
+		m.mode = ModeDetail
+		return m, nil
+
+	case openEditMsg:
+		e := editor.New(m.s, editor.ModeEdit, x.Task)
+		e.SetSize(m.width, m.height)
+		m.edit = &e
+		m.mode = ModeEditor
+		return m, m.edit.Init()
+
+	case pluginChangedMsg:
+		if m.plugHost != nil {
+			_ = m.plugHost.LoadAll()
+			m.rebuildViews()
+			m.rebuildPaletteIndex()
+			return m, m.listenPluginsCmd()
+		}
+		return m, nil
+
+	case syncDoneMsg:
+		if x.Err != nil {
+			m.errText = x.Err.Error()
+		}
+		return m, nil
+	}
+
+	// Global key handling.
+	if km, ok := msg.(tea.KeyMsg); ok {
+		if keymapMatch(m.km.Quit, km) && m.mode != ModeEditor {
+			return m, tea.Quit
+		}
+		if keymapMatch(m.km.Palette, km) && m.mode != ModeEditor {
+			m.mode = ModePalette
+			return m, m.pal.Open()
+		}
+		if keymapMatch(m.km.CycleTheme, km) && m.mode != ModeEditor {
+			m.mode = ModeThemeMenu
+			return m, nil
+		}
+		if keymapMatch(m.km.Help, km) && m.mode != ModeEditor {
+			m.mode = ModeHelp
+			return m, nil
+		}
+
+		if m.mode == ModeList {
+			switch {
+			case keymapMatch(m.km.ViewInbox, km):
+				m.setActiveView(core.ViewInbox)
+				return m, m.loadTasksCmd()
+			case keymapMatch(m.km.ViewToday, km):
+				m.setActiveView(core.ViewToday)
+				return m, m.loadTasksCmd()
+			case keymapMatch(m.km.ViewUpcoming, km):
+				m.setActiveView(core.ViewUpcoming)
+				return m, m.loadTasksCmd()
+			case keymapMatch(m.km.ViewTag, km):
+				m.setActiveView(core.ViewTag)
+				return m, m.loadTasksCmd()
+			case keymapMatch(m.km.ViewPriority, km):
+				m.setActiveView(core.ViewPriority)
+				return m, m.loadTasksCmd()
+			case keymapMatch(m.km.NewTask, km):
+				e := editor.New(m.s, editor.ModeNew, core.Task{Status: core.StatusTodo, Priority: core.P1})
+				e.SetSize(m.width, m.height)
+				m.edit = &e
+				m.mode = ModeEditor
+				return m, m.edit.Init()
+			case keymapMatch(m.km.EditTask, km):
+				if t, ok := m.list.Selected(); ok {
+					return m, m.fetchOpenEditCmd(t.ID)
+				}
+			case keymapMatch(m.km.DeleteTask, km):
+				if _, ok := m.list.Selected(); ok {
+					m.mode = ModeConfirmDelete
+					return m, nil
+				}
+			case keymapMatch(m.km.OpenTask, km):
+				if t, ok := m.list.Selected(); ok {
+					return m, m.fetchOpenTaskCmd(t.ID)
+				}
+			}
+		}
+
+		if m.mode == ModeDetail {
+			if keymapMatch(m.km.Back, km) {
+				m.mode = ModeList
+				return m, nil
+			}
+			if keymapMatch(m.km.EditTask, km) {
+				return m, m.fetchOpenEditCmd(m.det.Task().ID)
+			}
+		}
+
+		if m.mode == ModeConfirmDelete {
+			switch km.String() {
+			case "y", "enter":
+				if t, ok := m.list.Selected(); ok {
+					m.mode = ModeList
+					return m, m.deleteTaskCmd(t.ID)
+				}
+			case "n", "esc":
+				m.mode = ModeList
+				return m, nil
+			}
+		}
+	}
+
+	// Delegate to active component.
+	switch m.mode {
+	case ModeList, ModeConfirmDelete:
+		var cmd tea.Cmd
+		m.list, cmd = m.list.Update(msg)
+		return m, cmd
+	case ModePalette:
+		var cmd tea.Cmd
+		m.pal, cmd = m.pal.Update(msg)
+		return m, cmd
+	case ModeEditor:
+		if m.edit == nil {
+			m.mode = ModeList
+			return m, nil
+		}
+		e, cmd := m.edit.Update(msg)
+		*m.edit = e
+		return m, cmd
+	case ModeDetail:
+		var cmd tea.Cmd
+		// detail doesn't have its own update yet, but we might add it later
+		return m, cmd
+	case ModeHelp:
+		var cmd tea.Cmd
+		m.hlp, cmd = m.hlp.Update(msg)
+		return m, cmd
+	case ModeThemeMenu:
+		var cmd tea.Cmd
+		m.tm, cmd = m.tm.Update(msg)
+		return m, cmd
+	default:
+		return m, nil
+	}
+}
+
+func (m *Model) View() string {
+	if m.width <= 0 || m.height <= 0 {
+		return ""
+	}
+
+	var content string
+	isOverlay := false
+
+	switch m.mode {
+	case ModePalette:
+		content = m.pal.View()
+		isOverlay = true
+	case ModeEditor:
+		if m.edit != nil {
+			content = m.edit.View()
+			isOverlay = true
+		} else {
+			content = m.renderMainUI()
+		}
+	case ModeHelp:
+		content = m.hlp.View()
+		isOverlay = true
+	case ModeThemeMenu:
+		content = m.tm.View()
+		isOverlay = true
+	default:
+		content = m.renderMainUI()
+	}
+
+	if isOverlay {
+		content = lipgloss.Place(
+			m.width, m.height,
+			lipgloss.Center, lipgloss.Center,
+			content,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
+		)
+	} else {
+		content = lipgloss.Place(
+			m.width, m.height,
+			lipgloss.Left, lipgloss.Top,
+			content,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
+		)
+	}
+
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Background(m.s.Theme.Bg).
+		Render(content)
+}
+
+func (m *Model) renderMainUI() string {
+	head := m.renderHeader()
+	foot := m.renderFooter()
+
+	availableHeight := m.height - lipgloss.Height(head) - lipgloss.Height(foot)
+	if availableHeight < 0 {
+		availableHeight = 0
+	}
+
+	var body string
+	switch m.mode {
+	case ModeList, ModeConfirmDelete:
+		body = m.list.View()
+	case ModeDetail:
+		body = m.det.View()
+	default:
+		body = m.list.View()
+	}
+
+	body = lipgloss.NewStyle().
+		Height(availableHeight).
+		Width(m.width).
+		Background(m.s.Theme.Bg).
+		Render(body)
+
+	main := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Background(m.s.Theme.Bg).
+		Render(main)
+}
+
+func (m *Model) renderHeader() string {
+	v := m.views[m.activeIdx]
+
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(m.s.Theme.Accent).
+		Render(" KAIRO ")
+
+	viewTitle := lipgloss.NewStyle().
+		Foreground(m.s.Theme.Fg).
+		Bold(true).
+		Render(" " + v.Title + " ")
+
+	switch v.ID {
+	case core.ViewTag:
+		if m.tagParam != "" {
+			viewTitle += m.s.Muted.Render(" #" + m.tagParam)
+		}
+	case core.ViewPriority:
+		if m.priParam != nil {
+			viewTitle += m.s.Muted.Render(fmt.Sprintf(" P%d", int((*m.priParam).Clamp())))
+		}
+	}
+
+	right := m.s.Muted.Render(fmt.Sprintf("%d tasks ", len(m.tasks)))
+
+	left := lipgloss.JoinHorizontal(lipgloss.Left, title, viewTitle)
+
+	sp := m.width - 2 - lipgloss.Width(left) - lipgloss.Width(right)
+	if sp < 0 {
+		sp = 0
+	}
+
+	line := left + strings.Repeat(" ", sp) + right
+	return m.s.Header.Render(line)
+}
+
+func (m *Model) renderFooter() string {
+	left := ""
+	switch m.mode {
+	case ModeConfirmDelete:
+		left = m.s.BadgeBad.Render(" DELETE? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
+	case ModeDetail:
+		left = " " + m.s.Muted.Render("esc back • e edit • ctrl+p palette • ? help")
+	case ModeEditor:
+		left = " " + m.s.Muted.Render("ctrl+s save • esc cancel • tab next field")
+	case ModePalette:
+		left = " " + m.s.Muted.Render("enter select • esc close • ↑/↓ navigate")
+	case ModeHelp:
+		left = " " + m.s.Muted.Render("esc/q/? close")
+	case ModeThemeMenu:
+		left = " " + m.s.Muted.Render("enter select • esc/q/t close • ↑/↓ navigate")
+	default:
+		left = " " + m.s.Muted.Render("ctrl+p palette • n new • e edit • d delete • ? help • 1-5 views")
+	}
+
+	right := ""
+	if m.errText != "" {
+		right = lipgloss.NewStyle().Background(m.s.Theme.Bad).Foreground(m.s.Theme.Bg).Bold(true).Render(" ERROR ") + " " + m.s.Muted.Render(m.errText) + " "
+	} else {
+		right = m.s.Muted.Render(" v1.0.0 ")
+	}
+
+	sp := m.width - 2 - lipgloss.Width(left) - lipgloss.Width(right)
+	if sp < 0 {
+		sp = 0
+	}
+	line := left + strings.Repeat(" ", sp) + right
+	return m.s.Footer.Render(line)
+}
+
+func (m *Model) setActiveView(id core.ViewID) {
+	for i, v := range m.views {
+		if v.ID == id {
+			m.activeIdx = i
+			return
+		}
+	}
+}
+
+func (m *Model) rebuildViews() {
+	base := core.DefaultViews(time.Now())
+	if m.plugHost != nil {
+		for _, v := range m.plugHost.Views() {
+			base = append(base, core.View{ID: core.ViewID(v.ID), Title: v.Title, Filter: v.Filter})
+		}
+	}
+	m.views = base
+	if m.activeIdx >= len(m.views) {
+		m.activeIdx = 0
+	}
+}
+
+func (m *Model) activeFilter() core.Filter {
+	v := m.views[m.activeIdx]
+	f := v.Filter
+	if v.ID == core.ViewTag && m.tagParam != "" {
+		f.Tag = m.tagParam
+	}
+	if v.ID == core.ViewPriority && m.priParam != nil {
+		f.Priority = m.priParam
+	}
+	return f
+}
+
+func (m *Model) loadTasksCmd() tea.Cmd {
+	f := m.activeFilter()
+	return func() tea.Msg {
+		ts, err := m.repo.ListTasks(m.ctx, storage.ListOptions{Filter: f, Limit: 800})
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return tasksLoadedMsg{Tasks: ts}
+	}
+}
+
+func (m *Model) loadAllTasksCmd() tea.Cmd {
+	return func() tea.Msg {
+		ts, err := m.repo.AllTasks(m.ctx)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return allTasksLoadedMsg{Tasks: ts}
+	}
+}
+
+func (m *Model) loadTagsCmd() tea.Cmd {
+	return func() tea.Msg {
+		tags, err := m.repo.ListTags(m.ctx)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return tagsLoadedMsg{Tags: tags}
+	}
+}
+
+func (m *Model) createTaskCmd(t core.Task) tea.Cmd {
+	return func() tea.Msg {
+		created, err := m.repo.CreateTask(m.ctx, t)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return taskCreatedMsg{Task: created}
+	}
+}
+
+func (m *Model) updateTaskCmd(id string, p core.TaskPatch) tea.Cmd {
+	return func() tea.Msg {
+		updated, err := m.repo.UpdateTask(m.ctx, id, p)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return taskUpdatedMsg{Task: updated}
+	}
+}
+
+func (m *Model) deleteTaskCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		if err := m.repo.DeleteTask(m.ctx, id); err != nil {
+			return errMsg{Err: err}
+		}
+		return taskDeletedMsg{ID: id}
+	}
+}
+
+func (m *Model) fetchOpenTaskCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		t, err := m.repo.GetTask(m.ctx, id)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return openTaskMsg{Task: t}
+	}
+}
+
+func (m *Model) fetchOpenEditCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		t, err := m.repo.GetTask(m.ctx, id)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return openEditMsg{Task: t}
+	}
+}
+
+func (m *Model) refreshStyles() {
+	m.s = styles.New(m.theme)
+	m.list = tasklist.New(m.s, m.cfg.App.VimMode)
+	m.list.SetSize(m.width, m.height-4)
+	m.list.SetTasks(m.tasks)
+	m.pal = palette.New(m.s)
+	m.pal.SetSize(m.width, m.height)
+	m.det = detail.New(m.s)
+	m.det.SetSize(m.width, m.height-4)
+	m.hlp = help.New(m.s, m.km)
+	m.hlp.SetSize(m.width, m.height)
+	m.tm = theme_menu.New(m.s)
+	m.tm.SetSize(m.width, m.height)
+	if m.edit != nil {
+		m.edit.SetSize(m.width, m.height)
+	}
+	m.rebuildPaletteIndex()
+}
+
+func (m *Model) rebuildPaletteIndex() {
+	items := make([]search.Item, 0, len(m.all)+len(m.tags)+32)
+
+	items = append(items,
+		search.Item{ID: "cmd:new", Kind: search.KindCommand, Title: "New task", Hint: "Create a task"},
+		search.Item{ID: "cmd:sync", Kind: search.KindCommand, Title: "Sync now", Hint: "Git pull/push"},
+		search.Item{ID: "cmd:theme", Kind: search.KindCommand, Title: "Theme menu", Hint: "Switch theme"},
+		search.Item{ID: "cmd:view:inbox", Kind: search.KindCommand, Title: "View: Inbox", Hint: "1"},
+		search.Item{ID: "cmd:view:today", Kind: search.KindCommand, Title: "View: Today", Hint: "2"},
+		search.Item{ID: "cmd:view:upcoming", Kind: search.KindCommand, Title: "View: Upcoming", Hint: "3"},
+		search.Item{ID: "cmd:view:tag", Kind: search.KindCommand, Title: "View: By Tag", Hint: "4"},
+		search.Item{ID: "cmd:view:priority", Kind: search.KindCommand, Title: "View: By Priority", Hint: "5"},
+	)
+
+	for _, t := range m.tags {
+		items = append(items, search.Item{ID: t, Kind: search.KindTag, Title: "#" + t, Hint: "tag"})
+	}
+
+	for p := core.P0; p <= core.P3; p++ {
+		items = append(items, search.Item{ID: fmt.Sprintf("pri:%d", int(p)), Kind: search.KindCommand, Title: fmt.Sprintf("Priority: P%d", int(p)), Hint: "set priority view"})
+	}
+
+	if m.plugHost != nil {
+		for _, c := range m.plugHost.Commands() {
+			items = append(items, search.Item{ID: c.ID, Kind: search.KindCommand, Title: c.Title, Hint: "plugin • " + c.PluginID})
+		}
+		for _, v := range m.plugHost.Views() {
+			items = append(items, search.Item{ID: "cmd:view:" + v.ID, Kind: search.KindCommand, Title: "View: " + v.Title, Hint: "plugin • " + v.PluginID})
+		}
+	}
+
+	for _, t := range m.all {
+		hint := string(t.Status)
+		if t.Deadline != nil {
+			hint += " • due " + t.Deadline.Local().Format("Jan 2")
+		}
+		items = append(items, search.Item{ID: t.ID, Kind: search.KindTask, Title: t.Title, Desc: t.Description, Hint: hint})
+	}
+
+	idx := search.NewIndex(items)
+	m.pal.SetIndex(idx)
+}
+
+func (m *Model) runCommand(id string) tea.Cmd {
+	switch id {
+	case "cmd:new":
+		e := editor.New(m.s, editor.ModeNew, core.Task{Status: core.StatusTodo, Priority: core.P1})
+		e.SetSize(m.width, m.height)
+		m.edit = &e
+		m.mode = ModeEditor
+		return m.edit.Init()
+	case "cmd:theme":
+		m.mode = ModeThemeMenu
+		return nil
+	case "cmd:view:inbox":
+		m.setActiveView(core.ViewInbox)
+		return m.loadTasksCmd()
+	case "cmd:view:today":
+		m.setActiveView(core.ViewToday)
+		return m.loadTasksCmd()
+	case "cmd:view:upcoming":
+		m.setActiveView(core.ViewUpcoming)
+		return m.loadTasksCmd()
+	case "cmd:view:tag":
+		m.setActiveView(core.ViewTag)
+		return m.loadTasksCmd()
+	case "cmd:view:priority":
+		m.setActiveView(core.ViewPriority)
+		return m.loadTasksCmd()
+	case "cmd:sync":
+		return m.syncNowCmd()
+	}
+
+	if strings.HasPrefix(id, "cmd:view:plugin:") {
+		viewID := strings.TrimPrefix(id, "cmd:view:")
+		m.setActiveView(core.ViewID(viewID))
+		return m.loadTasksCmd()
+	}
+
+	if strings.HasPrefix(id, "plugin:") && m.plugHost != nil {
+		return func() tea.Msg {
+			if err := m.plugHost.RunCommand(m.ctx, id); err != nil {
+				return errMsg{Err: err}
+			}
+			return taskUpdatedMsg{Task: core.Task{}}
+		}
+	}
+
+	if strings.HasPrefix(id, "pri:") {
+		raw := strings.TrimPrefix(id, "pri:")
+		var p int
+		_, _ = fmt.Sscanf(raw, "%d", &p)
+		pp := core.Priority(p).Clamp()
+		m.priParam = &pp
+		m.setActiveView(core.ViewPriority)
+		return m.loadTasksCmd()
+	}
+
+	return func() tea.Msg { return errMsg{Err: errors.New("unknown command")} }
+}
+
+func (m *Model) listenPluginsCmd() tea.Cmd {
+	return func() tea.Msg {
+		<-m.plugCh
+		return pluginChangedMsg{}
+	}
+}
+
+func (m *Model) syncIfEnabledCmd() tea.Cmd {
+	if m.syncEngine == nil || !m.syncEngine.Enabled() {
+		return nil
+	}
+	return m.syncNowCmd()
+}
+
+func (m *Model) syncNowCmd() tea.Cmd {
+	if m.syncEngine == nil || !m.syncEngine.Enabled() {
+		return func() tea.Msg { return errMsg{Err: errors.New("sync not configured")} }
+	}
+	return func() tea.Msg {
+		err := m.syncEngine.SyncNow(m.ctx)
+		return syncDoneMsg{Err: err}
+	}
+}
+
+func keymapMatch(b interface{ Keys() []string }, k tea.KeyMsg) bool {
+	for _, kk := range b.Keys() {
+		if kk == k.String() {
+			return true
+		}
+	}
+	return false
+}

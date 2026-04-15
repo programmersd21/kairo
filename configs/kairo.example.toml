@@ -1,0 +1,46 @@
+[app]
+theme = "midnight"
+vim_mode = false
+show_help = true
+
+[theme]
+# Any field set here overrides the built-in theme colors.
+# bg = "#0B0F14"
+# fg = "#E6EAF2"
+# muted = "#9AA4B2"
+# border = "#1D2733"
+# accent = "#7AA2F7"
+# good = "#9ECE6A"
+# warn = "#E0AF68"
+# bad = "#F7768E"
+# overlay = "#101722"
+
+[storage]
+path = "" # empty = default app data dir
+
+[sync]
+enabled = false
+repo_path = ""   # folder containing a git repo (or where it will be initialized)
+remote = "origin"
+branch = "main"
+strategy = "ours" # ours|theirs
+auto_push = true
+
+[plugins]
+enabled = true
+dir = "" # empty = default plugins dir
+
+[keymap]
+palette = "ctrl+p"
+new_task = "n"
+edit_task = "e"
+delete_task = "d"
+open_task = "enter"
+back = "esc"
+quit = "q"
+view_inbox = "1"
+view_today = "2"
+view_upcoming = "3"
+view_tag = "4"
+view_priority = "5"
+cycle_theme = "t"
