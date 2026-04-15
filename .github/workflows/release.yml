@@ -4,9 +4,7 @@ on:
   push:
     paths:
       - 'VERSION.txt'
-    branches:
-      - main
-      - master
+  workflow_dispatch:
 
 permissions:
   contents: write
