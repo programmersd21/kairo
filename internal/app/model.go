@@ -713,9 +713,9 @@ func (m *Model) renderFooter() string {
 		style := m.s.Muted
 		if m.isErr {
 			icon = styles.IconError
-			style = lipgloss.NewStyle().Foreground(m.s.Theme.Bad).Bold(true)
+			style = m.s.Muted.Foreground(m.s.Theme.Bad).Bold(true)
 		} else {
-			style = lipgloss.NewStyle().Foreground(m.s.Theme.Good).Bold(true)
+			style = m.s.Muted.Foreground(m.s.Theme.Good).Bold(true)
 		}
 		right = style.Render(icon+" ") + m.s.Muted.Render(m.statusText) + " "
 	} else {

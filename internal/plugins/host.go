@@ -197,7 +197,7 @@ func (h *Host) RunCommand(ctx context.Context, fullID string) error {
 		return errors.New("plugin has no commands")
 	}
 
-	var run lua.LValue = lua.LNil
+	run := lua.LNil
 	ctbl.ForEach(func(_ lua.LValue, v lua.LValue) {
 		if run.Type() == lua.LTFunction {
 			return

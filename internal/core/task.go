@@ -101,7 +101,6 @@ func (t Task) Validate() error {
 	if !t.Status.Valid() {
 		return errors.New("invalid status")
 	}
-	t.Priority = t.Priority.Clamp()
 	return nil
 }
 

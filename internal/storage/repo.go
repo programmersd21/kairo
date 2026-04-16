@@ -161,7 +161,11 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 	var tasks []core.Task
 	for rows.Next() {
 		var (
@@ -212,7 +216,11 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 			ORDER BY g.name ASC
 		`, idSet...)
 		if err == nil {
-			defer tagRows.Close()
+	defer func() {
+		if err := tagRows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 			tagsByID := map[string][]string{}
 			for tagRows.Next() {
 				var taskID, name string
@@ -235,7 +243,11 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 	if err != nil {
 		return tasks, nil, nil
 	}
-	defer tRows.Close()
+	defer func() {
+		if err := tRows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 	var tomb []Tombstone
 	for tRows.Next() {
 		var id string
@@ -309,9 +321,6 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 		where = append(where, "t.deadline_ms IS NOT NULL AND t.deadline_ms < ?")
 		args = append(args, opt.Filter.To.UTC().UnixMilli())
 	}
-	if opt.Filter.IncludeNilDeadline && opt.Filter.From == nil && opt.Filter.To == nil {
-		// no deadline constraints; include nil by default.
-	}
 	if opt.Filter.Tag != "" {
 		where = append(where, "EXISTS (SELECT 1 FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id AND g.name=?)")
 		args = append(args, core.NormalizeTag(opt.Filter.Tag))
@@ -352,7 +361,11 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 
 	out := []core.Task{}
 	for rows.Next() {
@@ -408,7 +421,11 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	if err != nil {
 		return out, nil
 	}
-	defer tagRows.Close()
+	defer func() {
+		if err := tagRows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 
 	tagsByID := map[string][]string{}
 	for tagRows.Next() {
@@ -429,7 +446,11 @@ func (r *Repository) ListTags(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 	var out []string
 	for rows.Next() {
 		var n string
@@ -451,7 +472,11 @@ func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 	var out []core.Task
 	for rows.Next() {
 		var (
@@ -505,7 +530,11 @@ func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	if err != nil {
 		return out, nil
 	}
-	defer tagRows.Close()
+	defer func() {
+		if err := tagRows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 	tagsByID := map[string][]string{}
 	for tagRows.Next() {
 		var taskID, name string
@@ -590,7 +619,11 @@ func (r *Repository) taskTags(ctx context.Context, id string) ([]string, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Log or handle error appropriately
+		}
+	}()
 	var out []string
 	for rows.Next() {
 		var n string

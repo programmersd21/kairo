@@ -16,7 +16,11 @@ func TestCreateListUpdateDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
+	defer func() {
+		if err := r.Close(); err != nil {
+			t.Errorf("failed to close repository: %v", err)
+		}
+	}()
 
 	created, err := r.CreateTask(ctx, core.Task{
 		Title:       "Ship v1",
@@ -72,7 +76,11 @@ func TestUpsertAndTombstone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
+	defer func() {
+		if err := r.Close(); err != nil {
+			t.Errorf("failed to close repository: %v", err)
+		}
+	}()
 
 	now := time.Now().UTC()
 	id, _ := core.NewID(now)

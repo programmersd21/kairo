@@ -193,13 +193,13 @@ func (m Model) View() string {
 
 	// Input fields with labels
 	fields := []string{
-		m.renderField("TITLE", m.title.View(), 0 == m.focus),
-		m.renderField("TAGS", m.tags.View(), 1 == m.focus),
+		m.renderField("TITLE", m.title.View(), m.focus == 0),
+		m.renderField("TAGS", m.tags.View(), m.focus == 1),
 		lipgloss.JoinHorizontal(lipgloss.Left,
-			m.renderField("PRIORITY", m.priority.View(), 2 == m.focus),
-			m.renderField("STATUS", m.status.View(), 4 == m.focus),
+			m.renderField("PRIORITY", m.priority.View(), m.focus == 2),
+			m.renderField("STATUS", m.status.View(), m.focus == 4),
 		),
-		m.renderField("DUE", m.deadline.View(), 3 == m.focus),
+		m.renderField("DUE", m.deadline.View(), m.focus == 3),
 	}
 
 	if m.deadlineErr != "" {
