@@ -31,9 +31,16 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Skip if tag already exists (safe for re-runs and workflow_dispatch)
           if git rev-parse "${{ env.VERSION }}" >/dev/null 2>&1; then
-            echo "Tag ${{ env.VERSION }} already exists, skipping."
+            TAGGED_COMMIT=$(git rev-list -n 1 "${{ env.VERSION }}")
+            CURRENT_COMMIT=$(git rev-parse HEAD)
+            if [ "$TAGGED_COMMIT" != "$CURRENT_COMMIT" ]; then
+              echo "Tag exists but points to wrong commit. Force-updating..."
+              git tag -f ${{ env.VERSION }}
+              git push origin ${{ env.VERSION }} --force
+            else
+              echo "Tag ${{ env.VERSION }} already points to HEAD, skipping."
+            fi
           else
             git tag ${{ env.VERSION }}
             git push origin ${{ env.VERSION }}
