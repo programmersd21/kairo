@@ -1,37 +1,66 @@
-# Binaries for programs and plugins
+# =========================
+# 🔧 Build artifacts (Go)
+# =========================
+
+# Root binaries only (avoid nuking cmd/kairo)
+/kairo
+/kairo.exe
+
+# Generic binaries
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Test binary, built with `go test -c`
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Preferred build output dir (use this going forward)
+bin/
+dist/
 
-# Go workspace file
+# =========================
+# 📦 Go workspace / deps
+# =========================
+
 go.work
+# vendor/   # uncomment if NOT committing vendor
 
-# IDEs
+# =========================
+# 🧠 IDE / Editor junk
+# =========================
+
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS generated files
+# =========================
+# 🖥 OS junk
+# =========================
+
 .DS_Store
 Thumbs.db
 
-# Kairo specific
-kairo
+# =========================
+# 🗄 Kairo runtime data
+# =========================
+
+# DB files
 kairo.db
 kairo.db-wal
 kairo.db-shm
+
+# Runtime dirs
 logs/
 data/
+
+# Local config (user-specific)
 config.toml
+
+# =========================
+# 🔐 Optional (future-proof)
+# =========================
+
+.env
+.env.*
