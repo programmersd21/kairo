@@ -525,53 +525,29 @@ func (m *Model) View() string {
 	}
 
 	var content string
-	isOverlay := false
 
 	switch m.mode {
 	case ModePalette:
 		content = m.pal.View()
-		isOverlay = true
 	case ModeEditor:
 		if m.edit != nil {
 			content = m.edit.View()
-			isOverlay = true
 		} else {
 			content = m.renderMainUI()
 		}
 	case ModeHelp:
 		content = m.hlp.View()
-		isOverlay = true
 	case ModeThemeMenu:
 		content = m.tm.View()
-		isOverlay = true
 	case ModePluginMenu:
 		content = m.pm.View()
-		isOverlay = true
 	default:
 		content = m.renderMainUI()
 	}
 
-	if isOverlay {
-		content = lipgloss.Place(
-			m.width, m.height,
-			lipgloss.Center, lipgloss.Center,
-			content,
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
-		)
-	} else {
-		// Ensure the returned view always covers the full terminal surface so
-		// "empty" areas still receive the app background color.
-		content = lipgloss.Place(
-			m.width, m.height,
-			lipgloss.Left, lipgloss.Top,
-			content,
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
-		)
-	}
-
 	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
 		Background(m.s.Theme.Bg).
 		Render(content)
 }
