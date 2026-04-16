@@ -55,6 +55,8 @@ Kairo is built with a modular architecture designed for performance, extensibili
 kairo/
 ├── CHANGELOG.md
 ├── cmd
+│   └── kairo
+│       └── main.go
 ├── CODE_OF_CONDUCT.md
 ├── configs
 │   └── kairo.example.toml
@@ -122,6 +124,11 @@ kairo/
 ├── plugins
 │   └── sample.lua
 ├── README.md
+├── screenshots
+│   ├── app.png
+│   ├── help_menu.png
+│   ├── task_desc.png
+│   └── theme_menu.png
 ├── SECURITY.md
 └── VERSION.txt
 ```
