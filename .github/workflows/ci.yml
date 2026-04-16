@@ -13,31 +13,25 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - uses: actions/setup-go@v5
       with:
-        go-version-file: 'go.mod'
+        go-version-file: go.mod
         cache: true
 
-    - name: Build
-      run: go build ./...
-
-    - name: Test
-      run: go test -v ./...
+    - run: go build ./...
+    - run: go test -v ./...
 
   lint:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - uses: actions/setup-go@v5
       with:
-        go-version-file: 'go.mod'
+        go-version-file: go.mod
         cache: true
 
-    - name: Lint
-      uses: golangci/golangci-lint-action@v7   # ← was v6
+    - uses: golangci/golangci-lint-action@v7
       with:
-        version: v2.8.0
+        version: v2.10.0
         
