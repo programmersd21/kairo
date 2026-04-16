@@ -62,5 +62,6 @@ config.toml
 # 🔐 Optional (future-proof)
 # =========================
 
+*.zip
 .env
 .env.*
