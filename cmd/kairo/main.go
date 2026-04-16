@@ -35,7 +35,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "kairo: storage:", err)
 		os.Exit(2)
 	}
-	defer repo.Close()
+	defer func() {
+		if err := repo.Close(); err != nil {
+			fmt.Fprintln(os.Stderr, "kairo: failed to close storage:", err)
+		}
+	}()
 
 	if len(os.Args) > 1 {
 		switch strings.ToLower(os.Args[1]) {
