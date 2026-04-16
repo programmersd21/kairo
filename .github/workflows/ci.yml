@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -21,8 +22,9 @@ jobs:
       run: go mod download
 
     - name: Build
+      working-directory: .
       run: go build -v ./cmd/kairo
-
+      
     - name: Test
       run: go test -v ./...
 
