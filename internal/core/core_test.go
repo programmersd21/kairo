@@ -14,14 +14,14 @@ func TestDefaultViews(t *testing.T) {
 
 func TestFilter_ApplyToTask(t *testing.T) {
 	f := Filter{
-		Tag: "test",
+		Tag:      "test",
 		Priority: new(Priority),
 	}
 	*f.Priority = P0
-	
+
 	task := Task{Title: "Test Task"}
 	f.ApplyToTask(&task)
-	
+
 	if task.Priority != P0 {
 		t.Errorf("expected priority P0, got %v", task.Priority)
 	}

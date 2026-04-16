@@ -58,7 +58,7 @@ type Host struct {
 	lastErr  error
 
 	watcher *fsnotify.Watcher
-	
+
 	// For API feedback
 	notifyFunc func(string, bool)
 }
@@ -507,7 +507,7 @@ func taskToTable(L *lua.LState, t core.Task) *lua.LTable {
 	L.SetField(tbl, "description", lua.LString(t.Description))
 	L.SetField(tbl, "status", lua.LString(string(t.Status)))
 	L.SetField(tbl, "priority", lua.LNumber(t.Priority))
-	
+
 	tags := L.NewTable()
 	for _, tg := range t.Tags {
 		tags.Append(lua.LString(tg))

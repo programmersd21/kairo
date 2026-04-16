@@ -216,11 +216,11 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 			ORDER BY g.name ASC
 		`, idSet...)
 		if err == nil {
-	defer func() {
-		if err := tagRows.Close(); err != nil {
-			_ = err // Suppress linter warning
-		}
-	}()
+			defer func() {
+				if err := tagRows.Close(); err != nil {
+					_ = err // Suppress linter warning
+				}
+			}()
 			tagsByID := map[string][]string{}
 			for tagRows.Next() {
 				var taskID, name string

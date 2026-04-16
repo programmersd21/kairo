@@ -111,8 +111,8 @@ func (m Model) renderMeta() string {
 	}
 
 	if m.task.Deadline != nil {
-		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left, 
-			m.styles.DetailKey.Render("Deadline"), 
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left,
+			m.styles.DetailKey.Render("Deadline"),
 			m.styles.DetailValue.Render(styles.IconDeadline+m.task.Deadline.Local().Format("Mon, Jan 02 15:04"))))
 	}
 
@@ -121,13 +121,13 @@ func (m Model) renderMeta() string {
 		for _, t := range m.task.Tags {
 			tagStr += styles.IconTag + t + " "
 		}
-		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left, 
-			m.styles.DetailKey.Render("Tags"), 
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left,
+			m.styles.DetailKey.Render("Tags"),
 			m.styles.DetailValue.Render(tagStr)))
 	}
 
-	rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left, 
-		m.styles.DetailKey.Render("Updated"), 
+	rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left,
+		m.styles.DetailKey.Render("Updated"),
 		m.styles.DetailValue.Render(humanTime(m.task.UpdatedAt, time.Now()))))
 
 	return lipgloss.JoinVertical(lipgloss.Left, rows...)

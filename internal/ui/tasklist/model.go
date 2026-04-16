@@ -53,14 +53,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch x.String() {
 		case "up", "k":
-			if (x.String() == "k" && !m.vimMode) {
+			if x.String() == "k" && !m.vimMode {
 				break
 			}
 			if m.sel > 0 {
 				m.sel--
 			}
 		case "down", "j":
-			if (x.String() == "j" && !m.vimMode) {
+			if x.String() == "j" && !m.vimMode {
 				break
 			}
 			if m.sel < len(m.tasks)-1 {
@@ -125,12 +125,12 @@ func (m Model) renderEmpty() string {
 	icon := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Accent).
 		Render(styles.IconTask)
-	
+
 	msg := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Fg).
 		Bold(true).
 		Render("No tasks here yet.")
-	
+
 	hint := m.styles.Muted.Render("Press 'n' to create your first task and stay productive.")
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
@@ -170,7 +170,7 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	left := lipgloss.JoinHorizontal(lipgloss.Left, indicator, status, " ", pri, " ", title)
 
 	rightParts := []string{}
-	
+
 	// Deadline
 	if t.Deadline != nil {
 		deadText := humanDeadline(*t.Deadline, time.Now())
@@ -198,7 +198,7 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	}
 
 	line := left + strings.Repeat(" ", space) + right
-	
+
 	rowStyle := lipgloss.NewStyle().Width(m.width).Padding(0, 1)
 	if selected {
 		rowStyle = rowStyle.Background(m.styles.Theme.Overlay)
