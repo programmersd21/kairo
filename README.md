@@ -48,8 +48,7 @@ Kairo is built with a modular architecture designed for performance, extensibili
 3.  **Synchronization:** If enabled, the Sync Engine periodically (or on-demand) exports database state to the Git-backed task files and performs `git pull/push` operations.
 4.  **Extensibility:** Lua plugins can hook into the task creation/deletion lifecycle and inject new items into the command palette.
 
-## 🚀 Installation
-
+## 🗼 Architecture
 
 ```bash
 kairo/
