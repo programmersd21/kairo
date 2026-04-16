@@ -37,7 +37,7 @@ jobs:
         cache: true
 
     - name: Lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v7   # ← was v6
       with:
-        version: v2.8.0   # ← first v2 release with Go 1.26 support
+        version: v2.8.0
         

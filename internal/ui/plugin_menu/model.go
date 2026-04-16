@@ -13,6 +13,8 @@ type UninstallMsg struct{ ID string }
 type OpenFolderMsg struct{}
 type ReloadMsg struct{}
 
+type UninstallConfirmMsg struct{ ID string }
+
 type Model struct {
 	styles  styles.Styles
 	width   int
@@ -60,7 +62,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case "x": // Uninstall key
 			if m.sel >= 0 && m.sel < len(m.plugins) {
 				id := m.plugins[m.sel].ID
-				return m, func() tea.Msg { return UninstallMsg{ID: id} }
+				return m, func() tea.Msg { return UninstallConfirmMsg{ID: id} }
 			}
 		}
 	}
