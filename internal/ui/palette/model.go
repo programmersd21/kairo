@@ -54,6 +54,10 @@ func (m *Model) SetIndex(idx *search.Index) {
 	m.refresh()
 }
 
+func (m *Model) SetPlaceholder(p string) {
+	m.input.Placeholder = p
+}
+
 func (m *Model) Open() tea.Cmd {
 	m.input.SetValue("")
 	m.input.CursorEnd()

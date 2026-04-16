@@ -10,6 +10,7 @@ import (
 
 type Keymap struct {
 	Palette    key.Binding
+	TaskSearch key.Binding
 	NewTask    key.Binding
 	EditTask   key.Binding
 	DeleteTask key.Binding
@@ -23,13 +24,16 @@ type Keymap struct {
 	ViewTag      key.Binding
 	ViewPriority key.Binding
 
-	CycleTheme key.Binding
-	Help       key.Binding
+	CycleTheme    key.Binding
+	OpenPluginDir key.Binding
+	ManagePlugins key.Binding
+	Help          key.Binding
 }
 
 func FromConfig(c config.KeymapConfig) Keymap {
 	return Keymap{
 		Palette:    bind(c.Palette, "palette", "command palette"),
+		TaskSearch: bind(c.TaskSearch, "search", "search tasks"),
 		NewTask:    bind(c.NewTask, "new", "new task"),
 		EditTask:   bind(c.EditTask, "edit", "edit task"),
 		DeleteTask: bind(c.DeleteTask, "delete", "delete task"),
@@ -43,8 +47,10 @@ func FromConfig(c config.KeymapConfig) Keymap {
 		ViewTag:      bind(c.ViewTag, "tag", "tag view"),
 		ViewPriority: bind(c.ViewPriority, "priority", "priority view"),
 
-		CycleTheme: bind(c.CycleTheme, "theme", "theme menu"),
-		Help:       bind(c.Help, "help", "show help"),
+		CycleTheme:    bind(c.CycleTheme, "theme", "theme menu"),
+		OpenPluginDir: bind(c.OpenPluginDir, "plugins-dir", "open plugins folder"),
+		ManagePlugins: bind(c.ManagePlugins, "manage-plugins", "manage plugins"),
+		Help:          bind(c.Help, "help", "show help"),
 	}
 }
 

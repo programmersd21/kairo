@@ -60,6 +60,7 @@ type PluginsConfig struct {
 
 type KeymapConfig struct {
 	Palette    string `toml:"palette"`
+	TaskSearch string `toml:"task_search"`
 	NewTask    string `toml:"new_task"`
 	EditTask   string `toml:"edit_task"`
 	DeleteTask string `toml:"delete_task"`
@@ -67,27 +68,41 @@ type KeymapConfig struct {
 	Back       string `toml:"back"`
 	Quit       string `toml:"quit"`
 
-	ViewInbox    string `toml:"view_inbox"`
-	ViewToday    string `toml:"view_today"`
-	ViewUpcoming string `toml:"view_upcoming"`
-	ViewTag      string `toml:"view_tag"`
-	ViewPriority string `toml:"view_priority"`
-	CycleTheme   string `toml:"cycle_theme"`
-	Help         string `toml:"help"`
+	ViewInbox     string `toml:"view_inbox"`
+	ViewToday     string `toml:"view_today"`
+	ViewUpcoming  string `toml:"view_upcoming"`
+	ViewTag       string `toml:"view_tag"`
+	ViewPriority  string `toml:"view_priority"`
+	CycleTheme    string `toml:"cycle_theme"`
+	OpenPluginDir string `toml:"open_plugin_dir"`
+	ManagePlugins string `toml:"manage_plugins"`
+	Help          string `toml:"help"`
 }
 
 func Default() Config {
 	return Config{
 		App: AppConfig{
-			Theme:    "midnight",
+			Theme:    "catppuccin",
 			VimMode:  false,
 			ShowHelp: true,
 		},
-		Theme:   ThemeConfig{},
-		Storage: StorageConfig{Path: ""},
+		Theme: ThemeConfig{
+			Bg:      "", // Use theme default
+			Fg:      "",
+			Muted:   "",
+			Border:  "",
+			Accent:  "",
+			Good:    "",
+			Warn:    "",
+			Bad:     "",
+			Overlay: "",
+		},
+		Storage: StorageConfig{
+			Path: "kairo.db",
+		},
 		Sync: SyncConfig{
 			Enabled:  false,
-			RepoPath: "",
+			RepoPath: "tasks-sync",
 			Remote:   "origin",
 			Branch:   "main",
 			Strategy: "ours",
@@ -95,23 +110,26 @@ func Default() Config {
 		},
 		Plugins: PluginsConfig{
 			Enabled: true,
-			Dir:     "",
+			Dir:     "plugins",
 		},
 		Keymap: KeymapConfig{
-			Palette:      "ctrl+p",
-			NewTask:      "n",
-			EditTask:     "e",
-			DeleteTask:   "d",
-			OpenTask:     "enter",
-			Back:         "esc",
-			Quit:         "q",
-			ViewInbox:    "1",
-			ViewToday:    "2",
-			ViewUpcoming: "3",
-			ViewTag:      "4",
-			ViewPriority: "5",
-			CycleTheme:   "t",
-			Help:         "?",
+			Palette:       "ctrl+p",
+			TaskSearch:    "/",
+			NewTask:       "n",
+			EditTask:      "e",
+			DeleteTask:    "d",
+			OpenTask:      "enter",
+			Back:          "esc",
+			Quit:          "q",
+			ViewInbox:     "1",
+			ViewToday:     "2",
+			ViewUpcoming:  "3",
+			ViewTag:       "4",
+			ViewPriority:  "5",
+			CycleTheme:    "t",
+			OpenPluginDir: "ctrl+g",
+			ManagePlugins: "p",
+			Help:          "?",
 		},
 	}
 }
@@ -147,10 +165,43 @@ func Load() (Config, error) {
 		return cfg, err
 	}
 
+	appDir, _ := util.AppDataDir(appName)
+
+	// Helper to resolve relative to app data dir
+	resolve := func(p *string) {
+		if *p != "" && !filepath.IsAbs(*p) {
+			*p = filepath.Join(appDir, *p)
+		}
+	}
+
+	resolve(&cfg.Storage.Path)
+	resolve(&cfg.Sync.RepoPath)
+	resolve(&cfg.Plugins.Dir)
+
+	if cfg.Storage.Path == "" {
+		cfg.Storage.Path = filepath.Join(appDir, "kairo.db")
+	}
+	if cfg.Plugins.Dir == "" {
+		cfg.Plugins.Dir = filepath.Join(appDir, "plugins")
+	}
+
 	cfg.App.Theme = strings.TrimSpace(cfg.App.Theme)
 	cfg.Sync.Strategy = strings.ToLower(strings.TrimSpace(cfg.Sync.Strategy))
 	if cfg.Sync.Strategy == "" {
 		cfg.Sync.Strategy = "ours"
+	}
+
+	// Keymap migrations.
+	migrated := false
+	switch strings.ToLower(strings.TrimSpace(cfg.Keymap.ManagePlugins)) {
+	case "ctrl+alt+g", "alt+ctrl+g":
+		// Legacy default; plugin manager is now bound to "p".
+		cfg.Keymap.ManagePlugins = "p"
+		migrated = true
+	}
+	if migrated {
+		// Best-effort: keep the on-disk config in sync with new defaults.
+		_ = cfg.Save()
 	}
 	return cfg, nil
 }

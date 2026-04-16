@@ -325,14 +325,26 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	if limit <= 0 {
 		limit = 500
 	}
+
+	orderBy := ""
+	switch opt.Filter.Sort {
+	case core.SortDeadline:
+		orderBy = "CASE WHEN t.deadline_ms IS NULL THEN 1 ELSE 0 END, t.deadline_ms ASC, t.priority ASC"
+	case core.SortPriority:
+		orderBy = "t.priority ASC, CASE WHEN t.deadline_ms IS NULL THEN 1 ELSE 0 END, t.deadline_ms ASC"
+	case core.SortCreated:
+		orderBy = "t.created_at_ms DESC"
+	case core.SortUpdated:
+		orderBy = "t.updated_at_ms DESC"
+	default:
+		orderBy = "CASE WHEN t.deadline_ms IS NULL THEN 1 ELSE 0 END, t.deadline_ms ASC, t.updated_at_ms DESC"
+	}
+
 	query := `
 		SELECT t.id, t.title, t.description, t.priority, t.deadline_ms, t.status, t.created_at_ms, t.updated_at_ms
 		FROM tasks t
 		WHERE ` + strings.Join(where, " AND ") + `
-		ORDER BY
-			CASE WHEN t.deadline_ms IS NULL THEN 1 ELSE 0 END,
-			t.deadline_ms ASC,
-			t.updated_at_ms DESC
+		ORDER BY ` + orderBy + `
 		LIMIT ?`
 	args = append(args, limit)
 

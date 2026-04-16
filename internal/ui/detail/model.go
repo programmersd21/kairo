@@ -49,13 +49,14 @@ func (m *Model) resetRenderer() {
 	if m.width <= 0 {
 		return
 	}
+	// Glamour styles
 	style := "dark"
-	if m.styles.Theme.Name == "paper" {
+	if m.styles.Theme.IsLight {
 		style = "light"
 	}
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStandardStyle(style),
-		glamour.WithWordWrap(m.width-4),
+		glamour.WithWordWrap(m.width-8), // More padding
 	)
 	if err == nil {
 		m.renderer = r
@@ -71,50 +72,65 @@ func (m *Model) View() string {
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(m.styles.Theme.Accent).
-		Background(m.styles.Theme.Bg).
-		BorderBottom(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(m.styles.Theme.Border).
-		Width(m.width - 4).
-		Render(m.task.Title)
+		Padding(0, 1).
+		Render(styles.IconTask + m.task.Title)
 
 	meta := m.renderMeta()
 
+	descriptionHeader := lipgloss.NewStyle().
+		Foreground(m.styles.Theme.Muted).
+		Bold(true).
+		Padding(1, 0, 0, 1).
+		Render("DESCRIPTION")
+
 	body := m.renderMarkdown(m.task.Description)
 	if strings.TrimSpace(body) == "" {
-		body = m.styles.Muted.Render("No description.")
+		body = "  " + m.styles.Muted.Render("No description provided.")
 	}
 
-	content := lipgloss.JoinVertical(lipgloss.Left, title, "", meta, "", body)
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		"\n",
+		meta,
+		"\n",
+		descriptionHeader,
+		body,
+	)
 
-	box := lipgloss.NewStyle().
+	return lipgloss.NewStyle().
 		Width(m.width).
 		Height(m.height).
-		Background(m.styles.Theme.Bg).
 		Padding(1, 2).
 		Render(content)
-	return box
 }
 
 func (m Model) renderMeta() string {
-	parts := []string{
-		m.styles.StatusBadge(m.task.Status),
-		" ",
-		m.styles.PriorityBadge(m.task.Priority),
+	rows := []string{
+		lipgloss.JoinHorizontal(lipgloss.Left, m.styles.DetailKey.Render("Status"), m.styles.StatusBadge(m.task.Status)),
+		lipgloss.JoinHorizontal(lipgloss.Left, m.styles.DetailKey.Render("Priority"), m.styles.PriorityBadge(m.task.Priority)),
 	}
 
-	metaStyle := m.styles.Muted.PaddingLeft(2)
-
 	if m.task.Deadline != nil {
-		parts = append(parts, metaStyle.Render("Due "+m.task.Deadline.Local().Format("Mon Jan 2 15:04")))
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left, 
+			m.styles.DetailKey.Render("Deadline"), 
+			m.styles.DetailValue.Render(styles.IconDeadline+m.task.Deadline.Local().Format("Mon, Jan 02 15:04"))))
 	}
 
 	if len(m.task.Tags) > 0 {
-		parts = append(parts, metaStyle.Render("#"+strings.Join(m.task.Tags, " #")))
+		tagStr := ""
+		for _, t := range m.task.Tags {
+			tagStr += styles.IconTag + t + " "
+		}
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left, 
+			m.styles.DetailKey.Render("Tags"), 
+			m.styles.DetailValue.Render(tagStr)))
 	}
 
-	parts = append(parts, metaStyle.Render("Updated "+humanTime(m.task.UpdatedAt, time.Now())))
-	return lipgloss.JoinHorizontal(lipgloss.Center, parts...)
+	rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left, 
+		m.styles.DetailKey.Render("Updated"), 
+		m.styles.DetailValue.Render(humanTime(m.task.UpdatedAt, time.Now()))))
+
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
 
 func (m *Model) renderMarkdown(src string) string {

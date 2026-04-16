@@ -60,7 +60,7 @@ func (m Model) View() string {
 		{
 			"Navigation",
 			[]struct{ key, desc string }{
-				{"1-5", "Switch views (Inbox, Today, etc.)"},
+				{"1-5, Tab", "Switch views (Inbox, Today, etc.)"},
 				{"j/k, ↑/↓", "Move selection"},
 				{"enter", "Open task details"},
 				{"esc", "Back / Close"},
@@ -72,13 +72,17 @@ func (m Model) View() string {
 				{"n", "New task"},
 				{"e", "Edit task"},
 				{"d", "Delete task"},
+				{"g", "Reload plugins"},
 			},
 		},
 		{
 			"App",
 			[]struct{ key, desc string }{
 				{"ctrl+p", "Command palette"},
+				{"/", "Search tasks"},
 				{"t", "Theme menu"},
+				{"ctrl+g", "Open plugins folder"},
+				{"p", "Manage plugins"},
 				{"?", "Show help"},
 				{"q", "Quit"},
 			},

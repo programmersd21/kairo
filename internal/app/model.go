@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -23,6 +25,7 @@ import (
 	"github.com/programmersd21/kairo/internal/ui/help"
 	"github.com/programmersd21/kairo/internal/ui/keymap"
 	"github.com/programmersd21/kairo/internal/ui/palette"
+	"github.com/programmersd21/kairo/internal/ui/plugin_menu"
 	"github.com/programmersd21/kairo/internal/ui/styles"
 	"github.com/programmersd21/kairo/internal/ui/tasklist"
 	"github.com/programmersd21/kairo/internal/ui/theme"
@@ -40,6 +43,7 @@ const (
 	ModeConfirmDelete
 	ModeHelp
 	ModeThemeMenu
+	ModePluginMenu
 )
 
 type Model struct {
@@ -67,12 +71,18 @@ type Model struct {
 	edit *editor.Model
 	hlp  help.Model
 	tm   theme_menu.Model
+	pm   plugin_menu.Model
+
+	palFullIdx   *search.Index
+	palTasksIdx  *search.Index
+	palTasksOnly bool
 
 	tasks []core.Task
 	all   []core.Task
 	tags  []string
 
-	errText string
+	statusText string
+	isErr      bool
 
 	syncEngine *ksync.Engine
 
@@ -99,6 +109,7 @@ func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
 	m.tm = theme_menu.New(m.s)
+	m.pm = plugin_menu.New(m.s)
 
 	// Sync.
 	if cfg.Sync.Enabled && strings.TrimSpace(cfg.Sync.RepoPath) != "" {
@@ -117,6 +128,10 @@ func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.
 		if dir != "" {
 			_ = os.MkdirAll(dir, 0o755)
 			m.plugHost = plugins.New(repo, dir)
+			m.plugHost.SetNotifyFunc(func(msg string, isErr bool) {
+				m.statusText = msg
+				m.isErr = isErr
+			})
 			_ = m.plugHost.LoadAll()
 			m.plugCh = make(chan struct{}, 8)
 			_ = m.plugHost.Watch(ctx, func() {
@@ -165,18 +180,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch x := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = x.Width, x.Height
-		m.list.SetSize(m.width, m.height-4)
-		m.pal.SetSize(m.width, m.height)
-		m.det.SetSize(m.width, m.height-4)
-		m.hlp.SetSize(m.width, m.height)
-		m.tm.SetSize(m.width, m.height)
-		if m.edit != nil {
-			m.edit.SetSize(m.width, m.height)
-		}
+		m.rebuildComponentSizes()
 		return m, nil
 
 	case errMsg:
-		m.errText = x.Err.Error()
+		m.statusText = x.Err.Error()
+		m.isErr = true
 		return m, nil
 
 	case tasksLoadedMsg:
@@ -219,6 +228,50 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		_ = m.cfg.Save()
 		m.refreshStyles()
 		m.mode = ModeList
+		return m, nil
+
+	case plugin_menu.CloseMsg:
+		if m.mode == ModePluginMenu {
+			m.mode = ModeList
+		}
+		return m, nil
+
+	case plugin_menu.UninstallMsg:
+		if m.plugHost != nil {
+			err := m.plugHost.DeletePlugin(x.ID)
+			if err != nil {
+				m.statusText = err.Error()
+				m.isErr = true
+			} else {
+				m.statusText = "Plugin uninstalled"
+				m.isErr = false
+				m.pm.SetPlugins(m.plugHost.Plugins())
+			}
+			m.rebuildViews()
+			m.rebuildPaletteIndex()
+		}
+		return m, nil
+
+	case plugin_menu.OpenFolderMsg:
+		if m.plugHost != nil {
+			dir := m.cfg.Plugins.Dir
+			if dir == "" {
+				stateDir, _ := util.AppStateDir("kairo")
+				dir = filepath.Join(stateDir, "plugins")
+			}
+			return m, openFolderCmd(dir)
+		}
+		return m, nil
+
+	case plugin_menu.ReloadMsg:
+		if m.plugHost != nil {
+			_ = m.plugHost.LoadAll()
+			m.pm.SetPlugins(m.plugHost.Plugins())
+			m.rebuildViews()
+			m.rebuildPaletteIndex()
+			m.statusText = "Plugins reloaded"
+			m.isErr = false
+		}
 		return m, nil
 
 	case palette.SelectMsg:
@@ -283,7 +336,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case syncDoneMsg:
 		if x.Err != nil {
-			m.errText = x.Err.Error()
+			m.statusText = x.Err.Error()
+			m.isErr = true
 		}
 		return m, nil
 	}
@@ -294,6 +348,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if keymapMatch(m.km.Palette, km) && m.mode != ModeEditor {
+			m.palTasksOnly = false
+			m.applyPaletteIndex()
+			m.pal.SetPlaceholder("Search tasks, commands, tags…")
+			m.mode = ModePalette
+			return m, m.pal.Open()
+		}
+		if keymapMatch(m.km.TaskSearch, km) && (m.mode == ModeList || m.mode == ModeDetail) {
+			m.palTasksOnly = true
+			m.applyPaletteIndex()
+			m.pal.SetPlaceholder("Search tasks…")
 			m.mode = ModePalette
 			return m, m.pal.Open()
 		}
@@ -301,13 +365,59 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = ModeThemeMenu
 			return m, nil
 		}
+		if keymapMatch(m.km.ManagePlugins, km) && m.mode != ModeEditor {
+			if m.mode == ModePluginMenu {
+				m.mode = ModeList
+				return m, nil
+			}
+			if m.plugHost != nil {
+				m.pm.SetPlugins(m.plugHost.Plugins())
+				m.mode = ModePluginMenu
+			}
+			return m, nil
+		}
+		if keymapMatch(m.km.OpenPluginDir, km) && m.mode != ModeEditor {
+			if m.plugHost != nil {
+				dir := m.cfg.Plugins.Dir
+				if dir == "" {
+					stateDir, err := util.AppStateDir("kairo")
+					if err == nil {
+						dir = filepath.Join(stateDir, "plugins")
+					}
+				}
+				if dir != "" {
+					return m, openFolderCmd(dir)
+				}
+			}
+			return m, nil
+		}
 		if keymapMatch(m.km.Help, km) && m.mode != ModeEditor {
 			m.mode = ModeHelp
 			return m, nil
 		}
 
+		if km.String() == "g" && m.mode == ModeList {
+			if m.plugHost != nil {
+				_ = m.plugHost.LoadAll()
+				m.rebuildViews()
+				m.rebuildPaletteIndex()
+				m.statusText = "Plugins reloaded"
+				m.isErr = false
+				return m, m.loadTasksCmd()
+			}
+		}
+
 		if m.mode == ModeList {
 			switch {
+			case km.String() == "tab":
+				m.activeIdx = (m.activeIdx + 1) % len(m.views)
+				return m, m.loadTasksCmd()
+			case km.String() == "shift+tab":
+				m.activeIdx--
+				if m.activeIdx < 0 {
+					m.activeIdx = len(m.views) - 1
+				}
+				return m, m.loadTasksCmd()
 			case keymapMatch(m.km.ViewInbox, km):
 				m.setActiveView(core.ViewInbox)
 				return m, m.loadTasksCmd()
@@ -324,7 +434,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.setActiveView(core.ViewPriority)
 				return m, m.loadTasksCmd()
 			case keymapMatch(m.km.NewTask, km):
-				e := editor.New(m.s, editor.ModeNew, core.Task{Status: core.StatusTodo, Priority: core.P1})
+				task := core.Task{Status: core.StatusTodo, Priority: core.P1}
+				m.activeFilter().ApplyToTask(&task)
+				e := editor.New(m.s, editor.ModeNew, task)
 				e.SetSize(m.width, m.height)
 				m.edit = &e
 				m.mode = ModeEditor
@@ -389,7 +501,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case ModeDetail:
 		var cmd tea.Cmd
-		// detail doesn't have its own update yet, but we might add it later
 		return m, cmd
 	case ModeHelp:
 		var cmd tea.Cmd
@@ -398,6 +509,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ModeThemeMenu:
 		var cmd tea.Cmd
 		m.tm, cmd = m.tm.Update(msg)
+		return m, cmd
+	case ModePluginMenu:
+		var cmd tea.Cmd
+		m.pm, cmd = m.pm.Update(msg)
 		return m, cmd
 	default:
 		return m, nil
@@ -429,6 +544,9 @@ func (m *Model) View() string {
 	case ModeThemeMenu:
 		content = m.tm.View()
 		isOverlay = true
+	case ModePluginMenu:
+		content = m.pm.View()
+		isOverlay = true
 	default:
 		content = m.renderMainUI()
 	}
@@ -442,6 +560,8 @@ func (m *Model) View() string {
 			lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
 		)
 	} else {
+		// Ensure the returned view always covers the full terminal surface so
+		// "empty" areas still receive the app background color.
 		content = lipgloss.Place(
 			m.width, m.height,
 			lipgloss.Left, lipgloss.Top,
@@ -452,8 +572,6 @@ func (m *Model) View() string {
 	}
 
 	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
 		Background(m.s.Theme.Bg).
 		Render(content)
 }
@@ -462,7 +580,9 @@ func (m *Model) renderMainUI() string {
 	head := m.renderHeader()
 	foot := m.renderFooter()
 
-	availableHeight := m.height - lipgloss.Height(head) - lipgloss.Height(foot)
+	hHeight := lipgloss.Height(head)
+	fHeight := lipgloss.Height(foot)
+	availableHeight := m.height - hHeight - fHeight
 	if availableHeight < 0 {
 		availableHeight = 0
 	}
@@ -484,49 +604,88 @@ func (m *Model) renderMainUI() string {
 		Render(body)
 
 	main := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+	return main
+}
 
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Background(m.s.Theme.Bg).
-		Render(main)
+func (m *Model) rebuildComponentSizes() {
+	// Calculate header height dynamically
+	head := m.renderHeader()
+	foot := m.renderFooter()
+	hHeight := lipgloss.Height(head)
+	fHeight := lipgloss.Height(foot)
+
+	avail := m.height - hHeight - fHeight
+	if avail < 0 {
+		avail = 0
+	}
+
+	m.list.SetSize(m.width, avail)
+	m.det.SetSize(m.width, avail)
+	m.pal.SetSize(m.width, m.height)
+	m.pm.SetSize(m.width, m.height)
+	m.hlp.SetSize(m.width, m.height)
+	m.tm.SetSize(m.width, m.height)
+	if m.edit != nil {
+		m.edit.SetSize(m.width, m.height)
+	}
 }
 
 func (m *Model) renderHeader() string {
-	v := m.views[m.activeIdx]
-
-	title := lipgloss.NewStyle().
+	// Top Bar: Logo and Tabs
+	logo := lipgloss.NewStyle().
+		Background(m.s.Theme.Accent).
+		Foreground(m.s.Theme.Bg).
 		Bold(true).
-		Foreground(m.s.Theme.Accent).
+		Padding(0, 1).
 		Render(" KAIRO ")
 
-	viewTitle := lipgloss.NewStyle().
-		Foreground(m.s.Theme.Fg).
-		Bold(true).
-		Render(" " + v.Title + " ")
-
-	switch v.ID {
-	case core.ViewTag:
-		if m.tagParam != "" {
-			viewTitle += m.s.Muted.Render(" #" + m.tagParam)
+	tabs := []string{}
+	for i, v := range m.views {
+		style := m.s.TabInactive
+		if i == m.activeIdx {
+			style = m.s.TabActive
 		}
-	case core.ViewPriority:
-		if m.priParam != nil {
-			viewTitle += m.s.Muted.Render(fmt.Sprintf(" P%d", int((*m.priParam).Clamp())))
-		}
+		tabs = append(tabs, style.Render(v.Title))
 	}
+	tabRow := lipgloss.JoinHorizontal(lipgloss.Left, tabs...)
 
-	right := m.s.Muted.Render(fmt.Sprintf("%d tasks ", len(m.tasks)))
+	topBarLeft := lipgloss.JoinHorizontal(lipgloss.Left, logo, " ", tabRow)
 
-	left := lipgloss.JoinHorizontal(lipgloss.Left, title, viewTitle)
+	count := fmt.Sprintf(" %d tasks ", len(m.tasks))
+	topBarRight := m.s.Muted.Render(count)
 
-	sp := m.width - 2 - lipgloss.Width(left) - lipgloss.Width(right)
+	sp := m.width - lipgloss.Width(topBarLeft) - lipgloss.Width(topBarRight)
 	if sp < 0 {
 		sp = 0
 	}
+	topBar := topBarLeft + strings.Repeat(" ", sp) + topBarRight
 
-	line := left + strings.Repeat(" ", sp) + right
-	return m.s.Header.Render(line)
+	// Bottom Bar of Header: View Details (Tags/Priority)
+	detailLine := ""
+	v := m.views[m.activeIdx]
+	if v.ID == core.ViewTag && m.tagParam != "" {
+		detailLine = "  " + m.s.Muted.Render(styles.IconTag) + m.s.Title.Render(m.tagParam)
+	} else if v.ID == core.ViewPriority && m.priParam != nil {
+		detailLine = "  " + m.s.Muted.Render("Priority: ") + m.s.PriorityBadge(*m.priParam)
+	}
+
+	header := topBar
+	if detailLine != "" {
+		// Fill detail line with spaces too
+		sp2 := m.width - lipgloss.Width(detailLine)
+		if sp2 > 0 {
+			detailLine += strings.Repeat(" ", sp2)
+		}
+		header = lipgloss.JoinVertical(lipgloss.Left, topBar, detailLine)
+	}
+
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Background(m.s.Theme.Bg).
+		BorderBottom(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(m.s.Theme.Border).
+		Render(header)
 }
 
 func (m *Model) renderFooter() string {
@@ -544,23 +703,43 @@ func (m *Model) renderFooter() string {
 		left = " " + m.s.Muted.Render("esc/q/? close")
 	case ModeThemeMenu:
 		left = " " + m.s.Muted.Render("enter select • esc/q/t close • ↑/↓ navigate")
+	case ModePluginMenu:
+		left = " " + m.s.Muted.Render("x uninstall • esc/q/p close • ↑/↓ navigate")
 	default:
-		left = " " + m.s.Muted.Render("ctrl+p palette • n new • e edit • d delete • ? help • 1-5 views")
+		left = " " + m.s.Muted.Render("ctrl+p palette • n new • g reload plugins • d delete • ? help • 1-5 views")
 	}
 
 	right := ""
-	if m.errText != "" {
-		right = lipgloss.NewStyle().Background(m.s.Theme.Bad).Foreground(m.s.Theme.Bg).Bold(true).Render(" ERROR ") + " " + m.s.Muted.Render(m.errText) + " "
+	if m.statusText != "" {
+		icon := styles.IconInfo
+		style := m.s.Muted
+		if m.isErr {
+			icon = styles.IconError
+			style = lipgloss.NewStyle().Foreground(m.s.Theme.Bad).Bold(true)
+		} else {
+			style = lipgloss.NewStyle().Foreground(m.s.Theme.Good).Bold(true)
+		}
+		right = style.Render(icon+" ") + m.s.Muted.Render(m.statusText) + " "
 	} else {
-		right = m.s.Muted.Render(" v1.0.0 ")
+		syncStatus := ""
+		if m.syncEngine != nil && m.syncEngine.Enabled() {
+			syncStatus = styles.IconSync + " "
+		}
+		right = m.s.Muted.Render(syncStatus + "v1.0.0 ")
 	}
 
-	sp := m.width - 2 - lipgloss.Width(left) - lipgloss.Width(right)
+	sp := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	if sp < 0 {
 		sp = 0
 	}
 	line := left + strings.Repeat(" ", sp) + right
-	return m.s.Footer.Render(line)
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Background(m.s.Theme.Bg).
+		BorderTop(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(m.s.Theme.Border).
+		Render(line)
 }
 
 func (m *Model) setActiveView(id core.ViewID) {
@@ -588,12 +767,16 @@ func (m *Model) rebuildViews() {
 func (m *Model) activeFilter() core.Filter {
 	v := m.views[m.activeIdx]
 	f := v.Filter
+
+	// Apply dynamic parameters if it's a built-in view that supports them
 	if v.ID == core.ViewTag && m.tagParam != "" {
 		f.Tag = m.tagParam
 	}
 	if v.ID == core.ViewPriority && m.priParam != nil {
 		f.Priority = m.priParam
 	}
+
+	// If it's a plugin-defined view, the filter is already set in rebuildViews
 	return f
 }
 
@@ -680,19 +863,14 @@ func (m *Model) fetchOpenEditCmd(id string) tea.Cmd {
 func (m *Model) refreshStyles() {
 	m.s = styles.New(m.theme)
 	m.list = tasklist.New(m.s, m.cfg.App.VimMode)
-	m.list.SetSize(m.width, m.height-4)
 	m.list.SetTasks(m.tasks)
 	m.pal = palette.New(m.s)
-	m.pal.SetSize(m.width, m.height)
 	m.det = detail.New(m.s)
-	m.det.SetSize(m.width, m.height-4)
 	m.hlp = help.New(m.s, m.km)
-	m.hlp.SetSize(m.width, m.height)
 	m.tm = theme_menu.New(m.s)
-	m.tm.SetSize(m.width, m.height)
-	if m.edit != nil {
-		m.edit.SetSize(m.width, m.height)
-	}
+	m.pm = plugin_menu.New(m.s)
+
+	m.rebuildComponentSizes()
 	m.rebuildPaletteIndex()
 }
 
@@ -735,10 +913,31 @@ func (m *Model) rebuildPaletteIndex() {
 		items = append(items, search.Item{ID: t.ID, Kind: search.KindTask, Title: t.Title, Desc: t.Description, Hint: hint})
 	}
 
-	idx := search.NewIndex(items)
-	m.pal.SetIndex(idx)
+	m.palFullIdx = search.NewIndex(items)
+
+	taskItems := make([]search.Item, 0, len(m.all))
+	for _, t := range m.all {
+		hint := string(t.Status)
+		if t.Deadline != nil {
+			hint += " • due " + t.Deadline.Local().Format("Jan 2")
+		}
+		taskItems = append(taskItems, search.Item{ID: t.ID, Kind: search.KindTask, Title: t.Title, Desc: t.Description, Hint: hint})
+	}
+	m.palTasksIdx = search.NewIndex(taskItems)
+	m.applyPaletteIndex()
 }
 
+func (m *Model) applyPaletteIndex() {
+	if m.palTasksOnly {
+		if m.palTasksIdx != nil {
+			m.pal.SetIndex(m.palTasksIdx)
+		}
+		return
+	}
+	if m.palFullIdx != nil {
+		m.pal.SetIndex(m.palFullIdx)
+	}
+}
 func (m *Model) runCommand(id string) tea.Cmd {
 	switch id {
 	case "cmd:new":
@@ -821,9 +1020,30 @@ func (m *Model) syncNowCmd() tea.Cmd {
 	}
 }
 
+func openFolderCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		var err error
+		switch runtime.GOOS {
+		case "windows":
+			err = exec.Command("explorer", path).Start()
+		case "darwin":
+			err = exec.Command("open", path).Start()
+		case "linux":
+			err = exec.Command("xdg-open", path).Start()
+		default:
+			err = fmt.Errorf("unsupported platform")
+		}
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return nil
+	}
+}
+
 func keymapMatch(b interface{ Keys() []string }, k tea.KeyMsg) bool {
+	kn := keymap.NormalizeChord(k.String())
 	for _, kk := range b.Keys() {
-		if kk == k.String() {
+		if keymap.NormalizeChord(kk) == kn {
 			return true
 		}
 	}

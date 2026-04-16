@@ -139,16 +139,56 @@ Run the binary:
 ./kairo
 ```
 
-### Keybindings (Default)
+## ⌨️ Keybindings
 
-- `ctrl+p`: Open command palette
-- `n`: Create new task
-- `e`: Edit selected task
-- `d`: Delete selected task
-- `enter`: View task details
-- `1..5`: Switch views (Inbox, Today, Upcoming, Tag, Priority)
-- `t`: Cycle theme
-- `q` / `esc`: Back/Close
+Kairo is designed for keyboard efficiency. All keybindings are configurable in your `config.toml`.
+
+### Global & Navigation
+| Key | Action |
+| :--- | :--- |
+| `ctrl+p` | Open Command Palette (fuzzy search tasks, tags, and commands) |
+| `/` | Search tasks (fuzzy by name) |
+| `tab` | Cycle to next view (Inbox → Today → Upcoming → ...) |
+| `shift+tab` | Cycle to previous view |
+| `t` | Open Theme Menu / Cycle themes |
+| `ctrl+g` | Open Lua plugins folder |
+| `p` | Manage plugins (list & uninstall) |
+| `g` | Reload all Lua plugins |
+
+| `?` | Show Help overlay |
+| `q` | Quit Kairo |
+
+### Task List (Normal Mode)
+| Key | Action |
+| :--- | :--- |
+| `k` / `up` | Move selection up |
+| `j` / `down` | Move selection down |
+| `g` / `home` | Jump to top of list |
+| `G` / `end` | Jump to bottom of list |
+| `pgup` / `pgdown` | Scroll page up/down |
+| `n` | Create a new task |
+| `e` | Edit selected task |
+| `d` | Delete selected task (requires confirmation) |
+| `enter` | View detailed task information & Markdown description |
+
+### View Switching (Quick Keys)
+| Key | View |
+| :--- | :--- |
+| `1` | **Inbox:** All active tasks |
+| `2` | **Today:** Tasks due today or overdue |
+| `3` | **Upcoming:** Tasks with future deadlines |
+| `4` | **Tag:** Filter tasks by a specific tag |
+| `5` | **Priority:** Filter tasks by priority level (P0-P3) |
+
+### Task Editor & Detail View
+| Key | Action |
+| :--- | :--- |
+| `ctrl+s` | Save changes (in Editor) |
+| `tab` | Move to next input field |
+| `shift+tab` | Move to previous input field |
+| `esc` | Cancel / Go back to list |
+
+> **Pro Tip:** In the Command Palette (`ctrl+p`), you can type commands like `pri:0` to jump to Priority 0 tasks, or `#work` to jump to a specific tag.
 
 ## ⚙️ Configuration
 
@@ -174,9 +214,90 @@ Kairo uses a distributed approach:
 
 ## 🔌 Plugins (Lua)
 
-Kairo supports Lua plugins for custom commands and filters. Place `.lua` files in your `plugins/` directory.
+Kairo's plugin system allows you to extend the TUI with custom logic, views, and commands. Place `.lua` files in your plugins directory (e.g., `~/.config/kairo/plugins/`).
 
-Example: `plugins/sample.lua`
+### Plugin Structure
+Every plugin must return a table containing its metadata and optional `commands` and `views`.
+
+#### Metadata Fields
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | `string` | Unique identifier (defaults to filename) |
+| `name` | `string` | Display name in Plugin Manager |
+| `description` | `string` | Short summary of plugin features |
+| `author` | `string` | Plugin author name |
+| `version` | `string` | Current version (e.g., "1.0.0") |
+
+```lua
+return {
+    id = "my-plugin",
+    name = "Example Plugin",
+    description = "A simple example plugin",
+    author = "Kairo Developer",
+    version = "1.0.0",
+    -- ... commands and views ...
+}
+```
+
+### `kairo` Global API
+The following functions are available to all plugins:
+
+#### Tasks
+- `kairo.create_task(table)`: Create a task. Fields: `title`, `description`, `status`, `priority`, `tags` (table). Returns created task.
+- `kairo.get_task(id)`: Retrieve a task by ID. Returns task table or `nil`.
+- `kairo.update_task(id, patch_table)`: Update a task. Returns updated task.
+- `kairo.delete_task(id)`: Permanently remove a task.
+- `kairo.list_tasks(filter_table)`: Query tasks. Filter fields: `statuses` (table), `tag`, `priority` (number), `sort`.
+
+#### UI
+- `kairo.notify(message, is_error)`: Push a message to the status bar.
+
+#### Example: "Cleanup" Command
+```lua
+-- plugins/cleanup.lua
+return {
+    id = "cleanup",
+    name = "Auto Cleanup",
+    description = "Removes all DONE tasks with a single command",
+    commands = {
+        {
+            id = "run-cleanup",
+            title = "Cleanup: Remove Done",
+            run = function()
+                local tasks = kairo.list_tasks({statuses = {"done"}})
+                for _, t in ipairs(tasks) do
+                    kairo.delete_task(t.id)
+                end
+                kairo.notify("Cleanup complete!", false)
+            end
+        }
+    }
+}
+```
+
+#### Example: "Focus" View
+```lua
+-- plugins/focus.lua
+return {
+    id = "focus",
+    name = "Focus Mode",
+    views = {
+        {
+            id = "active-high-pri",
+            title = "🔥 Focus",
+            filter = {
+                statuses = {"doing"},
+                min_priority = 0,
+                sort = "deadline"
+            }
+        }
+    }
+}
+```
+
+### Sorting Modes
+When defining a view filter or listing tasks, you can use: `"deadline"`, `"priority"`, `"updated"`, or `"created"`.
+
 
 ## 🤝 Contributing
 

@@ -52,11 +52,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch x := msg.(type) {
 	case tea.KeyMsg:
 		switch x.String() {
-		case "up":
+		case "up", "k":
+			if (x.String() == "k" && !m.vimMode) {
+				break
+			}
 			if m.sel > 0 {
 				m.sel--
 			}
-		case "down":
+		case "down", "j":
+			if (x.String() == "j" && !m.vimMode) {
+				break
+			}
 			if m.sel < len(m.tasks)-1 {
 				m.sel++
 			}
@@ -70,10 +76,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if m.sel > len(m.tasks)-1 {
 				m.sel = len(m.tasks) - 1
 			}
-		case "home", "g":
-			if !m.vimMode && x.String() == "g" {
-				break
-			}
+		case "home":
 			m.sel = 0
 		case "end", "G":
 			if x.String() == "G" && !m.vimMode {
@@ -81,14 +84,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			if len(m.tasks) > 0 {
 				m.sel = len(m.tasks) - 1
-			}
-		case "j":
-			if m.vimMode && m.sel < len(m.tasks)-1 {
-				m.sel++
-			}
-		case "k":
-			if m.vimMode && m.sel > 0 {
-				m.sel--
 			}
 		}
 	}
@@ -100,20 +95,10 @@ func (m Model) View() string {
 		return ""
 	}
 	if len(m.tasks) == 0 {
-		msg := lipgloss.NewStyle().
-			Foreground(m.styles.Theme.Muted).
-			Italic(true).
-			Render("No tasks found.")
-		hint := lipgloss.NewStyle().
-			Foreground(m.styles.Theme.Accent).
-			Render("Press 'n' to create your first task.")
-
-		content := lipgloss.JoinVertical(lipgloss.Center, msg, hint)
-		filled := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content, lipgloss.WithWhitespaceChars(" "), lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg))
-		return filled
+		return m.renderEmpty()
 	}
 
-	visible := max(1, m.height)
+	visible := m.height
 	start := clamp(m.sel-visible/2, 0, max(0, len(m.tasks)-visible))
 	end := min(len(m.tasks), start+visible)
 
@@ -123,26 +108,44 @@ func (m Model) View() string {
 		line := m.renderRow(t, i == m.sel)
 		lines = append(lines, line)
 	}
-	// Fill remaining space with background
+
+	// Padding with empty lines if needed
 	for len(lines) < visible {
-		emptyLine := lipgloss.NewStyle().Background(m.styles.Theme.Bg).Render(strings.Repeat(" ", m.width))
+		emptyLine := lipgloss.NewStyle().
+			Width(m.width).
+			Background(m.styles.Theme.Bg).
+			Render(strings.Repeat(" ", m.width))
 		lines = append(lines, emptyLine)
 	}
-	return strings.Join(lines, "\n")
+
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+func (m Model) renderEmpty() string {
+	icon := lipgloss.NewStyle().
+		Foreground(m.styles.Theme.Accent).
+		Render(styles.IconTask)
+	
+	msg := lipgloss.NewStyle().
+		Foreground(m.styles.Theme.Fg).
+		Bold(true).
+		Render("No tasks here yet.")
+	
+	hint := m.styles.Muted.Render("Press 'n' to create your first task and stay productive.")
+
+	content := lipgloss.JoinVertical(lipgloss.Center,
+		icon,
+		"\n",
+		msg,
+		hint,
+	)
+
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
 
 func (m Model) renderRow(t core.Task, selected bool) string {
 	status := m.styles.StatusBadge(t.Status)
 	pri := m.styles.PriorityBadge(t.Priority)
-
-	dead := ""
-	if t.Deadline != nil {
-		dead = humanDeadline(*t.Deadline, time.Now())
-	}
-	tags := ""
-	if len(t.Tags) > 0 {
-		tags = "#" + strings.Join(t.Tags, " #")
-	}
 
 	// Selection indicator
 	indicator := "  "
@@ -150,40 +153,57 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 		indicator = lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Render("┃ ")
 	}
 
-	titleStyle := lipgloss.NewStyle().Foreground(m.styles.Theme.Fg).Background(m.styles.Theme.Bg)
+	titleStyle := m.styles.RowNormal
 	if selected {
-		titleStyle = titleStyle.Foreground(m.styles.Theme.Accent).Background(m.styles.Theme.Overlay).Bold(true)
+		titleStyle = m.styles.RowSelected
 	} else if t.Status == core.StatusDone {
-		titleStyle = m.styles.Muted.Strikethrough(true)
+		titleStyle = m.styles.RowDimmed.Strikethrough(true)
 	}
 
-	title := titleStyle.Render(truncate(t.Title, max(16, m.width/2)))
+	titleText := t.Title
+	if t.Status == core.StatusDone {
+		titleText = " " + titleText
+	}
+
+	title := titleStyle.Render(truncate(titleText, max(16, m.width/2)))
 
 	left := lipgloss.JoinHorizontal(lipgloss.Left, indicator, status, " ", pri, " ", title)
 
 	rightParts := []string{}
-	if dead != "" {
+	
+	// Deadline
+	if t.Deadline != nil {
+		deadText := humanDeadline(*t.Deadline, time.Now())
 		deadStyle := m.styles.Muted
 		if t.Deadline.Before(time.Now()) && t.Status != core.StatusDone {
-			deadStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Bad)
+			deadStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Bad).Bold(true)
 		}
-		rightParts = append(rightParts, deadStyle.Render(dead))
+		rightParts = append(rightParts, deadStyle.Render(styles.IconDeadline+deadText))
 	}
-	if tags != "" {
-		rightParts = append(rightParts, m.styles.Muted.Render(truncate(tags, max(10, m.width/4))))
+
+	// Tags
+	if len(t.Tags) > 0 {
+		tagStr := ""
+		for _, tag := range t.Tags {
+			tagStr += styles.IconTag + tag + " "
+		}
+		rightParts = append(rightParts, m.styles.Muted.Render(truncate(tagStr, max(10, m.width/4))))
 	}
+
 	right := strings.Join(rightParts, "  ")
 
-	space := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 1
+	space := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 2
 	if space < 1 {
 		space = 1
 	}
 
 	line := left + strings.Repeat(" ", space) + right
-	rowStyle := lipgloss.NewStyle().Background(m.styles.Theme.Bg).Width(m.width)
+	
+	rowStyle := lipgloss.NewStyle().Width(m.width).Padding(0, 1)
 	if selected {
 		rowStyle = rowStyle.Background(m.styles.Theme.Overlay)
 	}
+
 	return rowStyle.Render(line)
 }
 
@@ -194,7 +214,6 @@ func truncate(s string, w int) string {
 	if lipgloss.Width(s) <= w {
 		return s
 	}
-	// keep it simple; assume mostly ascii titles.
 	if w <= 1 {
 		return "…"
 	}
@@ -215,12 +234,12 @@ func humanDeadline(t time.Time, now time.Time) string {
 		return fmt.Sprintf("%dd overdue", int(d.Hours()/24))
 	}
 	if d < 2*time.Hour {
-		return fmt.Sprintf("in %dm", int(d.Minutes()))
+		return fmt.Sprintf("%dm", int(d.Minutes()))
 	}
 	if d < 36*time.Hour {
-		return fmt.Sprintf("in %dh", int(d.Hours()))
+		return fmt.Sprintf("%dh", int(d.Hours()))
 	}
-	return fmt.Sprintf("in %dd", int(d.Hours()/24))
+	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 
 func clamp(x, lo, hi int) int {

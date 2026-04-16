@@ -55,33 +55,33 @@ type Model struct {
 
 func New(s styles.Styles, mode Mode, t core.Task) Model {
 	ti := textinput.New()
-	ti.Prompt = "Title: "
+	ti.Prompt = styles.IconTask + "Title: "
 	ti.CharLimit = 200
 	ti.SetValue(strings.TrimSpace(t.Title))
 	ti.Focus()
 
 	tags := textinput.New()
-	tags.Prompt = "Tags:  "
+	tags.Prompt = styles.IconTag + "Tags:  "
 	tags.CharLimit = 200
 	if len(t.Tags) > 0 {
 		tags.SetValue("#" + strings.Join(t.Tags, " #"))
 	}
 
 	pr := textinput.New()
-	pr.Prompt = "Pri:   "
+	pr.Prompt = styles.IconPriority1 + "Pri:   "
 	pr.CharLimit = 2
 	pr.SetValue(fmt.Sprintf("%d", int(t.Priority.Clamp())))
 
 	dl := textinput.New()
-	dl.Prompt = "Due:   "
+	dl.Prompt = styles.IconDeadline + "Due:   "
 	dl.CharLimit = 64
 	if t.Deadline != nil {
 		dl.SetValue(t.Deadline.Local().Format("2006-01-02 15:04"))
 	}
 
 	st := textinput.New()
-	st.Prompt = "Status:"
-	st.CharLimit = 8
+	st.Prompt = styles.IconDoing + "Status:"
+	st.CharLimit = 16
 	if t.Status == "" {
 		st.SetValue(string(core.StatusTodo))
 	} else {
@@ -113,12 +113,12 @@ func New(s styles.Styles, mode Mode, t core.Task) Model {
 
 func (m *Model) SetSize(w, h int) {
 	m.width, m.height = w, h
-	m.desc.SetWidth(max(20, w-4))
-	m.desc.SetHeight(max(4, h-12))
-	m.title.Width = max(20, w-10)
-	m.tags.Width = max(20, w-10)
+	m.desc.SetWidth(max(20, min(76, w-10)))
+	m.desc.SetHeight(max(4, h-16))
+	m.title.Width = max(20, min(60, w-20))
+	m.tags.Width = max(20, min(60, w-20))
 	m.priority.Width = 6
-	m.deadline.Width = max(20, w-10)
+	m.deadline.Width = max(20, min(60, w-20))
 	m.status.Width = 10
 }
 
@@ -175,7 +175,7 @@ func (m Model) View() string {
 	if w <= 0 {
 		w = 80
 	}
-	cardW := min(80, w-6)
+	cardW := min(84, w-6)
 
 	title := "NEW TASK"
 	if m.mode == ModeEdit {
@@ -184,11 +184,12 @@ func (m Model) View() string {
 
 	header := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(m.styles.Theme.Accent).
+		Foreground(m.styles.Theme.Bg).
+		Background(m.styles.Theme.Accent).
 		Padding(0, 1).
-		Render(title)
+		Render(" " + title + " ")
 
-	help := m.styles.Muted.Padding(0, 1).Render("ctrl+s save • esc cancel • tab navigate")
+	help := m.styles.Muted.Padding(0, 1).Render("ctrl+s save • esc cancel • tab next")
 
 	// Input fields with labels
 	fields := []string{
@@ -202,7 +203,7 @@ func (m Model) View() string {
 	}
 
 	if m.deadlineErr != "" {
-		fields = append(fields, lipgloss.NewStyle().Foreground(m.styles.Theme.Bad).Padding(0, 2).Render("ERROR: "+m.deadlineErr))
+		fields = append(fields, lipgloss.NewStyle().Foreground(m.styles.Theme.Bad).Padding(0, 2).Render(styles.IconError+" ERROR: "+m.deadlineErr))
 	} else if m.deadlinePreview != "" {
 		fields = append(fields, m.styles.Muted.Padding(0, 2).Render("→ "+m.deadlinePreview))
 	}
@@ -217,17 +218,22 @@ func (m Model) View() string {
 		descBox = descBox.BorderLeftForeground(m.styles.Theme.Accent)
 	}
 
-	fields = append(fields, "", lipgloss.NewStyle().Padding(0, 2).Render(descBox.Render(descView)))
+	fields = append(fields, "\n", lipgloss.NewStyle().Padding(0, 2).Render(descBox.Render(descView)))
 
 	content := lipgloss.JoinVertical(lipgloss.Left, append([]string{header, help, ""}, fields...)...)
 
-	return lipgloss.NewStyle().
+	card := lipgloss.NewStyle().
 		Width(cardW).
 		Background(m.styles.Theme.Bg).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(m.styles.Theme.Accent).
 		Padding(1, 2).
 		Render(content)
+
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
+	)
 }
 
 func (m Model) renderField(label, input string, focused bool) string {
@@ -269,10 +275,6 @@ func (m *Model) focusField() {
 	case 5:
 		m.desc.Focus()
 	}
-}
-
-func (m Model) renderInput(s string) string {
-	return lipgloss.NewStyle().Padding(0, 1).Render(s)
 }
 
 func (m *Model) recomputeDeadline() {

@@ -21,6 +21,16 @@ type View struct {
 	MetaHint string // e.g. active tag
 }
 
+type SortMode string
+
+const (
+	SortDefault  SortMode = ""
+	SortDeadline SortMode = "deadline"
+	SortPriority SortMode = "priority"
+	SortUpdated  SortMode = "updated"
+	SortCreated  SortMode = "created"
+)
+
 type Filter struct {
 	Statuses           []Status
 	Tag                string
@@ -28,6 +38,33 @@ type Filter struct {
 	From               *time.Time
 	To                 *time.Time
 	IncludeNilDeadline bool
+	Sort               SortMode
+}
+
+func (f Filter) ApplyToTask(t *Task) {
+	if len(f.Statuses) > 0 {
+		t.Status = f.Statuses[0]
+	}
+	if f.Tag != "" {
+		exists := false
+		for _, existing := range t.Tags {
+			if existing == f.Tag {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			t.Tags = append(t.Tags, f.Tag)
+		}
+	}
+	if f.Priority != nil {
+		t.Priority = *f.Priority
+	}
+	// For views with a specific "To" date like "Today", set the deadline
+	if f.To != nil && t.Deadline == nil {
+		d := f.To.Add(-1 * time.Second) // Just before the boundary
+		t.Deadline = &d
+	}
 }
 
 func DefaultViews(now time.Time) []View {
@@ -40,6 +77,7 @@ func DefaultViews(now time.Time) []View {
 			Filter: Filter{
 				Statuses:           []Status{StatusTodo, StatusDoing},
 				IncludeNilDeadline: true,
+				Sort:               SortUpdated,
 			},
 		},
 		{
@@ -50,6 +88,7 @@ func DefaultViews(now time.Time) []View {
 				From:               &dayStart,
 				To:                 &dayEnd,
 				IncludeNilDeadline: false,
+				Sort:               SortDeadline,
 			},
 		},
 		{
@@ -59,6 +98,7 @@ func DefaultViews(now time.Time) []View {
 				Statuses:           []Status{StatusTodo, StatusDoing},
 				From:               &dayEnd,
 				IncludeNilDeadline: false,
+				Sort:               SortDeadline,
 			},
 		},
 		{
@@ -67,6 +107,7 @@ func DefaultViews(now time.Time) []View {
 			Filter: Filter{
 				Statuses:           []Status{StatusTodo, StatusDoing, StatusDone},
 				IncludeNilDeadline: true,
+				Sort:               SortUpdated,
 			},
 		},
 		{
@@ -75,6 +116,7 @@ func DefaultViews(now time.Time) []View {
 			Filter: Filter{
 				Statuses:           []Status{StatusTodo, StatusDoing, StatusDone},
 				IncludeNilDeadline: true,
+				Sort:               SortPriority,
 			},
 		},
 	}
