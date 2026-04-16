@@ -1,12 +1,16 @@
-# Kairo
+# 📝 Kairo
 
-[![CI](https://github.com/programmersd21/kairo/actions/workflows/ci.yml/badge.svg)](https://github.com/programmersd21/kairo/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/programmersd21/kairo)](https://goreportcard.com/report/github.com/programmersd21/kairo)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Main App](screenshots/app.png)
 
-**Time, executed well.**
+[![CI](https://img.shields.io/github/actions/workflow/status/programmersd21/kairo/ci.yml?branch=main&style=for-the-badge)](https://github.com/programmersd21/kairo/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/programmersd21/kairo?style=for-the-badge)](https://goreportcard.com/report/github.com/programmersd21/kairo)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-Kairo is a keyboard-first, offline-first terminal task manager designed for focused execution. Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss), and SQLite.
+**⌛ Time, executed well.**
+
+---
+
+⚡ Kairo is a keyboard-first, offline-first terminal task manager designed for focused execution. Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss), and SQLite.
 
 ## ✨ Features
 
@@ -18,6 +22,12 @@ Kairo is a keyboard-first, offline-first terminal task manager designed for focu
 - **Plugins:** Lua-based commands and views with hot-reload.
 - **Import/Export:** Support for JSON and Markdown.
 - **Theming:** Built-in and user-definable theme overrides with runtime switching.
+
+## 📸 Screenshots
+
+| Task Description | Help Menu | Theme Menu |
+| :---: | :---: | :---: |
+| ![Task Description](screenshots/task_desc.png) | ![Help Menu](screenshots/help_menu.png) | ![Theme Menu](screenshots/theme_menu.png) |
 
 ## 🏗 Architecture
 
