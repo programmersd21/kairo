@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -684,27 +685,49 @@ func (m *Model) renderHeader() string {
 		Render(header)
 }
 
+// firstKey returns the first configured key for a binding, or "?" if unset.
+func firstKey(b key.Binding) string {
+	keys := b.Keys()
+	if len(keys) == 0 {
+		return "?"
+	}
+	return keys[0]
+}
+
 func (m *Model) renderFooter() string {
+	fk := firstKey
 	left := ""
 	switch m.mode {
 	case ModeConfirmDelete:
 		left = m.s.BadgeBad.Render(" DELETE? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
 	case ModeDetail:
-		left = " " + m.s.Muted.Render("esc back • e edit • ctrl+p palette • ? help")
+		left = " " + m.s.Muted.Render(
+			fk(m.km.Back)+" back • "+
+				fk(m.km.EditTask)+" edit • "+
+				fk(m.km.Palette)+" palette • "+
+				fk(m.km.Help)+" help",
+		)
 	case ModeEditor:
 		left = " " + m.s.Muted.Render("ctrl+s save • esc cancel • tab next field")
 	case ModePalette:
 		left = " " + m.s.Muted.Render("enter select • esc close • ↑/↓ navigate")
 	case ModeHelp:
-		left = " " + m.s.Muted.Render("esc/q/? close")
+		left = " " + m.s.Muted.Render("esc/q/"+fk(m.km.Help)+" close")
 	case ModeThemeMenu:
-		left = " " + m.s.Muted.Render("enter select • esc/q/t close • ↑/↓ navigate")
+		left = " " + m.s.Muted.Render("enter select • esc/q/"+fk(m.km.CycleTheme)+" close • ↑/↓ navigate")
 	case ModePluginMenu:
-		left = " " + m.s.Muted.Render("x uninstall • esc/q/p close • ↑/↓ navigate")
+		left = " " + m.s.Muted.Render("x uninstall • esc/q/"+fk(m.km.ManagePlugins)+" close • ↑/↓ navigate")
 	case ModePluginUninstall:
 		left = m.s.BadgeBad.Render(" UNINSTALL? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
 	default:
-		left = " " + m.s.Muted.Render("ctrl+p palette • n new • g reload plugins • d delete • ? help • 1-5 views")
+		left = " " + m.s.Muted.Render(
+			fk(m.km.Palette)+" palette • "+
+				fk(m.km.NewTask)+" new • "+
+				"g reload plugins • "+
+				fk(m.km.DeleteTask)+" delete • "+
+				fk(m.km.Help)+" help • "+
+				fk(m.km.ViewInbox)+"-"+fk(m.km.ViewPriority)+" views",
+		)
 	}
 
 	right := ""

@@ -1,6 +1,9 @@
-.PHONY: build test lint clean run
+.PHONY: build test lint clean run fmt
 
 BINARY_NAME=kairo
+
+fmt:
+	go fmt ./...
 
 build:
 	go build -trimpath -ldflags "-s -w" -o $(BINARY_NAME) ./cmd/kairo
@@ -21,3 +24,4 @@ run: build
 
 install:
 	go install ./cmd/kairo
+	
