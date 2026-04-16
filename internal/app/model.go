@@ -603,8 +603,7 @@ func (m *Model) renderMainUI() string {
 		Background(m.s.Theme.Bg).
 		Render(body)
 
-	main := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
-	return main
+	return lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
 }
 
 func (m *Model) rebuildComponentSizes() {
