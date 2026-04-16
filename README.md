@@ -45,25 +45,24 @@ Kairo is built with a modular architecture designed for performance, extensibili
 kairo/
 ├── CHANGELOG.md
 ├── cmd
-│   └── kairo
-│       └── main.go
 ├── CODE_OF_CONDUCT.md
 ├── configs
 │   └── kairo.example.toml
 ├── CONTRIBUTING.md
 ├── go.mod
 ├── go.sum
-├── image.png
 ├── internal
 │   ├── app
 │   │   ├── model.go
 │   │   └── msg.go
 │   ├── config
-│   │   └── config.go
+│   │   ├── config.go
+│   │   └── config_test.go
 │   ├── core
 │   │   ├── codec
 │   │   │   ├── json.go
 │   │   │   └── markdown.go
+│   │   ├── core_test.go
 │   │   ├── ids.go
 │   │   ├── nlp
 │   │   │   └── deadline.go
@@ -89,8 +88,13 @@ kairo/
 │   │   ├── help
 │   │   │   └── model.go
 │   │   ├── keymap
-│   │   │   └── keymap.go
+│   │   │   ├── keymap.go
+│   │   │   ├── keymap_test.go
+│   │   │   ├── normalize.go
+│   │   │   └── normalize_test.go
 │   │   ├── palette
+│   │   │   └── model.go
+│   │   ├── plugin_menu
 │   │   │   └── model.go
 │   │   ├── styles
 │   │   │   └── styles.go
@@ -101,7 +105,8 @@ kairo/
 │   │   └── theme_menu
 │   │       └── model.go
 │   └── util
-│       └── paths.go
+│       ├── paths.go
+│       └── util_test.go
 ├── LICENSE
 ├── Makefile
 ├── plugins
