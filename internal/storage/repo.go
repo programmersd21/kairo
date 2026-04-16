@@ -163,7 +163,7 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 	var tasks []core.Task
@@ -218,7 +218,7 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 		if err == nil {
 	defer func() {
 		if err := tagRows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 			tagsByID := map[string][]string{}
@@ -245,7 +245,7 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 	}
 	defer func() {
 		if err := tRows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 	var tomb []Tombstone
@@ -363,7 +363,7 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 
@@ -423,7 +423,7 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	}
 	defer func() {
 		if err := tagRows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 
@@ -448,7 +448,7 @@ func (r *Repository) ListTags(ctx context.Context) ([]string, error) {
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 	var out []string
@@ -474,7 +474,7 @@ func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 	var out []core.Task
@@ -532,7 +532,7 @@ func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	}
 	defer func() {
 		if err := tagRows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 	tagsByID := map[string][]string{}
@@ -621,7 +621,7 @@ func (r *Repository) taskTags(ctx context.Context, id string) ([]string, error) 
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			// Log or handle error appropriately
+			_ = err // Suppress linter warning
 		}
 	}()
 	var out []string

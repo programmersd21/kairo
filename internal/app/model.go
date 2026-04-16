@@ -710,14 +710,12 @@ func (m *Model) renderFooter() string {
 	right := ""
 	if m.statusText != "" {
 		icon := styles.IconInfo
-		style := m.s.Muted
 		if m.isErr {
 			icon = styles.IconError
-			style = m.s.Muted.Foreground(m.s.Theme.Bad).Bold(true)
+			right = m.s.Muted.Foreground(m.s.Theme.Bad).Bold(true).Render(icon+" ") + m.s.Muted.Render(m.statusText) + " "
 		} else {
-			style = m.s.Muted.Foreground(m.s.Theme.Good).Bold(true)
+			right = m.s.Muted.Foreground(m.s.Theme.Good).Bold(true).Render(icon+" ") + m.s.Muted.Render(m.statusText) + " "
 		}
-		right = style.Render(icon+" ") + m.s.Muted.Render(m.statusText) + " "
 	} else {
 		syncStatus := ""
 		if m.syncEngine != nil && m.syncEngine.Enabled() {

@@ -214,7 +214,7 @@ func (m Model) View() string {
 		Border(lipgloss.NormalBorder(), false, false, false, true).
 		BorderLeftForeground(m.styles.Theme.Border)
 
-	if 5 == m.focus {
+	if m.focus == 5 {
 		descBox = descBox.BorderLeftForeground(m.styles.Theme.Accent)
 	}
 
