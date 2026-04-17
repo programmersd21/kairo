@@ -50,12 +50,6 @@ func (m Model) View() string {
 	}
 
 	header := m.styles.Title.Render(" Help & Keybindings ")
-	// Ensure header fills width with background
-	header = lipgloss.NewStyle().
-		Width(cardW).
-		Background(m.styles.Theme.Bg).
-		Padding(0, 1).
-		Render(header)
 
 	// Helper to extract keys from binding
 	getK := func(b key.Binding) string {

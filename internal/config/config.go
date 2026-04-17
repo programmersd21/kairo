@@ -71,11 +71,13 @@ type KeymapConfig struct {
 	ViewInbox     string `toml:"view_inbox"`
 	ViewToday     string `toml:"view_today"`
 	ViewUpcoming  string `toml:"view_upcoming"`
+	ViewCompleted string `toml:"view_completed"`
 	ViewTag       string `toml:"view_tag"`
 	ViewPriority  string `toml:"view_priority"`
 	CycleTheme    string `toml:"cycle_theme"`
 	OpenPluginDir string `toml:"open_plugin_dir"`
 	ManagePlugins string `toml:"manage_plugins"`
+	ToggleStrike  string `toml:"toggle_strike"`
 	Help          string `toml:"help"`
 }
 
@@ -129,6 +131,7 @@ func Default() Config {
 			CycleTheme:    "t",
 			OpenPluginDir: "ctrl+g",
 			ManagePlugins: "p",
+			ToggleStrike:  "z",
 			Help:          "?",
 		},
 	}

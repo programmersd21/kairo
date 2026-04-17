@@ -18,15 +18,17 @@ type Keymap struct {
 	Back       key.Binding
 	Quit       key.Binding
 
-	ViewInbox    key.Binding
-	ViewToday    key.Binding
-	ViewUpcoming key.Binding
-	ViewTag      key.Binding
-	ViewPriority key.Binding
+	ViewInbox     key.Binding
+	ViewToday     key.Binding
+	ViewUpcoming  key.Binding
+	ViewCompleted key.Binding
+	ViewTag       key.Binding
+	ViewPriority  key.Binding
 
 	CycleTheme    key.Binding
 	OpenPluginDir key.Binding
 	ManagePlugins key.Binding
+	ToggleStrike  key.Binding
 	Help          key.Binding
 }
 
@@ -41,15 +43,17 @@ func FromConfig(c config.KeymapConfig) Keymap {
 		Back:       bind(c.Back, "back", "back"),
 		Quit:       bind(c.Quit, "quit", "quit"),
 
-		ViewInbox:    bind(c.ViewInbox, "inbox", "inbox view"),
-		ViewToday:    bind(c.ViewToday, "today", "today view"),
-		ViewUpcoming: bind(c.ViewUpcoming, "upcoming", "upcoming view"),
-		ViewTag:      bind(c.ViewTag, "tag", "tag view"),
-		ViewPriority: bind(c.ViewPriority, "priority", "priority view"),
+		ViewInbox:     bind(c.ViewInbox, "inbox", "inbox view"),
+		ViewToday:     bind(c.ViewToday, "today", "today view"),
+		ViewUpcoming:  bind(c.ViewUpcoming, "upcoming", "upcoming view"),
+		ViewCompleted: bind(c.ViewCompleted, "completed", "completed view"),
+		ViewTag:       bind(c.ViewTag, "tag", "tag view"),
+		ViewPriority:  bind(c.ViewPriority, "priority", "priority view"),
 
 		CycleTheme:    bind(c.CycleTheme, "theme", "theme menu"),
 		OpenPluginDir: bind(c.OpenPluginDir, "plugins-dir", "open plugins folder"),
 		ManagePlugins: bind(c.ManagePlugins, "manage-plugins", "manage plugins"),
+		ToggleStrike:  bind(c.ToggleStrike, "strike", "toggle completion with animation"),
 		Help:          bind(c.Help, "help", "show help"),
 	}
 }

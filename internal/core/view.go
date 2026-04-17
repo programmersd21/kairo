@@ -7,11 +7,12 @@ import (
 type ViewID string
 
 const (
-	ViewInbox    ViewID = "inbox"
-	ViewToday    ViewID = "today"
-	ViewUpcoming ViewID = "upcoming"
-	ViewTag      ViewID = "tag"
-	ViewPriority ViewID = "priority"
+	ViewInbox     ViewID = "inbox"
+	ViewToday     ViewID = "today"
+	ViewUpcoming  ViewID = "upcoming"
+	ViewCompleted ViewID = "completed"
+	ViewTag       ViewID = "tag"
+	ViewPriority  ViewID = "priority"
 )
 
 type View struct {
@@ -99,6 +100,15 @@ func DefaultViews(now time.Time) []View {
 				From:               &dayEnd,
 				IncludeNilDeadline: false,
 				Sort:               SortDeadline,
+			},
+		},
+		{
+			ID:    ViewCompleted,
+			Title: "Completed",
+			Filter: Filter{
+				Statuses:           []Status{StatusDone},
+				IncludeNilDeadline: true,
+				Sort:               SortUpdated,
 			},
 		},
 		{

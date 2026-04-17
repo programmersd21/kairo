@@ -177,76 +177,40 @@ func (m Model) View() string {
 	}
 	cardW := min(84, w-6)
 
-	title := "NEW TASK"
-	if m.mode == ModeEdit {
-		title = "EDIT TASK"
-	}
-
-	header := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(m.styles.Theme.Bg).
-		Background(m.styles.Theme.Accent).
-		Padding(0, 1).
-		Render(" " + title + " ")
-
-	help := m.styles.Muted.Padding(0, 1).Render("ctrl+s save • esc cancel • tab next")
-
-	// Input fields with labels
 	fields := []string{
-		m.renderField("TITLE", m.title.View(), m.focus == 0),
-		m.renderField("TAGS", m.tags.View(), m.focus == 1),
+		m.renderField("Title", m.title.View(), m.focus == 0),
+		m.renderField("Tags", m.tags.View(), m.focus == 1),
 		lipgloss.JoinHorizontal(lipgloss.Left,
-			m.renderField("PRIORITY", m.priority.View(), m.focus == 2),
-			m.renderField("STATUS", m.status.View(), m.focus == 4),
+			m.renderField("Pri", m.priority.View(), m.focus == 2),
+			m.renderField("Status", m.status.View(), m.focus == 4),
 		),
-		m.renderField("DUE", m.deadline.View(), m.focus == 3),
+		m.renderField("Due", m.deadline.View(), m.focus == 3),
 	}
 
 	if m.deadlineErr != "" {
-		fields = append(fields, lipgloss.NewStyle().Foreground(m.styles.Theme.Bad).Padding(0, 2).Render(styles.IconError+" ERROR: "+m.deadlineErr))
+		fields = append(fields, m.styles.Error.Padding(0, 2).Render(m.deadlineErr))
 	} else if m.deadlinePreview != "" {
-		fields = append(fields, m.styles.Muted.Padding(0, 2).Render("→ "+m.deadlinePreview))
+		fields = append(fields, m.styles.Muted.Padding(0, 2).Render(m.deadlinePreview))
 	}
 
 	descView := m.desc.View()
-	descBox := lipgloss.NewStyle().
-		Padding(0, 1).
-		Border(lipgloss.NormalBorder(), false, false, false, true).
-		BorderLeftForeground(m.styles.Theme.Border)
+	fields = append(fields, "", lipgloss.NewStyle().Padding(0, 2).Render(descView))
 
-	if m.focus == 5 {
-		descBox = descBox.BorderLeftForeground(m.styles.Theme.Accent)
-	}
+	content := lipgloss.JoinVertical(lipgloss.Left, fields...)
 
-	fields = append(fields, "\n", lipgloss.NewStyle().Padding(0, 2).Render(descBox.Render(descView)))
-
-	content := lipgloss.JoinVertical(lipgloss.Left, append([]string{header, help, ""}, fields...)...)
-
-	card := lipgloss.NewStyle().
-		Width(cardW).
-		Background(m.styles.Theme.Bg).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.styles.Theme.Accent).
-		Padding(1, 2).
-		Render(content)
-
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card,
-		lipgloss.WithWhitespaceChars(" "),
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+		m.styles.Overlay.Width(cardW).Render(content),
 		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
 	)
 }
 
 func (m Model) renderField(label, input string, focused bool) string {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(m.styles.Theme.Muted).
-		Bold(true).
-		Width(12)
-
+	labelStyle := m.styles.Muted.Width(8)
 	if focused {
 		labelStyle = labelStyle.Foreground(m.styles.Theme.Accent)
 	}
 
-	return lipgloss.NewStyle().Padding(0, 2).Render(
+	return lipgloss.NewStyle().Padding(0, 1).Render(
 		lipgloss.JoinHorizontal(lipgloss.Left, labelStyle.Render(label), input),
 	)
 }

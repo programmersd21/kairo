@@ -169,7 +169,7 @@ var Cloud = Theme{
 	Fg:      lipgloss.Color("#334155"),
 	Muted:   lipgloss.Color("#64748B"),
 	Border:  lipgloss.Color("#E2E8F0"),
-	Accent:  lipgloss.Color("#0F172A"),
+	Accent:  lipgloss.Color("#3B82F6"), // Vibrant Blue
 	Good:    lipgloss.Color("#10B981"),
 	Warn:    lipgloss.Color("#F59E0B"),
 	Bad:     lipgloss.Color("#EF4444"),
@@ -183,7 +183,7 @@ var Sepia = Theme{
 	Fg:      lipgloss.Color("#5B4636"),
 	Muted:   lipgloss.Color("#8C7A6B"),
 	Border:  lipgloss.Color("#DED0B6"),
-	Accent:  lipgloss.Color("#8B4513"),
+	Accent:  lipgloss.Color("#D97706"), // Rich Amber
 	Good:    lipgloss.Color("#4A5D23"),
 	Warn:    lipgloss.Color("#A0522D"),
 	Bad:     lipgloss.Color("#8B0000"),

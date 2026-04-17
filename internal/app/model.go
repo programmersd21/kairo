@@ -565,11 +565,10 @@ func (m *Model) View() string {
 		content = m.renderMainUI()
 	}
 
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Background(m.s.Theme.Bg).
-		Render(content)
+	return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
+	)
 }
 
 func (m *Model) renderMainUI() string {
@@ -601,13 +600,7 @@ func (m *Model) renderMainUI() string {
 		Background(m.s.Theme.Bg).
 		Render(body)
 
-	// Join vertically and fill entire viewport with background
-	content := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Background(m.s.Theme.Bg).
-		Render(content)
+	return lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
 }
 
 func (m *Model) rebuildComponentSizes() {

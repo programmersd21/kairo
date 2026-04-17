@@ -1,8 +1,6 @@
 package theme_menu
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -70,44 +68,21 @@ func (m Model) View() string {
 	if w <= 0 {
 		w = 80
 	}
-	cardW := min(48, w-4)
-	if cardW < 32 {
-		cardW = w - 2
-	}
-
-	header := m.styles.Title.Render(" Select Theme ")
+	cardW := min(40, w-4)
 
 	var lines []string
-	lines = append(lines, lipgloss.NewStyle().Padding(0, 1).Render(header), "")
-
 	for i, t := range m.themes {
-		indicator := "  "
-		style := lipgloss.NewStyle().Padding(0, 2).Width(cardW - 4).Background(m.styles.Theme.Bg)
+		style := m.styles.RowNormal
+		prefix := "  "
 		if i == m.sel {
-			indicator = lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Render("→ ")
-			style = style.Background(m.styles.Theme.Overlay).Foreground(m.styles.Theme.Accent).Bold(true)
+			style = m.styles.RowSelected
+			prefix = "> "
 		}
-
-		name := t.Name
-		if t.Name == m.styles.Theme.Name {
-			name += " (current)"
-		}
-
-		lines = append(lines, style.Render(indicator+name))
+		lines = append(lines, style.Render(prefix+t.Name))
 	}
 
-	lines = append(lines, "", m.styles.Muted.Padding(0, 2).Render("enter to select • esc to close"))
-
-	card := lipgloss.NewStyle().
-		Width(cardW).
-		Background(m.styles.Theme.Bg).
-		Border(lipgloss.ThickBorder()).
-		BorderForeground(m.styles.Theme.Accent).
-		Padding(1, 0).
-		Render(strings.Join(lines, "\n"))
-
-	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center, card,
-		lipgloss.WithWhitespaceChars(" "),
+	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center,
+		m.styles.Overlay.Width(cardW).Render(lipgloss.JoinVertical(lipgloss.Left, lines...)),
 		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
 	)
 }

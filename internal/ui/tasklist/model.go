@@ -118,13 +118,7 @@ func (m Model) View() string {
 		lines = append(lines, emptyLine)
 	}
 
-	// Join all lines and ensure the result fills the viewport with background
-	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Background(m.styles.Theme.Bg).
-		Render(content)
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
 func (m Model) renderEmpty() string {
@@ -235,7 +229,7 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 
 	line := left + strings.Repeat(" ", padding) + right
 
-	rowStyle := lipgloss.NewStyle().Width(m.width).Padding(0, 1)
+	rowStyle := lipgloss.NewStyle().Width(m.width).Padding(0, 1).Background(m.styles.Theme.Bg)
 	if selected {
 		rowStyle = rowStyle.Background(m.styles.Theme.Overlay)
 	}

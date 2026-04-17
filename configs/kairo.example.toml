@@ -1,5 +1,5 @@
 [app]
-theme = "midnight"
+theme = "catppuccin"
 vim_mode = false
 show_help = true
 
@@ -44,3 +44,7 @@ view_upcoming = "3"
 view_tag = "4"
 view_priority = "5"
 cycle_theme = "t"
+manage_plugins = "p"
+open_plugin_dir = "ctrl+g"
+toggle_strike = "z"
+help = "?"

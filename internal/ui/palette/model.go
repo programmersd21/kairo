@@ -1,8 +1,6 @@
 package palette
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -122,69 +120,49 @@ func (m Model) View() string {
 	if w <= 0 {
 		w = 80
 	}
-	cardW := min(72, w-4)
-	if cardW < 44 {
-		cardW = w - 2
-	}
-	m.input.Width = cardW - 6
+	cardW := min(76, w-4)
 
-	header := m.styles.Title.Render("Search")
-	input := m.styles.Input.Width(cardW - 4).Render(m.input.View())
+	input := lipgloss.NewStyle().
+		Padding(0, 1).
+		Render(m.input.View())
 
-	lines := []string{
-		lipgloss.NewStyle().Padding(0, 2).Width(cardW - 4).Render(header),
-		lipgloss.NewStyle().Padding(0, 1).Render(input),
-	}
-
+	var results []string
 	if len(m.results) == 0 {
-		lines = append(lines, m.styles.Muted.Padding(1, 2).Width(cardW-4).Render("No results found"))
+		results = append(results, m.styles.Muted.Padding(0, 2).Render("No results."))
 	} else {
 		for i, r := range m.results {
-			lines = append(lines, m.renderResult(cardW-2, i, r))
+			results = append(results, m.renderResult(cardW-2, i, r))
 		}
 	}
 
-	card := lipgloss.NewStyle().
-		Width(cardW).
-		Background(m.styles.Theme.Bg).
-		Border(lipgloss.ThickBorder()).
-		BorderForeground(m.styles.Theme.Accent).
-		Padding(1, 0).
-		Render(strings.Join(lines, "\n"))
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		input,
+		"",
+		lipgloss.JoinVertical(lipgloss.Left, results...),
+	)
 
-	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center, card,
-		lipgloss.WithWhitespaceChars(" "),
+	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center,
+		m.styles.Overlay.Width(cardW).Render(content),
 		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
 	)
 }
 
 func (m Model) renderResult(w, idx int, r search.Result) string {
-	kind := strings.ToUpper(string(r.Item.Kind))
-	kindStyle := m.styles.Muted
-	switch r.Item.Kind {
-	case search.KindCommand:
-		kindStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Bold(true)
-	case search.KindTask:
-		kindStyle = m.styles.Muted
-	case search.KindTag:
-		kindStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Warn)
-	}
-
-	left := kindStyle.Width(10).Render(kind)
-	title := r.Item.Title
-	if r.Item.Hint != "" {
-		title = title + m.styles.Muted.Render("  "+r.Item.Hint)
-	}
-
 	indicator := "  "
-	st := lipgloss.NewStyle().Width(w).Padding(0, 2).Background(m.styles.Theme.Bg)
+	style := lipgloss.NewStyle().Width(w).Padding(0, 1)
 	if idx == m.sel {
-		indicator = lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Render("→ ")
-		st = st.Background(m.styles.Theme.Overlay).Foreground(m.styles.Theme.Accent).Bold(true)
+		indicator = "> "
+		style = style.Foreground(m.styles.Theme.Accent)
 	}
 
-	line := indicator + left + title
-	return st.Render(truncate(line, w-4))
+	title := r.Item.Title
+	hint := ""
+	if r.Item.Hint != "" {
+		hint = " " + m.styles.Muted.Render(r.Item.Hint)
+	}
+
+	line := indicator + title + hint
+	return style.Render(truncate(line, w-2))
 }
 
 func truncate(s string, w int) string {
