@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/programmersd21/kairo/internal/ui/keymap"
@@ -50,6 +50,12 @@ func (m Model) View() string {
 	}
 
 	header := m.styles.Title.Render(" Help & Keybindings ")
+	// Ensure header fills width with background
+	header = lipgloss.NewStyle().
+		Width(cardW).
+		Background(m.styles.Theme.Bg).
+		Padding(0, 1).
+		Render(header)
 
 	// Helper to extract keys from binding
 	getK := func(b key.Binding) string {

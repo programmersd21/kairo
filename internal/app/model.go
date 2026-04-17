@@ -601,7 +601,13 @@ func (m *Model) renderMainUI() string {
 		Background(m.s.Theme.Bg).
 		Render(body)
 
-	return lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+	// Join vertically and fill entire viewport with background
+	content := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Background(m.s.Theme.Bg).
+		Render(content)
 }
 
 func (m *Model) rebuildComponentSizes() {
@@ -630,25 +636,26 @@ func (m *Model) rebuildComponentSizes() {
 func (m *Model) renderHeader() string {
 	// Top Bar: Logo and Tabs
 	logo := lipgloss.NewStyle().
-		Background(m.s.Theme.Accent).
-		Foreground(m.s.Theme.Bg).
+		Foreground(m.s.Theme.Accent).
 		Bold(true).
 		Padding(0, 1).
-		Render(" KAIRO ")
+		Render("KAIRO")
 
 	tabs := []string{}
 	for i, v := range m.views {
 		style := m.s.TabInactive
 		if i == m.activeIdx {
-			style = m.s.TabActive
+			style = m.s.TabActive.
+				Border(lipgloss.NormalBorder(), false, false, true, false).
+				BorderBottomForeground(m.s.Theme.Accent)
 		}
 		tabs = append(tabs, style.Render(v.Title))
 	}
 	tabRow := lipgloss.JoinHorizontal(lipgloss.Left, tabs...)
 
-	topBarLeft := lipgloss.JoinHorizontal(lipgloss.Left, logo, " ", tabRow)
+	topBarLeft := lipgloss.JoinHorizontal(lipgloss.Left, logo, "  ", tabRow)
 
-	count := fmt.Sprintf(" %d tasks ", len(m.tasks))
+	count := fmt.Sprintf("%d tasks", len(m.tasks))
 	topBarRight := m.s.Muted.Render(count)
 
 	sp := m.width - lipgloss.Width(topBarLeft) - lipgloss.Width(topBarRight)
@@ -721,12 +728,12 @@ func (m *Model) renderFooter() string {
 		left = m.s.BadgeBad.Render(" UNINSTALL? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
 	default:
 		left = " " + m.s.Muted.Render(
-			fk(m.km.Palette)+" palette • "+
-				fk(m.km.NewTask)+" new • "+
-				"g reload plugins • "+
-				fk(m.km.DeleteTask)+" delete • "+
-				fk(m.km.Help)+" help • "+
-				fk(m.km.ViewInbox)+"-"+fk(m.km.ViewPriority)+" views",
+			fk(m.km.Palette)+" 󰘥  • "+
+				fk(m.km.NewTask)+" 󰈄  • "+
+				"g 󰑐  • "+
+				fk(m.km.DeleteTask)+" 󰅙  • "+
+				fk(m.km.Help)+" 󰋼  • "+
+				fk(m.km.ViewInbox)+"-"+fk(m.km.ViewPriority)+" 󰈈 ",
 		)
 	}
 

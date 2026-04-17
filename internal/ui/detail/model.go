@@ -69,68 +69,92 @@ func (m *Model) View() string {
 		return ""
 	}
 
+	// Header
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(m.styles.Theme.Accent).
-		Padding(0, 1).
+		Padding(1, 2).
 		Render(styles.IconTask + m.task.Title)
 
+	// Divider
+	divider := lipgloss.NewStyle().
+		Foreground(m.styles.Theme.Border).
+		Padding(0, 2).
+		Render(strings.Repeat("─", m.width-4))
+
+	// Metadata
 	meta := m.renderMeta()
 
-	descriptionHeader := lipgloss.NewStyle().
-		Foreground(m.styles.Theme.Muted).
-		Bold(true).
-		Padding(1, 0, 0, 1).
-		Render("DESCRIPTION")
-
+	// Description
 	body := m.renderMarkdown(m.task.Description)
 	if strings.TrimSpace(body) == "" {
-		body = "  " + m.styles.Muted.Render("No description provided.")
+		body = lipgloss.NewStyle().
+			Foreground(m.styles.Theme.Muted).
+			Italic(true).
+			Padding(1, 4).
+			Render("No description provided.")
+	} else {
+		body = lipgloss.NewStyle().Padding(0, 2).Render(body)
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title,
-		"\n",
+		divider,
 		meta,
-		"\n",
-		descriptionHeader,
+		lipgloss.NewStyle().Height(1).Render(""),
+		lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Bold(true).Padding(0, 2).Render("Description"),
 		body,
 	)
 
 	return lipgloss.NewStyle().
 		Width(m.width).
 		Height(m.height).
-		Padding(1, 2).
+		Background(m.styles.Theme.Bg).
 		Render(content)
 }
 
 func (m Model) renderMeta() string {
-	rows := []string{
-		lipgloss.JoinHorizontal(lipgloss.Left, m.styles.DetailKey.Render("Status"), m.styles.StatusBadge(m.task.Status)),
-		lipgloss.JoinHorizontal(lipgloss.Left, m.styles.DetailKey.Render("Priority"), m.styles.PriorityBadge(m.task.Priority)),
-	}
+	var meta []string
 
+	// Status & Priority in one line
+	status := lipgloss.JoinHorizontal(lipgloss.Left,
+		m.styles.Muted.Render("Status:   "),
+		m.styles.StatusBadge(m.task.Status),
+	)
+	priority := lipgloss.JoinHorizontal(lipgloss.Left,
+		m.styles.Muted.Render("Priority: "),
+		m.styles.PriorityBadge(m.task.Priority),
+	)
+	meta = append(meta, lipgloss.JoinHorizontal(lipgloss.Left,
+		lipgloss.NewStyle().Padding(1, 2).Render(status),
+		lipgloss.NewStyle().Padding(1, 4).Render(priority),
+	))
+
+	// Deadline & Tags
 	if m.task.Deadline != nil {
-		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left,
-			m.styles.DetailKey.Render("Deadline"),
-			m.styles.DetailValue.Render(styles.IconDeadline+m.task.Deadline.Local().Format("Mon, Jan 02 15:04"))))
+		meta = append(meta, lipgloss.NewStyle().Padding(0, 2).Render(
+			lipgloss.JoinHorizontal(lipgloss.Left,
+				m.styles.Muted.Render("Due:      "),
+				m.styles.DetailValue.Render(styles.IconDeadline+m.task.Deadline.Local().Format("Mon, Jan 02 15:04")),
+			)))
 	}
 
 	if len(m.task.Tags) > 0 {
 		tagStr := ""
-		for _, t := range m.task.Tags {
-			tagStr += styles.IconTag + t + " "
+		for i, t := range m.task.Tags {
+			if i > 0 {
+				tagStr += " "
+			}
+			tagStr += "#" + t
 		}
-		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left,
-			m.styles.DetailKey.Render("Tags"),
-			m.styles.DetailValue.Render(tagStr)))
+		meta = append(meta, lipgloss.NewStyle().Padding(0, 2).Render(
+			lipgloss.JoinHorizontal(lipgloss.Left,
+				m.styles.Muted.Render("Tags:     "),
+				m.styles.DetailValue.Render(tagStr),
+			)))
 	}
 
-	rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left,
-		m.styles.DetailKey.Render("Updated"),
-		m.styles.DetailValue.Render(humanTime(m.task.UpdatedAt, time.Now()))))
-
-	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return lipgloss.JoinVertical(lipgloss.Left, meta...)
 }
 
 func (m *Model) renderMarkdown(src string) string {

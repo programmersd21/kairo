@@ -118,34 +118,63 @@ func (m Model) View() string {
 		lines = append(lines, emptyLine)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+	// Join all lines and ensure the result fills the viewport with background
+	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Background(m.styles.Theme.Bg).
+		Render(content)
 }
 
 func (m Model) renderEmpty() string {
 	icon := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Accent).
-		Render(styles.IconTask)
+		Bold(true).
+		Render("✨ " + styles.IconTask)
 
-	msg := lipgloss.NewStyle().
+	title := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Fg).
 		Bold(true).
-		Render("No tasks here yet.")
+		Margin(1, 0, 0, 0).
+		Render("No tasks here yet")
 
-	hint := m.styles.Muted.Render("Press 'n' to create your first task and stay productive.")
+	subtitle := lipgloss.NewStyle().
+		Foreground(m.styles.Theme.Muted).
+		Margin(1, 0, 0, 0).
+		Render("Press 'n' to create a new task and start your journey")
+
+	hint := lipgloss.NewStyle().
+		Foreground(m.styles.Theme.Muted).
+		Italic(true).
+		Margin(2, 0, 0, 0).
+		Render("Tip: Use the command palette (Ctrl+K) to access all features")
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		icon,
-		"\n",
-		msg,
+		title,
+		subtitle,
 		hint,
 	)
 
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
+	)
 }
 
 func (m Model) renderRow(t core.Task, selected bool) string {
-	status := m.styles.StatusBadge(t.Status)
-	pri := m.styles.PriorityBadge(t.Priority)
+	// Status icon with specific color
+	statusIcon := styles.IconTodo
+	statusStyle := m.styles.Muted
+	switch t.Status {
+	case core.StatusDoing:
+		statusIcon = styles.IconDoing
+		statusStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Warn)
+	case core.StatusDone:
+		statusIcon = styles.IconDone
+		statusStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Good)
+	}
 
 	// Selection indicator
 	indicator := "  "
@@ -161,22 +190,23 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	}
 
 	titleText := t.Title
-	if t.Status == core.StatusDone {
-		titleText = " " + titleText
-	}
+	title := titleStyle.Render(truncate(titleText, max(20, m.width-40)))
 
-	title := titleStyle.Render(truncate(titleText, max(16, m.width/2)))
-
-	left := lipgloss.JoinHorizontal(lipgloss.Left, indicator, status, " ", pri, " ", title)
+	// Build left side
+	left := indicator + statusStyle.Render(statusIcon) + " " + title
 
 	rightParts := []string{}
+
+	// Priority badge
+	pri := m.styles.PriorityBadge(t.Priority)
+	rightParts = append(rightParts, pri)
 
 	// Deadline
 	if t.Deadline != nil {
 		deadText := humanDeadline(*t.Deadline, time.Now())
 		deadStyle := m.styles.Muted
 		if t.Deadline.Before(time.Now()) && t.Status != core.StatusDone {
-			deadStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Bad).Bold(true)
+			deadStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Bad)
 		}
 		rightParts = append(rightParts, deadStyle.Render(styles.IconDeadline+deadText))
 	}
@@ -184,20 +214,26 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	// Tags
 	if len(t.Tags) > 0 {
 		tagStr := ""
-		for _, tag := range t.Tags {
-			tagStr += styles.IconTag + tag + " "
+		for i, tag := range t.Tags {
+			if i > 0 {
+				tagStr += " "
+			}
+			tagStr += "#" + tag
 		}
-		rightParts = append(rightParts, m.styles.Muted.Render(truncate(tagStr, max(10, m.width/4))))
+		rightParts = append(rightParts, m.styles.Muted.Render(truncate(tagStr, max(10, m.width/6))))
 	}
 
 	right := strings.Join(rightParts, "  ")
 
-	space := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 2
-	if space < 1 {
-		space = 1
+	// Calculate spacing
+	leftWidth := lipgloss.Width(left)
+	rightWidth := lipgloss.Width(right)
+	padding := m.width - leftWidth - rightWidth - 2
+	if padding < 1 {
+		padding = 1
 	}
 
-	line := left + strings.Repeat(" ", space) + right
+	line := left + strings.Repeat(" ", padding) + right
 
 	rowStyle := lipgloss.NewStyle().Width(m.width).Padding(0, 1)
 	if selected {
