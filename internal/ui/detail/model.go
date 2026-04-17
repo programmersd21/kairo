@@ -1,9 +1,7 @@
 package detail
 
 import (
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
@@ -178,21 +176,4 @@ func (m *Model) renderMarkdown(src string) string {
 	}
 	m.mdCache = strings.TrimRight(out, "\n")
 	return m.mdCache
-}
-
-func humanTime(t time.Time, now time.Time) string {
-	d := now.Sub(t)
-	if d < 0 {
-		d = -d
-	}
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
 }

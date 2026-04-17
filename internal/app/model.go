@@ -721,12 +721,12 @@ func (m *Model) renderFooter() string {
 		left = m.s.BadgeBad.Render(" UNINSTALL? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
 	default:
 		left = " " + m.s.Muted.Render(
-			fk(m.km.Palette)+" 󰘥  • "+
-				fk(m.km.NewTask)+" 󰈄  • "+
-				"g 󰑐  • "+
-				fk(m.km.DeleteTask)+" 󰅙  • "+
-				fk(m.km.Help)+" 󰋼  • "+
-				fk(m.km.ViewInbox)+"-"+fk(m.km.ViewPriority)+" 󰈈 ",
+			fk(m.km.Palette)+" "+styles.IconPalette+" • "+
+				fk(m.km.NewTask)+" "+styles.IconNew+" • "+
+				"g "+styles.IconSync+" • "+
+				fk(m.km.DeleteTask)+" "+styles.IconDelete+" • "+
+				fk(m.km.Help)+" "+styles.IconHelp+" • "+
+				fk(m.km.ViewInbox)+"-"+fk(m.km.ViewPriority)+" "+styles.IconView+" ",
 		)
 	}
 
