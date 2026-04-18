@@ -25,14 +25,15 @@ const (
 	IconSync      = "↻ "
 	IconError     = "✖ "
 	IconInfo      = "ℹ "
-	IconHelp      = "? "
+	IconHelp      = "help"
 	IconTask      = "❖ "
 	IconPlugin    = "🧩 "
 	// Additional safe icons for UI affordances
-	IconPalette = "🔎 "
-	IconNew     = "✚ "
-	IconDelete  = "🗑 "
-	IconView    = "▣ "
+	IconPalette = "🔎"
+	IconNew     = "✚"
+	IconDelete  = "🗑"
+	IconView    = "▣"
+	IconStrike  = "⚡"
 )
 
 // Design System Constants

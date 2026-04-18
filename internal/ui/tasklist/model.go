@@ -21,6 +21,12 @@ type Model struct {
 
 	tasks []core.Task
 	sel   int
+
+	// Animation state
+	animatingTaskID  string
+	animationStart   time.Time
+	animationDur     time.Duration
+	animationReverse bool
 }
 
 func New(s styles.Styles, vimMode bool) Model {
@@ -46,6 +52,13 @@ func (m *Model) SetTasks(ts []core.Task) {
 	if m.sel < 0 {
 		m.sel = 0
 	}
+}
+
+func (m *Model) SetAnimation(taskID string, start time.Time, duration time.Duration, reverse bool) {
+	m.animatingTaskID = taskID
+	m.animationStart = start
+	m.animationDur = duration
+	m.animationReverse = reverse
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -158,6 +171,18 @@ func (m Model) renderEmpty() string {
 }
 
 func (m Model) renderRow(t core.Task, selected bool) string {
+	// Check if this task is being animated
+	isAnimating := m.animatingTaskID == t.ID && m.animatingTaskID != ""
+	animProgress := 0.0
+	if isAnimating {
+		elapsed := time.Since(m.animationStart)
+		if elapsed < m.animationDur {
+			animProgress = float64(elapsed) / float64(m.animationDur)
+		} else {
+			animProgress = 1.0
+		}
+	}
+
 	// Status icon with specific color
 	statusIcon := styles.IconTodo
 	statusStyle := m.styles.Muted
@@ -184,7 +209,14 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	}
 
 	titleText := t.Title
-	title := titleStyle.Render(truncate(titleText, max(20, m.width-40)))
+	var title string
+	if isAnimating {
+		// Render progressive strikethrough across the text
+		displayTitle := m.renderProgressiveStrikethrough(titleText, animProgress)
+		title = m.styles.RowDimmed.Render(truncate(displayTitle, max(20, m.width-40)))
+	} else {
+		title = titleStyle.Render(truncate(titleText, max(20, m.width-40)))
+	}
 
 	// Build left side
 	left := indicator + statusStyle.Render(statusIcon) + " " + title
@@ -235,6 +267,64 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	}
 
 	return rowStyle.Render(line)
+}
+
+func (m Model) renderProgressBar(progress float64, width int) string {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 1 {
+		progress = 1
+	}
+	filled := int(float64(width) * progress)
+	bar := strings.Repeat("▰", filled) + strings.Repeat("▱", width-filled)
+	return m.styles.Muted.Foreground(m.styles.Theme.Accent).Render("[" + bar + "]")
+}
+
+func (m Model) renderProgressiveStrikethrough(text string, progress float64) string {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 1 {
+		progress = 1
+	}
+
+	runes := []rune(text)
+
+	if m.animationReverse {
+		// Reverse animation: start fully struckthrough, remove from left to right
+		normalCount := int(float64(len(runes)) * progress)
+
+		if normalCount == 0 {
+			// All struckthrough
+			return m.styles.RowDimmed.Strikethrough(true).Render(text)
+		}
+		if normalCount >= len(runes) {
+			// All normal
+			return text
+		}
+
+		// Split: normal part on left, struckthrough on right
+		normal := m.styles.RowDimmed.Render(string(runes[:normalCount]))
+		strikethrough := m.styles.RowDimmed.Strikethrough(true).Render(string(runes[normalCount:]))
+		return normal + strikethrough
+	} else {
+		// Forward animation: start normal, apply strikethrough from left to right
+		strikeCount := int(float64(len(runes)) * progress)
+
+		if strikeCount == 0 {
+			return text
+		}
+		if strikeCount >= len(runes) {
+			// All struckthrough
+			return m.styles.RowDimmed.Strikethrough(true).Render(text)
+		}
+
+		// Split: struckthrough on left, normal on right
+		strikethrough := m.styles.RowDimmed.Strikethrough(true).Render(string(runes[:strikeCount]))
+		normal := m.styles.RowDimmed.Render(string(runes[strikeCount:]))
+		return strikethrough + normal
+	}
 }
 
 func truncate(s string, w int) string {

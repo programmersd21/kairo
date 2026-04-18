@@ -76,6 +76,7 @@ func (m Model) View() string {
 			[]struct{ key, desc string }{
 				{getK(m.km.NewTask), "New task"},
 				{getK(m.km.EditTask), "Edit task"},
+				{getK(m.km.ToggleStrike), "Toggle completion with animation"},
 				{getK(m.km.DeleteTask), "Delete task"},
 			},
 		},

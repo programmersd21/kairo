@@ -92,6 +92,12 @@ type Model struct {
 
 	plugHost *plugins.Host
 	plugCh   chan struct{}
+
+	// Animation state for strike action
+	animatingTaskID   string
+	animationStarted  time.Time
+	animationDuration time.Duration
+	animationReverse  bool // true if uncompleting (reverse strike), false if completing
 }
 
 func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.Model, error) {
@@ -322,6 +328,31 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case taskDeletedMsg:
 		return m, tea.Batch(m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
 
+	case strikeAnimationTickMsg:
+		if m.animatingTaskID != x.TaskID {
+			return m, nil
+		}
+		elapsed := time.Since(m.animationStarted)
+		if elapsed >= m.animationDuration {
+			// Animation complete, update the task
+			m.animatingTaskID = ""
+			var taskToUpdate core.Task
+			for _, t := range m.all {
+				if t.ID == x.TaskID {
+					taskToUpdate = t
+					break
+				}
+			}
+			newStatus := core.StatusDone
+			if taskToUpdate.Status == core.StatusDone {
+				newStatus = core.StatusTodo
+			}
+			patch := core.TaskPatch{Status: &newStatus}
+			return m, m.updateTaskCmd(x.TaskID, patch)
+		}
+		// Continue animation
+		return m, m.strikeAnimationTickCmd(x.TaskID)
+
 	case openTaskMsg:
 		m.det.SetTask(x.Task)
 		m.mode = ModeDetail
@@ -463,6 +494,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if t, ok := m.list.Selected(); ok {
 					return m, m.fetchOpenTaskCmd(t.ID)
 				}
+			case keymapMatch(m.km.ToggleStrike, km):
+				if t, ok := m.list.Selected(); ok {
+					m.animatingTaskID = t.ID
+					m.animationStarted = time.Now()
+					m.animationDuration = 400 * time.Millisecond
+					m.animationReverse = (t.Status == core.StatusDone)
+					return m, m.strikeAnimationTickCmd(t.ID)
+				}
 			}
 		}
 
@@ -473,6 +512,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if keymapMatch(m.km.EditTask, km) {
 				return m, m.fetchOpenEditCmd(m.det.Task().ID)
+			}
+			if keymapMatch(m.km.ToggleStrike, km) {
+				t := m.det.Task()
+				m.animatingTaskID = t.ID
+				m.animationStarted = time.Now()
+				m.animationDuration = 400 * time.Millisecond
+				m.animationReverse = (t.Status == core.StatusDone)
+				return m, m.strikeAnimationTickCmd(t.ID)
 			}
 		}
 
@@ -580,6 +627,11 @@ func (m *Model) renderMainUI() string {
 	availableHeight := m.height - hHeight - fHeight
 	if availableHeight < 0 {
 		availableHeight = 0
+	}
+
+	// Sync animation state to tasklist
+	if m.animatingTaskID != "" {
+		m.list.SetAnimation(m.animatingTaskID, m.animationStarted, m.animationDuration, m.animationReverse)
 	}
 
 	var body string
@@ -723,7 +775,7 @@ func (m *Model) renderFooter() string {
 		left = " " + m.s.Muted.Render(
 			fk(m.km.Palette)+" "+styles.IconPalette+" • "+
 				fk(m.km.NewTask)+" "+styles.IconNew+" • "+
-				"g "+styles.IconSync+" • "+
+				fk(m.km.ToggleStrike)+" "+styles.IconStrike+" • "+
 				fk(m.km.DeleteTask)+" "+styles.IconDelete+" • "+
 				fk(m.km.Help)+" "+styles.IconHelp+" • "+
 				fk(m.km.ViewInbox)+"-"+fk(m.km.ViewPriority)+" "+styles.IconView+" ",
@@ -856,6 +908,13 @@ func (m *Model) deleteTaskCmd(id string) tea.Cmd {
 			return errMsg{Err: err}
 		}
 		return taskDeletedMsg{ID: id}
+	}
+}
+
+func (m *Model) strikeAnimationTickCmd(taskID string) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(16 * time.Millisecond) // ~60 FPS
+		return strikeAnimationTickMsg{TaskID: taskID}
 	}
 }
 

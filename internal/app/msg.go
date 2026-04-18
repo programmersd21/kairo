@@ -18,3 +18,5 @@ type openEditMsg struct{ Task core.Task }
 type pluginChangedMsg struct{}
 
 type syncDoneMsg struct{ Err error }
+
+type strikeAnimationTickMsg struct{ TaskID string }

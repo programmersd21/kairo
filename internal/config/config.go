@@ -168,6 +168,66 @@ func Load() (Config, error) {
 		return cfg, err
 	}
 
+	// Merge defaults for empty keybindings
+	defaults := Default()
+	if cfg.Keymap.Palette == "" {
+		cfg.Keymap.Palette = defaults.Keymap.Palette
+	}
+	if cfg.Keymap.TaskSearch == "" {
+		cfg.Keymap.TaskSearch = defaults.Keymap.TaskSearch
+	}
+	if cfg.Keymap.NewTask == "" {
+		cfg.Keymap.NewTask = defaults.Keymap.NewTask
+	}
+	if cfg.Keymap.EditTask == "" {
+		cfg.Keymap.EditTask = defaults.Keymap.EditTask
+	}
+	if cfg.Keymap.DeleteTask == "" {
+		cfg.Keymap.DeleteTask = defaults.Keymap.DeleteTask
+	}
+	if cfg.Keymap.OpenTask == "" {
+		cfg.Keymap.OpenTask = defaults.Keymap.OpenTask
+	}
+	if cfg.Keymap.Back == "" {
+		cfg.Keymap.Back = defaults.Keymap.Back
+	}
+	if cfg.Keymap.Quit == "" {
+		cfg.Keymap.Quit = defaults.Keymap.Quit
+	}
+	if cfg.Keymap.ViewInbox == "" {
+		cfg.Keymap.ViewInbox = defaults.Keymap.ViewInbox
+	}
+	if cfg.Keymap.ViewToday == "" {
+		cfg.Keymap.ViewToday = defaults.Keymap.ViewToday
+	}
+	if cfg.Keymap.ViewUpcoming == "" {
+		cfg.Keymap.ViewUpcoming = defaults.Keymap.ViewUpcoming
+	}
+	if cfg.Keymap.ViewCompleted == "" {
+		cfg.Keymap.ViewCompleted = defaults.Keymap.ViewCompleted
+	}
+	if cfg.Keymap.ViewTag == "" {
+		cfg.Keymap.ViewTag = defaults.Keymap.ViewTag
+	}
+	if cfg.Keymap.ViewPriority == "" {
+		cfg.Keymap.ViewPriority = defaults.Keymap.ViewPriority
+	}
+	if cfg.Keymap.CycleTheme == "" {
+		cfg.Keymap.CycleTheme = defaults.Keymap.CycleTheme
+	}
+	if cfg.Keymap.OpenPluginDir == "" {
+		cfg.Keymap.OpenPluginDir = defaults.Keymap.OpenPluginDir
+	}
+	if cfg.Keymap.ManagePlugins == "" {
+		cfg.Keymap.ManagePlugins = defaults.Keymap.ManagePlugins
+	}
+	if cfg.Keymap.ToggleStrike == "" {
+		cfg.Keymap.ToggleStrike = defaults.Keymap.ToggleStrike
+	}
+	if cfg.Keymap.Help == "" {
+		cfg.Keymap.Help = defaults.Keymap.Help
+	}
+
 	appDir, _ := util.AppDataDir(appName)
 
 	// Helper to resolve relative to app data dir
