@@ -1,3 +1,5 @@
+<div align="center">
+
 # 📝 Kairo
 
 ![Main App](screenshots/app.png)
@@ -8,11 +10,13 @@
 
 **⌛ Time, executed well.**
 
+</div>
+
 ---
 
-### A Premium Terminal Task Manager Designed for Focused Execution
+### ✨ A Premium Terminal Task Manager Designed for Focused Execution
 
-Kairo is a lightning-fast, keyboard-first task management application built for developers and power users. It combines the simplicity of a command-line tool with the sophistication of a modern, premium design system.
+🏃🏻 Kairo is a lightning-fast, keyboard-first task management application built for developers and power users. It combines the simplicity of a command-line tool with the sophistication of a modern, premium design system.
 
 🎯 **Instant Responsiveness** — Sub-millisecond task searching and navigation  
 🎨 **Premium UI Design** — Modern color palette with accessibility at its core  
