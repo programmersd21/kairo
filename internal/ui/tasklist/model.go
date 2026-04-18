@@ -269,18 +269,6 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	return rowStyle.Render(line)
 }
 
-func (m Model) renderProgressBar(progress float64, width int) string {
-	if progress < 0 {
-		progress = 0
-	}
-	if progress > 1 {
-		progress = 1
-	}
-	filled := int(float64(width) * progress)
-	bar := strings.Repeat("▰", filled) + strings.Repeat("▱", width-filled)
-	return m.styles.Muted.Foreground(m.styles.Theme.Accent).Render("[" + bar + "]")
-}
-
 func (m Model) renderProgressiveStrikethrough(text string, progress float64) string {
 	if progress < 0 {
 		progress = 0
