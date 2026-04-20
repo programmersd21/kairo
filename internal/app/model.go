@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -34,6 +35,41 @@ import (
 	"github.com/programmersd21/kairo/internal/util"
 )
 
+// FilterState manages the tag filter with explicit lifecycle:
+// - active: whether a filter is currently applied
+// - value: the tag being filtered (only meaningful when active)
+// This replaces the previous plain `tagParam` string to provide clear state management
+// and enable proper reset/clear functionality.
+type FilterState struct {
+	active bool
+	value  string
+}
+
+// Set activates the filter with a specific tag value
+func (f *FilterState) Set(tag string) {
+	f.active = true
+	f.value = strings.TrimSpace(tag)
+}
+
+// Clear deactivates the filter and resets the value
+func (f *FilterState) Clear() {
+	f.active = false
+	f.value = ""
+}
+
+// IsActive returns whether a filter is currently applied
+func (f *FilterState) IsActive() bool {
+	return f.active
+}
+
+// Value returns the current filter value (empty if not active)
+func (f *FilterState) Value() string {
+	if !f.active {
+		return ""
+	}
+	return f.value
+}
+
 type Mode int
 
 const (
@@ -46,6 +82,7 @@ const (
 	ModeThemeMenu
 	ModePluginMenu
 	ModePluginUninstall
+	ModeTagFilter
 )
 
 type Model struct {
@@ -64,7 +101,7 @@ type Model struct {
 
 	views     []core.View
 	activeIdx int
-	tagParam  string
+	tagFilter FilterState // Replaced plain tagParam with proper state management
 	priParam  *core.Priority
 
 	list tasklist.Model
@@ -74,6 +111,8 @@ type Model struct {
 	hlp  help.Model
 	tm   theme_menu.Model
 	pm   plugin_menu.Model
+
+	tagFilterInput textinput.Model // Input field for direct tag filtering in Tag View
 
 	palFullIdx   *search.Index
 	palTasksIdx  *search.Index
@@ -105,14 +144,22 @@ func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.
 	s := styles.New(th)
 	km := keymap.FromConfig(cfg.Keymap)
 
+	// Initialize tag filter input
+	tagInput := textinput.New()
+	tagInput.Prompt = "#"
+	tagInput.Placeholder = "Enter tag to filter…"
+	tagInput.CharLimit = 64
+	tagInput.Width = 40
+
 	m := &Model{
-		ctx:   ctx,
-		cfg:   cfg,
-		repo:  repo,
-		km:    km,
-		theme: th,
-		s:     s,
-		mode:  ModeList,
+		ctx:            ctx,
+		cfg:            cfg,
+		repo:           repo,
+		km:             km,
+		theme:          th,
+		s:              s,
+		mode:           ModeList,
+		tagFilterInput: tagInput,
 	}
 	m.list = tasklist.New(m.s, cfg.App.VimMode)
 	m.pal = palette.New(m.s)
@@ -184,6 +231,26 @@ func (m *Model) Init() tea.Cmd {
 		cmds = append(cmds, m.listenPluginsCmd())
 	}
 	return tea.Batch(cmds...)
+}
+
+// isInputFocused returns true if the current mode has an active input field where
+// the user is typing. This is used to prevent global keybindings from firing while
+// input is focused, ensuring proper focus management and event routing.
+func (m *Model) isInputFocused() bool {
+	switch m.mode {
+	case ModeEditor:
+		// Editor has multiple text input fields that accept user input
+		return true
+	case ModePalette:
+		// Palette has a search input field that's always focused when active
+		return true
+	case ModeTagFilter:
+		// Tag filter input field is active when filtering by tag
+		return true
+	default:
+		// All other modes don't have active text input fields, so keybindings can safely fire
+		return false
+	}
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -298,8 +365,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case search.KindTask:
 			return m, m.fetchOpenTaskCmd(x.Item.ID)
 		case search.KindTag:
-			m.tagParam = x.Item.ID
+			m.tagFilter.Set(x.Item.ID)
 			m.setActiveView(core.ViewTag)
+			m.rebuildComponentSizes() // Recalculate layout when filter changes
 			return m, m.loadTasksCmd()
 		case search.KindCommand:
 			return m, m.runCommand(x.Item.ID)
@@ -382,12 +450,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Global key handling.
-	if km, ok := msg.(tea.KeyMsg); ok {
-		if keymapMatch(m.km.Quit, km) && m.mode != ModeEditor {
+	// Global key handling - only process keybindings if no input field is focused.
+	// This ensures that text input has exclusive focus and keybindings are disabled
+	// while typing in menus or editors.
+	if km, ok := msg.(tea.KeyMsg); ok && !m.isInputFocused() {
+		if keymapMatch(m.km.Quit, km) {
 			return m, tea.Quit
 		}
-		if keymapMatch(m.km.Palette, km) && m.mode != ModeEditor {
+		if keymapMatch(m.km.Palette, km) {
 			m.palTasksOnly = false
 			m.applyPaletteIndex()
 			m.pal.SetPlaceholder("Search tasks, commands, tags…")
@@ -401,11 +471,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = ModePalette
 			return m, m.pal.Open()
 		}
-		if keymapMatch(m.km.CycleTheme, km) && m.mode != ModeEditor {
+		if keymapMatch(m.km.CycleTheme, km) {
 			m.mode = ModeThemeMenu
 			return m, nil
 		}
-		if keymapMatch(m.km.ManagePlugins, km) && m.mode != ModeEditor {
+		if keymapMatch(m.km.ManagePlugins, km) {
 			if m.mode == ModePluginMenu {
 				m.mode = ModeList
 				return m, nil
@@ -416,7 +486,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		if keymapMatch(m.km.OpenPluginDir, km) && m.mode != ModeEditor {
+		if keymapMatch(m.km.OpenPluginDir, km) {
 			if m.plugHost != nil {
 				dir := m.cfg.Plugins.Dir
 				if dir == "" {
@@ -431,11 +501,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		if keymapMatch(m.km.Help, km) && m.mode != ModeEditor {
+		if keymapMatch(m.km.Help, km) {
 			m.mode = ModeHelp
 			return m, nil
 		}
 
+		// Plugin reload - single character keybinding only valid in ModeList
 		if km.String() == "g" && m.mode == ModeList {
 			if m.plugHost != nil {
 				_ = m.plugHost.LoadAll()
@@ -460,18 +531,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.loadTasksCmd()
 			case keymapMatch(m.km.ViewInbox, km):
 				m.setActiveView(core.ViewInbox)
+				m.tagFilter.Clear() // Clear filter when switching views
+				m.rebuildComponentSizes()
 				return m, m.loadTasksCmd()
 			case keymapMatch(m.km.ViewToday, km):
 				m.setActiveView(core.ViewToday)
+				m.tagFilter.Clear()
+				m.rebuildComponentSizes()
 				return m, m.loadTasksCmd()
 			case keymapMatch(m.km.ViewUpcoming, km):
 				m.setActiveView(core.ViewUpcoming)
+				m.tagFilter.Clear()
+				m.rebuildComponentSizes()
 				return m, m.loadTasksCmd()
 			case keymapMatch(m.km.ViewTag, km):
 				m.setActiveView(core.ViewTag)
+				// Enter tag filter mode to allow inline input
+				m.tagFilterInput.SetValue(m.tagFilter.Value())
+				m.tagFilterInput.Focus()
+				m.mode = ModeTagFilter
 				return m, m.loadTasksCmd()
 			case keymapMatch(m.km.ViewPriority, km):
 				m.setActiveView(core.ViewPriority)
+				m.tagFilter.Clear()
+				m.rebuildComponentSizes()
 				return m, m.loadTasksCmd()
 			case keymapMatch(m.km.NewTask, km):
 				task := core.Task{Status: core.StatusTodo, Priority: core.P1}
@@ -546,10 +629,42 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+
+		if m.mode == ModeTagFilter {
+			switch km.String() {
+			case "enter":
+				// Apply the filter and return to list view
+				tagValue := strings.TrimSpace(m.tagFilterInput.Value())
+				if tagValue != "" {
+					m.tagFilter.Set(tagValue)
+					m.setActiveView(core.ViewTag)
+					m.rebuildComponentSizes() // Recalculate layout when filter changes
+					m.mode = ModeList
+					return m, m.loadTasksCmd()
+				}
+				// Empty input: just close without applying
+				m.mode = ModeList
+				return m, nil
+			case "esc":
+				// Cancel and clear input
+				m.tagFilterInput.SetValue("")
+				m.mode = ModeList
+				return m, nil
+			case "ctrl+u":
+				// Clear the entire input
+				m.tagFilterInput.SetValue("")
+				return m, nil
+			}
+		}
 	}
 
 	// Delegate to active component.
 	switch m.mode {
+	case ModeTagFilter:
+		// Handle text input for tag filtering
+		var cmd tea.Cmd
+		m.tagFilterInput, cmd = m.tagFilterInput.Update(msg)
+		return m, cmd
 	case ModeList, ModeConfirmDelete:
 		var cmd tea.Cmd
 		m.list, cmd = m.list.Update(msg)
@@ -594,6 +709,9 @@ func (m *Model) View() string {
 	var content string
 
 	switch m.mode {
+	case ModeTagFilter:
+		// Show tag filter input overlay
+		content = m.renderTagFilterOverlay()
 	case ModePalette:
 		content = m.pal.View()
 	case ModeEditor:
@@ -712,8 +830,8 @@ func (m *Model) renderHeader() string {
 	// Bottom Bar of Header: View Details (Tags/Priority)
 	detailLine := ""
 	v := m.views[m.activeIdx]
-	if v.ID == core.ViewTag && m.tagParam != "" {
-		detailLine = "  " + m.s.Muted.Render(styles.IconTag) + m.s.Title.Render(m.tagParam)
+	if v.ID == core.ViewTag && m.tagFilter.IsActive() {
+		detailLine = "  " + m.s.Muted.Render(styles.IconTag) + m.s.Title.Render(m.tagFilter.Value()) + "  " + m.s.Muted.Render("[press 4 to edit]")
 	} else if v.ID == core.ViewPriority && m.priParam != nil {
 		detailLine = "  " + m.s.Muted.Render("Priority: ") + m.s.PriorityBadge(*m.priParam)
 	}
@@ -752,6 +870,8 @@ func (m *Model) renderFooter() string {
 	switch m.mode {
 	case ModeConfirmDelete:
 		left = m.s.BadgeBad.Render(" DELETE? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
+	case ModeTagFilter:
+		left = " " + m.s.Muted.Render("enter apply • esc cancel • ctrl+u clear")
 	case ModeDetail:
 		left = " " + m.s.Muted.Render(
 			fk(m.km.Back)+" back • "+
@@ -813,6 +933,51 @@ func (m *Model) renderFooter() string {
 		Render(line)
 }
 
+// renderTagFilterOverlay renders the tag filter input modal
+func (m *Model) renderTagFilterOverlay() string {
+	head := m.renderHeader()
+	foot := m.renderFooter()
+
+	hHeight := lipgloss.Height(head)
+	fHeight := lipgloss.Height(foot)
+	availableHeight := m.height - hHeight - fHeight
+	if availableHeight < 0 {
+		availableHeight = 0
+	}
+
+	// Render the body (tasklist) in the background
+	body := m.list.View()
+	body = lipgloss.NewStyle().
+		Height(availableHeight).
+		Width(m.width).
+		Background(m.s.Theme.Bg).
+		Render(body)
+
+	mainUI := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+
+	// Create filter input modal
+	inputLabel := m.s.Title.Render("Filter by Tag")
+	input := lipgloss.NewStyle().Padding(0, 1).Render(m.tagFilterInput.View())
+	hint := m.s.Muted.Render("Current tags: " + strings.Join(m.tags, ", "))
+	if len(m.tags) > 10 {
+		hint = m.s.Muted.Render("(Showing available tags)")
+	}
+
+	modal := lipgloss.JoinVertical(lipgloss.Left,
+		inputLabel,
+		input,
+		hint,
+	)
+
+	cardStyle := m.s.Overlay.Width(60)
+	card := cardStyle.Render(modal)
+
+	// Overlay the modal on top of the main UI
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card,
+		lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
+	) + "\n" + mainUI
+}
+
 func (m *Model) setActiveView(id core.ViewID) {
 	for i, v := range m.views {
 		if v.ID == id {
@@ -840,8 +1005,8 @@ func (m *Model) activeFilter() core.Filter {
 	f := v.Filter
 
 	// Apply dynamic parameters if it's a built-in view that supports them
-	if v.ID == core.ViewTag && m.tagParam != "" {
-		f.Tag = m.tagParam
+	if v.ID == core.ViewTag {
+		f.Tag = m.tagFilter.Value() // Use the new FilterState
 	}
 	if v.ID == core.ViewPriority && m.priParam != nil {
 		f.Priority = m.priParam
@@ -947,6 +1112,14 @@ func (m *Model) refreshStyles() {
 	m.hlp = help.New(m.s, m.km)
 	m.tm = theme_menu.New(m.s)
 	m.pm = plugin_menu.New(m.s)
+
+	// Reinitialize tag filter input with new styles
+	tagInput := textinput.New()
+	tagInput.Prompt = "#"
+	tagInput.Placeholder = "Enter tag to filter…"
+	tagInput.CharLimit = 64
+	tagInput.Width = 40
+	m.tagFilterInput = tagInput
 
 	m.rebuildComponentSizes()
 	m.rebuildPaletteIndex()

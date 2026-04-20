@@ -88,11 +88,12 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 | `1` | **Inbox** — Active tasks |
 | `2` | **Today** — Due today |
 | `3` | **Upcoming** — Future deadlines |
-| `4` | **Completed** — Done tasks |
-| `5` | **Tags** — Filter by tag |
-| `6` | **Priority** — Filter by priority |
+| `4` | **Tags** — Filter by tag |
+| `5` | **Priority** — Filter by priority |
 
 ### Pro Tips
+- Press `4` to open the **tag filter input modal** for direct tag entry
+- Type tag name and press `enter` to apply filter, or `esc` to cancel
 - Type `#tag` in the command palette to jump to a specific tag
 - Type `pri:0` to filter tasks by priority level
 - Use `ctrl+s` to save while editing
