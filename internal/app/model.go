@@ -770,7 +770,14 @@ func (m *Model) renderMainUI() string {
 		Background(m.s.Theme.Bg).
 		Render(body)
 
-	return lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+
+	// Wrap the entire vertical layout to ensure background fills the complete viewport
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Background(m.s.Theme.Bg).
+		Render(mainContent)
 }
 
 func (m *Model) rebuildComponentSizes() {
@@ -935,26 +942,6 @@ func (m *Model) renderFooter() string {
 
 // renderTagFilterOverlay renders the tag filter input modal
 func (m *Model) renderTagFilterOverlay() string {
-	head := m.renderHeader()
-	foot := m.renderFooter()
-
-	hHeight := lipgloss.Height(head)
-	fHeight := lipgloss.Height(foot)
-	availableHeight := m.height - hHeight - fHeight
-	if availableHeight < 0 {
-		availableHeight = 0
-	}
-
-	// Render the body (tasklist) in the background
-	body := m.list.View()
-	body = lipgloss.NewStyle().
-		Height(availableHeight).
-		Width(m.width).
-		Background(m.s.Theme.Bg).
-		Render(body)
-
-	mainUI := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
-
 	// Create filter input modal
 	inputLabel := m.s.Title.Render("Filter by Tag")
 	input := lipgloss.NewStyle().Padding(0, 1).Render(m.tagFilterInput.View())
@@ -972,10 +959,11 @@ func (m *Model) renderTagFilterOverlay() string {
 	cardStyle := m.s.Overlay.Width(60)
 	card := cardStyle.Render(modal)
 
-	// Overlay the modal on top of the main UI
+	// Overlay the modal on top of the screen with proper background
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card,
+		lipgloss.WithWhitespaceChars(" "),
 		lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
-	) + "\n" + mainUI
+	)
 }
 
 func (m *Model) setActiveView(id core.ViewID) {
