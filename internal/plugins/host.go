@@ -497,7 +497,7 @@ func (h *Host) registerAPI(L *lua.LState, ctx context.Context) {
 	}))
 
 	// Info API
-	L.SetField(k, "version", lua.LString("1.0.7"))
+	L.SetField(k, "version", lua.LString("1.0.4"))
 }
 
 func taskToTable(L *lua.LState, t core.Task) *lua.LTable {
