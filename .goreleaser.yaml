@@ -13,22 +13,37 @@ builds:
   - id: kairo
     main: ./cmd/kairo
     binary: kairo
-    goos: [linux, windows, darwin]
-    goarch: [amd64, arm64]
+
+    goos:
+      - linux
+      - windows
+      - darwin
+
+    goarch:
+      - amd64
+      - arm64
+
     flags:
       - -trimpath
+
     mod_timestamp: "{{ .CommitTimestamp }}"
+
     ldflags:
       - -s -w
       - -X main.version={{ .Version }}
-      - -X main.commit={{ .Commit }}
+      - -X main.commit={{ .ShortCommit }}
       - -X main.date={{ .CommitDate }}
 
 archives:
-  - formats: [tar.gz]
+  - id: default
+    formats:
+      - tar.gz
+
     format_overrides:
       - goos: windows
-        formats: [zip]
+        formats:
+          - zip
+
     name_template: >-
       {{ .ProjectName }}_{{ .Os }}_{{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
 
@@ -42,7 +57,7 @@ checksum:
   name_template: checksums.txt
 
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ incpatch .Version }}-devel"
 
 changelog:
   use: git
@@ -54,4 +69,8 @@ changelog:
       - '^chore:'
       - README
       - Merge
-      
+
+release:
+  draft: false
+  prerelease: auto
+  
