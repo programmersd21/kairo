@@ -65,6 +65,3 @@ config.toml
 *.zip
 .env
 .env.*
-
-# Analysis
-analysis/

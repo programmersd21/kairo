@@ -1,8 +1,8 @@
 <div align="center">
 
-# 📝 Kairo
+# 📝 Kairo — 🌿 Minimal, powerful task management.
 
-![Main App](screenshots/app.png)
+![Main App](screenshots/thumbnail.png)
 
 [![Release](https://img.shields.io/github/v/release/programmersd21/kairo?sort=semver&style=for-the-badge&logo=github&color=7c3aed)](https://github.com/programmersd21/kairo/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/programmersd21/kairo/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&color=2563eb)](https://github.com/programmersd21/kairo/actions)
@@ -26,10 +26,12 @@ with the sophistication of a *modern, premium design system*.
 🎯 **Instant Responsiveness** — Sub-millisecond task searching and navigation  
 🎨 **Premium UI Design** — Modern color palette with accessibility at its core  
 ⌨️ **Keyboard-First** — Complete control without ever touching a mouse  
+🖥️ **Seamless Rendering** — Pixel-perfect background fills the entire viewport, no terminal bleed-through  
 🔐 **Offline-First** — Your data lives locally in SQLite, always under your control  
 🔗 **Git-Backed Sync** — Optional distributed sync leveraging Git's architecture  
-🧩 **Extensible** — Lua-based plugins for custom workflows  
+🧩 **Extensible** — Unified Lua plugin system and CLI automation API  
 📱 **Responsive Layout** — Gracefully adapts to any terminal size  
+🤖 **Automation-Friendly** — Headless API for external scripts and CI/CD  
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framework), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (terminal styling), and SQLite (local storage).
 
@@ -39,16 +41,86 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framewo
 
 | Feature | Description |
 |---------|-------------|
-| **Task Engine** | Title, description (Markdown), tags, priority levels, deadlines, status tracking |
+| **Task Service** | Single source of truth for TUI, Lua, and CLI automation |
+| **Lua Plugins** | Native first-class scripting with event hooks (GopherLua) |
+| **Automation API** | Stable CLI interface for external control and JSON integration |
+| **Event Hooks** | React to task creation, updates, and app lifecycle events |
 | **Smart Filtering** | Multiple views: Inbox, Today, Upcoming, Completed, by Tag, by Priority |
 | **Fuzzy Search** | Lightning-fast command palette with ranked results |
 | **Strike Animation** | Visual feedback when completing tasks with 'z' |
 | **Offline Storage** | SQLite with WAL for reliability and concurrent access |
 | **Git Sync** | Optional repository-backed sync with per-task JSON files |
-| **Lua Plugins** | Extend the app with custom commands and views |
 | **Import/Export** | JSON and Markdown support for data portability |
-| **Modern Themes** | 4 built-in themes (Midnight, Dracula, Nord, Paper) with user customization |
-| **Minimalist UI** | Breathable, clean design system with standard Unicode compatibility |
+
+---
+
+## 🤖 Automation & CLI API
+
+Kairo provides a stable CLI API for external automation. Every operation available in the TUI can be performed via the `api` subcommand.
+
+### Usage
+
+```bash
+# List tasks with a specific tag
+kairo api list --tag work
+
+# Create a new task
+kairo api create --title "Finish report" --priority 1
+
+# Update a task
+kairo api update --id <task-id> --status done
+
+# Advanced JSON interface
+kairo api --json '{"action": "create", "payload": {"title": "API Task", "tags": ["bot"]}}'
+```
+
+---
+
+## 🔌 Plugins (Lua)
+
+Extend Kairo with custom logic, event hooks, commands, and views using Lua.
+
+### Plugin Structure
+
+```lua
+-- plugins/my-plugin.lua
+local plugin = {
+    id = "my-plugin",
+    name = "My Plugin",
+    description = "Reacts to tasks",
+    version = "1.0.0",
+}
+
+-- Hook into events
+kairo.on("task_create", function(event)
+    kairo.notify("New task: " .. event.task.title)
+end)
+
+-- Register custom commands
+plugin.commands = {
+    { id = "hello", title = "Say Hello", run = function() kairo.notify("Hello!") end }
+}
+
+return plugin
+```
+
+### Supported Events
+- `task_create`
+- `task_update`
+- `task_delete`
+- `app_start`
+- `app_stop`
+
+### Lua API Reference
+
+| Method | Description |
+|--------|-------------|
+| `kairo.create_task(table)` | Create a new task |
+| `kairo.update_task(id, table)` | Update an existing task |
+| `kairo.delete_task(id)` | Delete a task |
+| `kairo.list_tasks(filter)` | List tasks with optional filter |
+| `kairo.on(event, function)` | Register an event listener |
+| `kairo.notify(msg, is_error)` | Send a notification to the UI |
 
 ---
 
@@ -59,6 +131,7 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 ### Design Philosophy
 
 - **Breathable Layout** — Reduced padding and thin borders for a clean, modern look
+- **Seamless Backdrop** — Custom rendering engine ensures the theme background covers the entire terminal window
 - **Instant Feedback** — Smooth strikethrough animations when completing tasks
 - **Keyboard-First** — All interactions optimized for speed
 - **High Compatibility** — Uses standard Unicode symbols for consistent rendering across all terminals
@@ -82,18 +155,16 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 | `?` | ❓ Show help menu |
 | `q` | ❌ Quit |
 
-### View Filters
+### View Shortcuts
 
 | Shortcut | View |
 |----------|------|
-| `1` | **Inbox** — Active tasks |
-| `2` | **Today** — Due today |
-| `3` | **Upcoming** — Future deadlines |
-| `4` | **Tags** — Filter by tag |
-| `5` | **Priority** — Filter by priority |
+| `1` - `9` | **Switch Views** — Instant access to all tabs (Inbox, Today, Plugins, etc.) |
+| `f` | **Tag Filter** — Quickly jump to Tag View and filter by name |
+| `tab` / `shift+tab` | **Cycle Views** — Move through all available tabs |
 
 ### Pro Tips
-- Press `4` to open the **tag filter input modal** for direct tag entry
+- Press `f` to open the **tag filter input modal** for direct tag entry
 - Type tag name and press `enter` to apply filter, or `esc` to cancel
 - Type `#tag` in the command palette to jump to a specific tag
 - Type `pri:0` to filter tasks by priority level
@@ -153,6 +224,7 @@ Kairo is built with a modular architecture designed for performance, extensibili
 
 | Component | Role |
 |-----------|------|
+| **Task Service** | Single source of truth for TUI, Lua, and CLI automation |
 | **UI Layer** ([Bubble Tea](https://github.com/charmbracelet/bubbletea)) | Elm-inspired TUI framework with state-machine pattern for mode management |
 | **Storage** (SQLite) | Pure Go database with WAL for reliability and concurrent access |
 | **Sync Engine** (Git) | Distributed "no-backend" sync with per-task JSON files |
@@ -162,7 +234,7 @@ Kairo is built with a modular architecture designed for performance, extensibili
 ### Data Flow
 
 ```
-User Input → Bubble Tea Loop → Active Component
+User Input/API/Lua → Task Service → Hooks System
     ↓
 Immediate DB Persistence → Optional Git Sync
     ↓
@@ -171,76 +243,18 @@ UI Re-render → Instant User Feedback
 
 ---
 
-## 🔌 Plugins (Lua)
-
-Extend Kairo with custom commands and views using Lua. Place `.lua` files in your plugins directory.
-
-### Plugin Metadata
-
-```lua
-return {
-    id = "my-plugin",
-    name = "My Custom Plugin",
-    description = "Does something awesome",
-    author = "You",
-    version = "1.0.0",
-    -- commands and views defined below
-}
-```
-
-### API: Tasks
-
-```lua
--- Create, read, update, delete tasks
-kairo.create_task({title, description, status, priority, tags})
-kairo.get_task(id)
-kairo.update_task(id, {title, status, ...})
-kairo.delete_task(id)
-kairo.list_tasks({statuses, tag, priority, sort})
-```
-
-### API: UI
-
-```lua
--- Send notifications to the user
-kairo.notify(message, is_error)
-```
-
-### Example: Cleanup Command
-
-```lua
--- plugins/cleanup.lua
-return {
-    id = "cleanup",
-    name = "Cleanup Done Tasks",
-    description = "Removes all completed tasks",
-    commands = {
-        {
-            id = "run-cleanup",
-            title = "Cleanup: Remove Done",
-            run = function()
-                local tasks = kairo.list_tasks({statuses = {"done"}})
-                for _, t in ipairs(tasks) do
-                    kairo.delete_task(t.id)
-                end
-                kairo.notify("Cleanup complete!", false)
-            end
-        }
-    }
-}
-```
-
----
-
 ## 🌴 Project Structure
 
 ```
 kairo/
-├── cmd/kairo/              # Main entry point
+├── cmd/kairo/              # Main entry point (TUI & API)
 ├── internal/
+│   ├── service/            # Core Task Service (Single source of truth)
+│   ├── lua/                # Lua engine & bindings
+│   ├── api/                # CLI API implementation
+│   ├── hooks/              # Event system
 │   ├── app/                # Application state & messages
 │   ├── core/               # Task model & core logic
-│   ├── config/             # Configuration parsing
 │   ├── storage/            # SQLite repository
 │   ├── sync/               # Git sync engine
 │   ├── search/             # Fuzzy search index
@@ -275,6 +289,12 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - 📚 Documentation and tutorials
 - 🧩 Plugins and extensions
 - 🌍 Translations and localization
+
+---
+
+## 💙 Community Legend(s)
+
+- **@Tornado300** — Contributed significantly by reporting issues that led to multiple critical bug fixes.
 
 ---
 

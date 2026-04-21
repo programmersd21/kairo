@@ -20,7 +20,7 @@ import (
 	"github.com/programmersd21/kairo/internal/core"
 	"github.com/programmersd21/kairo/internal/plugins"
 	"github.com/programmersd21/kairo/internal/search"
-	"github.com/programmersd21/kairo/internal/storage"
+	"github.com/programmersd21/kairo/internal/service"
 	ksync "github.com/programmersd21/kairo/internal/sync"
 	"github.com/programmersd21/kairo/internal/ui/detail"
 	"github.com/programmersd21/kairo/internal/ui/editor"
@@ -28,6 +28,7 @@ import (
 	"github.com/programmersd21/kairo/internal/ui/keymap"
 	"github.com/programmersd21/kairo/internal/ui/palette"
 	"github.com/programmersd21/kairo/internal/ui/plugin_menu"
+	"github.com/programmersd21/kairo/internal/ui/render"
 	"github.com/programmersd21/kairo/internal/ui/styles"
 	"github.com/programmersd21/kairo/internal/ui/tasklist"
 	"github.com/programmersd21/kairo/internal/ui/theme"
@@ -89,7 +90,7 @@ type Model struct {
 	ctx context.Context
 
 	cfg   config.Config
-	repo  *storage.Repository
+	svc   service.TaskService
 	km    keymap.Keymap
 	theme theme.Theme
 	s     styles.Styles
@@ -139,7 +140,7 @@ type Model struct {
 	animationReverse  bool // true if uncompleting (reverse strike), false if completing
 }
 
-func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.Model, error) {
+func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.Model, error) {
 	th := applyThemeOverride(theme.ByName(cfg.App.Theme), cfg.Theme)
 	s := styles.New(th)
 	km := keymap.FromConfig(cfg.Keymap)
@@ -154,7 +155,7 @@ func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.
 	m := &Model{
 		ctx:            ctx,
 		cfg:            cfg,
-		repo:           repo,
+		svc:            svc,
 		km:             km,
 		theme:          th,
 		s:              s,
@@ -170,7 +171,7 @@ func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.
 
 	// Sync.
 	if cfg.Sync.Enabled && strings.TrimSpace(cfg.Sync.RepoPath) != "" {
-		m.syncEngine = ksync.New(repo, cfg.Sync.RepoPath, cfg.Sync.Remote, cfg.Sync.Branch, ksync.Strategy(cfg.Sync.Strategy), cfg.Sync.AutoPush)
+		m.syncEngine = ksync.New(svc.Repo(), cfg.Sync.RepoPath, cfg.Sync.Remote, cfg.Sync.Branch, ksync.Strategy(cfg.Sync.Strategy), cfg.Sync.AutoPush)
 	}
 
 	// Plugins.
@@ -184,7 +185,7 @@ func New(ctx context.Context, cfg config.Config, repo *storage.Repository) (tea.
 		}
 		if dir != "" {
 			_ = os.MkdirAll(dir, 0o755)
-			m.plugHost = plugins.New(repo, dir)
+			m.plugHost = plugins.New(svc, dir)
 			m.plugHost.SetNotifyFunc(func(msg string, isErr bool) {
 				m.statusText = msg
 				m.isErr = isErr
@@ -450,162 +451,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Global key handling - only process keybindings if no input field is focused.
-	// This ensures that text input has exclusive focus and keybindings are disabled
-	// while typing in menus or editors.
-	if km, ok := msg.(tea.KeyMsg); ok && !m.isInputFocused() {
-		if keymapMatch(m.km.Quit, km) {
-			return m, tea.Quit
-		}
-		if keymapMatch(m.km.Palette, km) {
-			m.palTasksOnly = false
-			m.applyPaletteIndex()
-			m.pal.SetPlaceholder("Search tasks, commands, tags…")
-			m.mode = ModePalette
-			return m, m.pal.Open()
-		}
-		if keymapMatch(m.km.TaskSearch, km) && (m.mode == ModeList || m.mode == ModeDetail) {
-			m.palTasksOnly = true
-			m.applyPaletteIndex()
-			m.pal.SetPlaceholder("Search tasks…")
-			m.mode = ModePalette
-			return m, m.pal.Open()
-		}
-		if keymapMatch(m.km.CycleTheme, km) {
-			m.mode = ModeThemeMenu
-			return m, nil
-		}
-		if keymapMatch(m.km.ManagePlugins, km) {
-			if m.mode == ModePluginMenu {
-				m.mode = ModeList
-				return m, nil
-			}
-			if m.plugHost != nil {
-				m.pm.SetPlugins(m.plugHost.Plugins())
-				m.mode = ModePluginMenu
-			}
-			return m, nil
-		}
-		if keymapMatch(m.km.OpenPluginDir, km) {
-			if m.plugHost != nil {
-				dir := m.cfg.Plugins.Dir
-				if dir == "" {
-					stateDir, err := util.AppStateDir("kairo")
-					if err == nil {
-						dir = filepath.Join(stateDir, "plugins")
-					}
-				}
-				if dir != "" {
-					return m, openFolderCmd(dir)
-				}
-			}
-			return m, nil
-		}
-		if keymapMatch(m.km.Help, km) {
-			m.mode = ModeHelp
-			return m, nil
-		}
-
-		// Plugin reload - single character keybinding only valid in ModeList
-		if km.String() == "g" && m.mode == ModeList {
-			if m.plugHost != nil {
-				_ = m.plugHost.LoadAll()
-				m.rebuildViews()
-				m.rebuildPaletteIndex()
-				m.statusText = "Plugins reloaded"
-				m.isErr = false
-				return m, m.loadTasksCmd()
-			}
-		}
-
-		if m.mode == ModeList {
-			switch {
-			case km.String() == "tab":
-				m.activeIdx = (m.activeIdx + 1) % len(m.views)
-				return m, m.loadTasksCmd()
-			case km.String() == "shift+tab":
-				m.activeIdx--
-				if m.activeIdx < 0 {
-					m.activeIdx = len(m.views) - 1
-				}
-				return m, m.loadTasksCmd()
-			case keymapMatch(m.km.ViewInbox, km):
-				m.setActiveView(core.ViewInbox)
-				m.tagFilter.Clear() // Clear filter when switching views
-				m.rebuildComponentSizes()
-				return m, m.loadTasksCmd()
-			case keymapMatch(m.km.ViewToday, km):
-				m.setActiveView(core.ViewToday)
-				m.tagFilter.Clear()
-				m.rebuildComponentSizes()
-				return m, m.loadTasksCmd()
-			case keymapMatch(m.km.ViewUpcoming, km):
-				m.setActiveView(core.ViewUpcoming)
-				m.tagFilter.Clear()
-				m.rebuildComponentSizes()
-				return m, m.loadTasksCmd()
-			case keymapMatch(m.km.ViewTag, km):
-				m.setActiveView(core.ViewTag)
-				// Enter tag filter mode to allow inline input
-				m.tagFilterInput.SetValue(m.tagFilter.Value())
-				m.tagFilterInput.Focus()
-				m.mode = ModeTagFilter
-				return m, m.loadTasksCmd()
-			case keymapMatch(m.km.ViewPriority, km):
-				m.setActiveView(core.ViewPriority)
-				m.tagFilter.Clear()
-				m.rebuildComponentSizes()
-				return m, m.loadTasksCmd()
-			case keymapMatch(m.km.NewTask, km):
-				task := core.Task{Status: core.StatusTodo, Priority: core.P1}
-				m.activeFilter().ApplyToTask(&task)
-				e := editor.New(m.s, editor.ModeNew, task)
-				e.SetSize(m.width, m.height)
-				m.edit = &e
-				m.mode = ModeEditor
-				return m, m.edit.Init()
-			case keymapMatch(m.km.EditTask, km):
-				if t, ok := m.list.Selected(); ok {
-					return m, m.fetchOpenEditCmd(t.ID)
-				}
-			case keymapMatch(m.km.DeleteTask, km):
-				if _, ok := m.list.Selected(); ok {
-					m.mode = ModeConfirmDelete
-					return m, nil
-				}
-			case keymapMatch(m.km.OpenTask, km):
-				if t, ok := m.list.Selected(); ok {
-					return m, m.fetchOpenTaskCmd(t.ID)
-				}
-			case keymapMatch(m.km.ToggleStrike, km):
-				if t, ok := m.list.Selected(); ok {
-					m.animatingTaskID = t.ID
-					m.animationStarted = time.Now()
-					m.animationDuration = 400 * time.Millisecond
-					m.animationReverse = (t.Status == core.StatusDone)
-					return m, m.strikeAnimationTickCmd(t.ID)
-				}
-			}
-		}
-
-		if m.mode == ModeDetail {
-			if keymapMatch(m.km.Back, km) {
-				m.mode = ModeList
-				return m, nil
-			}
-			if keymapMatch(m.km.EditTask, km) {
-				return m, m.fetchOpenEditCmd(m.det.Task().ID)
-			}
-			if keymapMatch(m.km.ToggleStrike, km) {
-				t := m.det.Task()
-				m.animatingTaskID = t.ID
-				m.animationStarted = time.Now()
-				m.animationDuration = 400 * time.Millisecond
-				m.animationReverse = (t.Status == core.StatusDone)
-				return m, m.strikeAnimationTickCmd(t.ID)
-			}
-		}
-
+	if km, ok := msg.(tea.KeyMsg); ok {
 		if m.mode == ModePluginUninstall {
 			switch km.String() {
 			case "y", "enter":
@@ -631,10 +477,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.mode == ModeTagFilter {
+			// Handle critical global keys even in input mode
+			if keymapMatch(m.km.Quit, km) {
+				// Allow quit to work from tag filter input
+				m.tagFilterInput.Blur()
+				m.tagFilterInput.SetValue("")
+				return m, tea.Quit
+			}
+
 			switch km.String() {
 			case "enter":
 				// Apply the filter and return to list view
 				tagValue := strings.TrimSpace(m.tagFilterInput.Value())
+				m.tagFilterInput.Blur()
 				if tagValue != "" {
 					m.tagFilter.Set(tagValue)
 					m.setActiveView(core.ViewTag)
@@ -647,6 +502,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "esc":
 				// Cancel and clear input
+				m.tagFilterInput.Blur()
 				m.tagFilterInput.SetValue("")
 				m.mode = ModeList
 				return m, nil
@@ -654,6 +510,154 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Clear the entire input
 				m.tagFilterInput.SetValue("")
 				return m, nil
+			}
+		}
+
+		// Global key handling - only process keybindings if no input field is focused.
+		// This ensures that text input has exclusive focus and keybindings are disabled
+		// while typing in menus or editors.
+		if !m.isInputFocused() {
+			if keymapMatch(m.km.Quit, km) {
+				return m, tea.Quit
+			}
+			if keymapMatch(m.km.Palette, km) {
+				m.palTasksOnly = false
+				m.applyPaletteIndex()
+				m.pal.SetPlaceholder("Search tasks, commands, tags…")
+				m.mode = ModePalette
+				return m, m.pal.Open()
+			}
+			if keymapMatch(m.km.TaskSearch, km) && (m.mode == ModeList || m.mode == ModeDetail) {
+				m.palTasksOnly = true
+				m.applyPaletteIndex()
+				m.pal.SetPlaceholder("Search tasks…")
+				m.mode = ModePalette
+				return m, m.pal.Open()
+			}
+			if keymapMatch(m.km.CycleTheme, km) {
+				m.mode = ModeThemeMenu
+				return m, nil
+			}
+			if keymapMatch(m.km.ManagePlugins, km) {
+				if m.mode == ModePluginMenu {
+					m.mode = ModeList
+					return m, nil
+				}
+				if m.plugHost != nil {
+					m.pm.SetPlugins(m.plugHost.Plugins())
+					m.mode = ModePluginMenu
+				}
+				return m, nil
+			}
+			if keymapMatch(m.km.OpenPluginDir, km) {
+				if m.plugHost != nil {
+					dir := m.cfg.Plugins.Dir
+					if dir == "" {
+						stateDir, err := util.AppStateDir("kairo")
+						if err == nil {
+							dir = filepath.Join(stateDir, "plugins")
+						}
+					}
+					if dir != "" {
+						return m, openFolderCmd(dir)
+					}
+				}
+				return m, nil
+			}
+			if keymapMatch(m.km.Help, km) {
+				m.mode = ModeHelp
+				return m, nil
+			}
+
+			// Plugin reload - single character keybinding only valid in ModeList
+			if km.String() == "g" && m.mode == ModeList {
+				if m.plugHost != nil {
+					_ = m.plugHost.LoadAll()
+					m.rebuildViews()
+					m.rebuildPaletteIndex()
+					m.statusText = "Plugins reloaded"
+					m.isErr = false
+					return m, m.loadTasksCmd()
+				}
+			}
+
+			if m.mode == ModeList {
+				// Dynamic view switching (1-9)
+				if len(km.String()) == 1 && km.String() >= "1" && km.String() <= "9" {
+					digit := int(km.String()[0] - '0')
+					idx := digit - 1
+					if idx >= 0 && idx < len(m.views) {
+						m.activeIdx = idx
+						m.tagFilter.Clear()
+						m.rebuildComponentSizes()
+						return m, m.loadTasksCmd()
+					}
+				}
+
+				switch {
+				case km.String() == "f":
+					m.setActiveView(core.ViewTag)
+					m.tagFilterInput.SetValue(m.tagFilter.Value())
+					m.tagFilterInput.Focus()
+					m.mode = ModeTagFilter
+					return m, m.loadTasksCmd()
+				case km.String() == "tab":
+					m.activeIdx = (m.activeIdx + 1) % len(m.views)
+					return m, m.loadTasksCmd()
+				case km.String() == "shift+tab":
+					m.activeIdx--
+					if m.activeIdx < 0 {
+						m.activeIdx = len(m.views) - 1
+					}
+					return m, m.loadTasksCmd()
+				case keymapMatch(m.km.NewTask, km):
+					task := core.Task{Status: core.StatusTodo, Priority: core.P1}
+					m.activeFilter().ApplyToTask(&task)
+					e := editor.New(m.s, editor.ModeNew, task)
+					e.SetSize(m.width, m.height)
+					m.edit = &e
+					m.mode = ModeEditor
+					return m, m.edit.Init()
+				case keymapMatch(m.km.EditTask, km):
+					if t, ok := m.list.Selected(); ok {
+						return m, m.fetchOpenEditCmd(t.ID)
+					}
+				case keymapMatch(m.km.DeleteTask, km):
+					if _, ok := m.list.Selected(); ok {
+						m.mode = ModeConfirmDelete
+						return m, nil
+					}
+				case keymapMatch(m.km.OpenTask, km):
+					if t, ok := m.list.Selected(); ok {
+						return m, m.fetchOpenTaskCmd(t.ID)
+					}
+				case keymapMatch(m.km.ToggleStrike, km):
+					if t, ok := m.list.Selected(); ok {
+						m.animatingTaskID = t.ID
+						m.animationStarted = time.Now()
+						m.animationDuration = 400 * time.Millisecond
+						m.animationReverse = (t.Status == core.StatusDone)
+						return m, m.strikeAnimationTickCmd(t.ID)
+					}
+				}
+			}
+
+			if m.mode == ModeDetail {
+				if keymapMatch(m.km.Back, km) {
+					m.mode = ModeList
+					return m, nil
+				}
+				if keymapMatch(m.km.EditTask, km) {
+					return m, m.fetchOpenEditCmd(m.det.Task().ID)
+				}
+				if keymapMatch(m.km.ToggleStrike, km) {
+					t := m.det.Task()
+					m.animatingTaskID = t.ID
+					m.animationStarted = time.Now()
+					m.animationDuration = 400 * time.Millisecond
+					m.animationReverse = (t.Status == core.StatusDone)
+					return m, m.strikeAnimationTickCmd(t.ID)
+				}
 			}
 		}
 	}
@@ -710,7 +714,6 @@ func (m *Model) View() string {
 
 	switch m.mode {
 	case ModeTagFilter:
-		// Show tag filter input overlay
 		content = m.renderTagFilterOverlay()
 	case ModePalette:
 		content = m.pal.View()
@@ -730,10 +733,12 @@ func (m *Model) View() string {
 		content = m.renderMainUI()
 	}
 
-	return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content,
-		lipgloss.WithWhitespaceChars(" "),
-		lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
-	)
+	// Final rendering pipeline: FillViewport guarantees that every cell in
+	// the width×height viewport has the background color applied.
+	// It pads lines, fills missing rows, and—critically—re-applies the
+	// background ANSI sequence after every SGR reset (\x1b[0m), which is
+	// the root cause of terminal default background bleeding through.
+	return render.FillViewport(content, m.width, m.height, m.s.Theme.Bg)
 }
 
 func (m *Model) renderMainUI() string {
@@ -764,20 +769,15 @@ func (m *Model) renderMainUI() string {
 		body = m.list.View()
 	}
 
+	// Ensure body fills its allocated height.
+	// The outer FillViewport handles width filling and ANSI reset fixup.
 	body = lipgloss.NewStyle().
 		Height(availableHeight).
 		Width(m.width).
 		Background(m.s.Theme.Bg).
 		Render(body)
 
-	mainContent := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
-
-	// Wrap the entire vertical layout to ensure background fills the complete viewport
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Background(m.s.Theme.Bg).
-		Render(mainContent)
+	return lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
 }
 
 func (m *Model) rebuildComponentSizes() {
@@ -804,52 +804,48 @@ func (m *Model) rebuildComponentSizes() {
 }
 
 func (m *Model) renderHeader() string {
-	// Top Bar: Logo and Tabs
+	// Logo
 	logo := lipgloss.NewStyle().
 		Foreground(m.s.Theme.Accent).
+		Background(m.s.Theme.Bg).
 		Bold(true).
 		Padding(0, 1).
 		Render("KAIRO")
 
+	// Tabs
 	tabs := []string{}
 	for i, v := range m.views {
 		style := m.s.TabInactive
 		if i == m.activeIdx {
 			style = m.s.TabActive.
 				Border(lipgloss.NormalBorder(), false, false, true, false).
-				BorderBottomForeground(m.s.Theme.Accent)
+				BorderBottomForeground(m.s.Theme.Accent).
+				BorderBackground(m.s.Theme.Bg)
 		}
 		tabs = append(tabs, style.Render(v.Title))
 	}
 	tabRow := lipgloss.JoinHorizontal(lipgloss.Left, tabs...)
 
-	topBarLeft := lipgloss.JoinHorizontal(lipgloss.Left, logo, "  ", tabRow)
+	sep := lipgloss.NewStyle().Background(m.s.Theme.Bg).Render("  ")
+	topBarLeft := lipgloss.JoinHorizontal(lipgloss.Left, logo, sep, tabRow)
 
 	count := fmt.Sprintf("%d tasks", len(m.tasks))
 	topBarRight := m.s.Muted.Render(count)
 
-	sp := m.width - lipgloss.Width(topBarLeft) - lipgloss.Width(topBarRight)
-	if sp < 0 {
-		sp = 0
-	}
-	topBar := topBarLeft + strings.Repeat(" ", sp) + topBarRight
+	topBar := render.BarLine(topBarLeft, topBarRight, m.width, m.s.Theme.Bg)
 
-	// Bottom Bar of Header: View Details (Tags/Priority)
+	// Detail line (tag/priority info)
 	detailLine := ""
 	v := m.views[m.activeIdx]
 	if v.ID == core.ViewTag && m.tagFilter.IsActive() {
-		detailLine = "  " + m.s.Muted.Render(styles.IconTag) + m.s.Title.Render(m.tagFilter.Value()) + "  " + m.s.Muted.Render("[press 4 to edit]")
+		detailLine = "  " + m.s.Muted.Render(styles.IconTag) + m.s.Title.Render(m.tagFilter.Value()) + "  " + m.s.Muted.Render("[press f to edit]")
 	} else if v.ID == core.ViewPriority && m.priParam != nil {
 		detailLine = "  " + m.s.Muted.Render("Priority: ") + m.s.PriorityBadge(*m.priParam)
 	}
 
 	header := topBar
 	if detailLine != "" {
-		// Fill detail line with spaces too
-		sp2 := m.width - lipgloss.Width(detailLine)
-		if sp2 > 0 {
-			detailLine += strings.Repeat(" ", sp2)
-		}
+		detailLine = render.BarLine(detailLine, "", m.width, m.s.Theme.Bg)
 		header = lipgloss.JoinVertical(lipgloss.Left, topBar, detailLine)
 	}
 
@@ -859,6 +855,7 @@ func (m *Model) renderHeader() string {
 		BorderBottom(true).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(m.s.Theme.Border).
+		BorderBackground(m.s.Theme.Bg).
 		Render(header)
 }
 
@@ -905,7 +902,7 @@ func (m *Model) renderFooter() string {
 				fk(m.km.ToggleStrike)+" "+styles.IconStrike+" • "+
 				fk(m.km.DeleteTask)+" "+styles.IconDelete+" • "+
 				fk(m.km.Help)+" "+styles.IconHelp+" • "+
-				fk(m.km.ViewInbox)+"-"+fk(m.km.ViewPriority)+" "+styles.IconView+" ",
+				"1-9 "+styles.IconView+" ",
 		)
 	}
 
@@ -914,29 +911,26 @@ func (m *Model) renderFooter() string {
 		icon := styles.IconInfo
 		if m.isErr {
 			icon = styles.IconError
-			right = m.s.Muted.Foreground(m.s.Theme.Bad).Bold(true).Render(icon+" ") + m.s.Muted.Render(m.statusText) + " "
+			right = m.s.Muted.Foreground(m.s.Theme.Bad).Bold(true).Render(icon+" ") + m.s.Muted.Render(m.statusText+" ")
 		} else {
-			right = m.s.Muted.Foreground(m.s.Theme.Good).Bold(true).Render(icon+" ") + m.s.Muted.Render(m.statusText) + " "
+			right = m.s.Muted.Foreground(m.s.Theme.Good).Bold(true).Render(icon+" ") + m.s.Muted.Render(m.statusText+" ")
 		}
 	} else {
 		syncStatus := ""
 		if m.syncEngine != nil && m.syncEngine.Enabled() {
 			syncStatus = styles.IconSync + " "
 		}
-		right = m.s.Muted.Render(syncStatus + "v1.0.0 ")
+		right = m.s.Muted.Render(syncStatus + "v1.1.0 ")
 	}
 
-	sp := m.width - lipgloss.Width(left) - lipgloss.Width(right)
-	if sp < 0 {
-		sp = 0
-	}
-	line := left + strings.Repeat(" ", sp) + right
+	line := render.BarLine(left, right, m.width, m.s.Theme.Bg)
 	return lipgloss.NewStyle().
 		Width(m.width).
 		Background(m.s.Theme.Bg).
 		BorderTop(true).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(m.s.Theme.Border).
+		BorderBackground(m.s.Theme.Bg).
 		Render(line)
 }
 
@@ -1007,7 +1001,7 @@ func (m *Model) activeFilter() core.Filter {
 func (m *Model) loadTasksCmd() tea.Cmd {
 	f := m.activeFilter()
 	return func() tea.Msg {
-		ts, err := m.repo.ListTasks(m.ctx, storage.ListOptions{Filter: f, Limit: 800})
+		ts, err := m.svc.List(m.ctx, f)
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -1017,7 +1011,7 @@ func (m *Model) loadTasksCmd() tea.Cmd {
 
 func (m *Model) loadAllTasksCmd() tea.Cmd {
 	return func() tea.Msg {
-		ts, err := m.repo.AllTasks(m.ctx)
+		ts, err := m.svc.ListAll(m.ctx)
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -1027,7 +1021,7 @@ func (m *Model) loadAllTasksCmd() tea.Cmd {
 
 func (m *Model) loadTagsCmd() tea.Cmd {
 	return func() tea.Msg {
-		tags, err := m.repo.ListTags(m.ctx)
+		tags, err := m.svc.ListTags(m.ctx)
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -1037,7 +1031,7 @@ func (m *Model) loadTagsCmd() tea.Cmd {
 
 func (m *Model) createTaskCmd(t core.Task) tea.Cmd {
 	return func() tea.Msg {
-		created, err := m.repo.CreateTask(m.ctx, t)
+		created, err := m.svc.Create(m.ctx, t)
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -1047,7 +1041,7 @@ func (m *Model) createTaskCmd(t core.Task) tea.Cmd {
 
 func (m *Model) updateTaskCmd(id string, p core.TaskPatch) tea.Cmd {
 	return func() tea.Msg {
-		updated, err := m.repo.UpdateTask(m.ctx, id, p)
+		updated, err := m.svc.Update(m.ctx, id, p)
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -1057,7 +1051,7 @@ func (m *Model) updateTaskCmd(id string, p core.TaskPatch) tea.Cmd {
 
 func (m *Model) deleteTaskCmd(id string) tea.Cmd {
 	return func() tea.Msg {
-		if err := m.repo.DeleteTask(m.ctx, id); err != nil {
+		if err := m.svc.Delete(m.ctx, id); err != nil {
 			return errMsg{Err: err}
 		}
 		return taskDeletedMsg{ID: id}
@@ -1073,7 +1067,7 @@ func (m *Model) strikeAnimationTickCmd(taskID string) tea.Cmd {
 
 func (m *Model) fetchOpenTaskCmd(id string) tea.Cmd {
 	return func() tea.Msg {
-		t, err := m.repo.GetTask(m.ctx, id)
+		t, err := m.svc.GetByID(m.ctx, id)
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -1083,7 +1077,7 @@ func (m *Model) fetchOpenTaskCmd(id string) tea.Cmd {
 
 func (m *Model) fetchOpenEditCmd(id string) tea.Cmd {
 	return func() tea.Msg {
-		t, err := m.repo.GetTask(m.ctx, id)
+		t, err := m.svc.GetByID(m.ctx, id)
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -1123,7 +1117,8 @@ func (m *Model) rebuildPaletteIndex() {
 		search.Item{ID: "cmd:view:inbox", Kind: search.KindCommand, Title: "View: Inbox", Hint: "1"},
 		search.Item{ID: "cmd:view:today", Kind: search.KindCommand, Title: "View: Today", Hint: "2"},
 		search.Item{ID: "cmd:view:upcoming", Kind: search.KindCommand, Title: "View: Upcoming", Hint: "3"},
-		search.Item{ID: "cmd:view:tag", Kind: search.KindCommand, Title: "View: By Tag", Hint: "4"},
+		search.Item{ID: "cmd:view:completed", Kind: search.KindCommand, Title: "View: Completed", Hint: "4"},
+		search.Item{ID: "cmd:view:tag", Kind: search.KindCommand, Title: "View: By Tag", Hint: "f"},
 		search.Item{ID: "cmd:view:priority", Kind: search.KindCommand, Title: "View: By Priority", Hint: "5"},
 	)
 
@@ -1196,6 +1191,9 @@ func (m *Model) runCommand(id string) tea.Cmd {
 		return m.loadTasksCmd()
 	case "cmd:view:upcoming":
 		m.setActiveView(core.ViewUpcoming)
+		return m.loadTasksCmd()
+	case "cmd:view:completed":
+		m.setActiveView(core.ViewCompleted)
 		return m.loadTasksCmd()
 	case "cmd:view:tag":
 		m.setActiveView(core.ViewTag)

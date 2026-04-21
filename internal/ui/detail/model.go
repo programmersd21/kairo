@@ -107,6 +107,7 @@ func (m *Model) View() string {
 	return lipgloss.NewStyle().
 		Width(m.width).
 		Height(m.height).
+		Background(m.styles.Theme.Bg).
 		Render(content)
 }
 

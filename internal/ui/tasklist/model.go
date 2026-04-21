@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/programmersd21/kairo/internal/core"
+	"github.com/programmersd21/kairo/internal/ui/render"
 	"github.com/programmersd21/kairo/internal/ui/styles"
 )
 
@@ -122,12 +123,14 @@ func (m Model) View() string {
 		lines = append(lines, line)
 	}
 
-	// Padding with empty lines if needed
+	// Pad remaining rows with background-filled empty lines.
+	// The outer FillViewport also handles this, but doing it here
+	// ensures the tasklist always returns a consistent height.
+	emptyLine := lipgloss.NewStyle().
+		Width(m.width).
+		Background(m.styles.Theme.Bg).
+		Render(strings.Repeat(" ", m.width))
 	for len(lines) < visible {
-		emptyLine := lipgloss.NewStyle().
-			Width(m.width).
-			Background(m.styles.Theme.Bg).
-			Render(strings.Repeat(" ", m.width))
 		lines = append(lines, emptyLine)
 	}
 
@@ -137,22 +140,26 @@ func (m Model) View() string {
 func (m Model) renderEmpty() string {
 	icon := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Accent).
+		Background(m.styles.Theme.Bg).
 		Bold(true).
-		Render("✨ " + styles.IconTask)
+		Render("\u2728 " + styles.IconTask)
 
 	title := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Fg).
+		Background(m.styles.Theme.Bg).
 		Bold(true).
 		Margin(1, 0, 0, 0).
 		Render("No tasks here yet")
 
 	subtitle := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Muted).
+		Background(m.styles.Theme.Bg).
 		Margin(1, 0, 0, 0).
 		Render("Press 'n' to create a new task and start your journey")
 
 	hint := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Muted).
+		Background(m.styles.Theme.Bg).
 		Italic(true).
 		Margin(2, 0, 0, 0).
 		Render("Tip: Use the command palette (Ctrl+K) to access all features")
@@ -164,6 +171,7 @@ func (m Model) renderEmpty() string {
 		hint,
 	)
 
+	// Place centered; FillViewport at the top level will handle ANSI fixup.
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content,
 		lipgloss.WithWhitespaceChars(" "),
 		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
@@ -183,22 +191,27 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 		}
 	}
 
-	// Status icon with specific color
+	rowBg := m.styles.Theme.Bg
+	if selected {
+		rowBg = m.styles.Theme.Overlay
+	}
+
+	// Status icon
 	statusIcon := styles.IconTodo
-	statusStyle := m.styles.Muted
+	statusStyle := lipgloss.NewStyle().Foreground(m.styles.Theme.Muted).Background(rowBg)
 	switch t.Status {
 	case core.StatusDoing:
 		statusIcon = styles.IconDoing
-		statusStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Warn)
+		statusStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Warn).Background(rowBg)
 	case core.StatusDone:
 		statusIcon = styles.IconDone
-		statusStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Good)
+		statusStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Good).Background(rowBg)
 	}
 
 	// Selection indicator
-	indicator := "  "
+	indicator := lipgloss.NewStyle().Background(rowBg).Render("  ")
 	if selected {
-		indicator = lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Render("┃ ")
+		indicator = lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Background(rowBg).Render("\u2503 ")
 	}
 
 	titleStyle := m.styles.RowNormal
@@ -211,7 +224,6 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	titleText := t.Title
 	var title string
 	if isAnimating {
-		// Render progressive strikethrough across the text
 		displayTitle := m.renderProgressiveStrikethrough(titleText, animProgress)
 		title = m.styles.RowDimmed.Render(truncate(displayTitle, max(20, m.width-40)))
 	} else {
@@ -219,7 +231,8 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	}
 
 	// Build left side
-	left := indicator + statusStyle.Render(statusIcon) + " " + title
+	spaceBg := lipgloss.NewStyle().Background(rowBg).Render(" ")
+	left := indicator + statusStyle.Render(statusIcon) + spaceBg + title
 
 	rightParts := []string{}
 
@@ -232,7 +245,7 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 		deadText := humanDeadline(*t.Deadline, time.Now())
 		deadStyle := m.styles.Muted
 		if t.Deadline.Before(time.Now()) && t.Status != core.StatusDone {
-			deadStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Bad)
+			deadStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Bad).Background(rowBg)
 		}
 		rightParts = append(rightParts, deadStyle.Render(styles.IconDeadline+deadText))
 	}
@@ -249,23 +262,17 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 		rightParts = append(rightParts, m.styles.Muted.Render(truncate(tagStr, max(10, m.width/6))))
 	}
 
-	right := strings.Join(rightParts, "  ")
+	right := strings.Join(rightParts, lipgloss.NewStyle().Background(rowBg).Render("  "))
 
-	// Calculate spacing
-	leftWidth := lipgloss.Width(left)
-	rightWidth := lipgloss.Width(right)
-	padding := m.width - leftWidth - rightWidth - 2
-	if padding < 1 {
-		padding = 1
+	// Use render.BarLine: fills the gap between left and right with bg-styled spaces.
+	// Subtract 2 for the Padding(0,1) applied by rowStyle below.
+	innerWidth := m.width - 2
+	if innerWidth < 0 {
+		innerWidth = m.width
 	}
+	line := render.BarLine(left, right, innerWidth, rowBg)
 
-	line := left + strings.Repeat(" ", padding) + right
-
-	rowStyle := lipgloss.NewStyle().Width(m.width).Padding(0, 1).Background(m.styles.Theme.Bg)
-	if selected {
-		rowStyle = rowStyle.Background(m.styles.Theme.Overlay)
-	}
-
+	rowStyle := lipgloss.NewStyle().Width(m.width).Padding(0, 1).Background(rowBg)
 	return rowStyle.Render(line)
 }
 

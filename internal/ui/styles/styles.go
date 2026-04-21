@@ -114,8 +114,8 @@ type Styles struct {
 
 func New(t theme.Theme) Styles {
 	base := lipgloss.NewStyle().Foreground(t.Fg).Background(t.Bg)
-	accentStyle := lipgloss.NewStyle().Foreground(t.Accent)
-	mutedStyle := lipgloss.NewStyle().Foreground(t.Muted)
+	accentStyle := lipgloss.NewStyle().Foreground(t.Accent).Background(t.Bg)
+	mutedStyle := lipgloss.NewStyle().Foreground(t.Muted).Background(t.Bg)
 
 	selection := lipgloss.NewStyle().
 		Foreground(t.Bg).
@@ -141,10 +141,12 @@ func New(t theme.Theme) Styles {
 		// Tabs & Navigation
 		TabActive: lipgloss.NewStyle().
 			Foreground(t.Accent).
+			Background(t.Bg).
 			Bold(true).
 			Padding(0, 1),
 		TabInactive: lipgloss.NewStyle().
 			Foreground(t.Muted).
+			Background(t.Bg).
 			Padding(0, 1),
 		Separator: mutedStyle.SetString("│"),
 
@@ -157,15 +159,20 @@ func New(t theme.Theme) Styles {
 
 		// Badges - Compact
 		Badge: lipgloss.NewStyle().
-			Foreground(t.Muted),
+			Foreground(t.Muted).
+			Background(t.Bg),
 		BadgeGood: lipgloss.NewStyle().
-			Foreground(t.Good),
+			Foreground(t.Good).
+			Background(t.Bg),
 		BadgeWarn: lipgloss.NewStyle().
-			Foreground(t.Warn),
+			Foreground(t.Warn).
+			Background(t.Bg),
 		BadgeBad: lipgloss.NewStyle().
-			Foreground(t.Bad),
+			Foreground(t.Bad).
+			Background(t.Bg),
 		BadgeMuted: lipgloss.NewStyle().
-			Foreground(t.Muted),
+			Foreground(t.Muted).
+			Background(t.Bg),
 
 		// Detail & Form
 		DetailKey: mutedStyle.

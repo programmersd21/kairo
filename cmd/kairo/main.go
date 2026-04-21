@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,10 +13,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/programmersd21/kairo/internal/api"
 	"github.com/programmersd21/kairo/internal/app"
 	"github.com/programmersd21/kairo/internal/config"
 	"github.com/programmersd21/kairo/internal/core"
 	"github.com/programmersd21/kairo/internal/core/codec"
+	"github.com/programmersd21/kairo/internal/hooks"
+	"github.com/programmersd21/kairo/internal/service"
 	"github.com/programmersd21/kairo/internal/storage"
 	ksync "github.com/programmersd21/kairo/internal/sync"
 )
@@ -41,8 +45,22 @@ func main() {
 		}
 	}()
 
+	// Initialize unified service layer
+	hks := hooks.New()
+	svc := service.New(repo, hks)
+
+	// Emit app start event (plugins can listen to this)
+	hks.AppStarted()
+	defer hks.AppStopped()
+
 	if len(os.Args) > 1 {
 		switch strings.ToLower(os.Args[1]) {
+		case "api":
+			if err := runAPI(ctx, svc, os.Args[2:]); err != nil {
+				fmt.Fprintln(os.Stderr, "kairo api:", err)
+				os.Exit(2)
+			}
+			return
 		case "export":
 			if err := runExport(ctx, repo, os.Args[2:]); err != nil {
 				fmt.Fprintln(os.Stderr, "kairo export:", err)
@@ -69,7 +87,7 @@ func main() {
 		}
 	}
 
-	m, err := app.New(ctx, cfg, repo)
+	m, err := app.New(ctx, cfg, svc)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "kairo:", err)
 		os.Exit(2)
@@ -80,6 +98,46 @@ func main() {
 		fmt.Fprintln(os.Stderr, "kairo:", err)
 		os.Exit(1)
 	}
+}
+
+func runAPI(ctx context.Context, svc service.TaskService, args []string) error {
+	if len(args) == 0 {
+		return errors.New("missing action (create, list, update, delete, get, list-tags)")
+	}
+
+	taskAPI := api.New(svc)
+	action := args[0]
+
+	var req api.Request
+	if action == "--json" {
+		if len(args) < 2 {
+			return errors.New("--json requires a JSON string")
+		}
+		if err := json.Unmarshal([]byte(args[1]), &req); err != nil {
+			return fmt.Errorf("invalid json: %w", err)
+		}
+	} else {
+		req.Action = action
+		payload := make(map[string]interface{})
+		for i := 1; i < len(args); i++ {
+			if strings.HasPrefix(args[i], "--") {
+				key := strings.TrimPrefix(args[i], "--")
+				if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
+					payload[key] = args[i+1]
+					i++
+				} else {
+					payload[key] = true
+				}
+			}
+		}
+		b, _ := json.Marshal(payload)
+		req.Payload = b
+	}
+
+	resp := taskAPI.Execute(ctx, req)
+	out, _ := json.MarshalIndent(resp, "", "  ")
+	fmt.Println(string(out))
+	return nil
 }
 
 func runExport(ctx context.Context, repo *storage.Repository, args []string) error {

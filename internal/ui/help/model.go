@@ -66,7 +66,8 @@ func (m Model) View() string {
 		{
 			"Navigation",
 			[]struct{ key, desc string }{
-				{getK(m.km.ViewInbox) + ", " + getK(m.km.ViewToday) + ", " + getK(m.km.ViewUpcoming) + ", " + getK(m.km.ViewTag) + ", " + getK(m.km.ViewPriority), "Switch views"},
+				{"1-9", "Switch views (tabs)"},
+				{"f", "Filter by tag (Tag view)"},
 				{getK(m.km.OpenTask), "Open task details"},
 				{getK(m.km.Back), "Back / Close"},
 			},

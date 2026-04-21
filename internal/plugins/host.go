@@ -15,7 +15,8 @@ import (
 	lua "github.com/yuin/gopher-lua"
 
 	"github.com/programmersd21/kairo/internal/core"
-	"github.com/programmersd21/kairo/internal/storage"
+	klua "github.com/programmersd21/kairo/internal/lua"
+	"github.com/programmersd21/kairo/internal/service"
 )
 
 type PluginInfo struct {
@@ -47,8 +48,8 @@ type handlerRef struct {
 }
 
 type Host struct {
-	repo *storage.Repository
-	dir  string
+	service service.TaskService
+	dir     string
 
 	mu       sync.RWMutex
 	plugins  []PluginInfo
@@ -63,7 +64,12 @@ type Host struct {
 	notifyFunc func(string, bool)
 }
 
-func New(repo *storage.Repository, dir string) *Host { return &Host{repo: repo, dir: dir} }
+func New(svc service.TaskService, dir string) *Host {
+	return &Host{
+		service: svc,
+		dir:     dir,
+	}
+}
 
 func (h *Host) Enabled() bool { return strings.TrimSpace(h.dir) != "" }
 
@@ -182,7 +188,8 @@ func (h *Host) RunCommand(ctx context.Context, fullID string) error {
 	L := lua.NewState()
 	defer L.Close()
 
-	h.registerAPI(L, ctx)
+	eng := klua.NewEngine(h.service, h.service.Hooks())
+	eng.SetupKairoAPI(L)
 
 	if err := L.DoFile(ref.Path); err != nil {
 		return err
@@ -273,7 +280,8 @@ func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, map[
 	L := lua.NewState()
 	defer L.Close()
 
-	h.registerAPI(L, context.Background())
+	eng := klua.NewEngine(h.service, h.service.Hooks())
+	eng.SetupKairoAPI(L)
 
 	if err := L.DoFile(path); err != nil {
 		return PluginInfo{}, nil, nil, nil, fmt.Errorf("plugin %s: %w", filepath.Base(path), err)
@@ -363,162 +371,6 @@ func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, map[
 	}
 
 	return info, cmds, views, handlers, nil
-}
-
-func (h *Host) registerAPI(L *lua.LState, ctx context.Context) {
-	k := L.NewTable()
-	L.SetGlobal("kairo", k)
-
-	// Task API
-	L.SetField(k, "create_task", L.NewFunction(func(L *lua.LState) int {
-		tbl := L.CheckTable(1)
-		task := core.Task{
-			Title:       luaToString(tbl.RawGetString("title")),
-			Description: luaToString(tbl.RawGetString("description")),
-			Status:      core.Status(strings.ToLower(luaToString(tbl.RawGetString("status")))),
-			Priority:    core.Priority(luaToInt(tbl.RawGetString("priority"))).Clamp(),
-		}
-		if task.Status == "" {
-			task.Status = core.StatusTodo
-		}
-		if tagTbl, ok := tbl.RawGetString("tags").(*lua.LTable); ok {
-			tagTbl.ForEach(func(_ lua.LValue, v lua.LValue) {
-				task.Tags = append(task.Tags, core.NormalizeTag(luaToString(v)))
-			})
-		}
-		created, err := h.repo.CreateTask(ctx, task)
-		if err != nil {
-			L.Push(lua.LNil)
-			L.Push(lua.LString(err.Error()))
-			return 2
-		}
-		L.Push(taskToTable(L, created))
-		return 1
-	}))
-
-	L.SetField(k, "get_task", L.NewFunction(func(L *lua.LState) int {
-		id := L.CheckString(1)
-		t, err := h.repo.GetTask(ctx, id)
-		if err != nil {
-			L.Push(lua.LNil)
-			return 1
-		}
-		L.Push(taskToTable(L, t))
-		return 1
-	}))
-
-	L.SetField(k, "update_task", L.NewFunction(func(L *lua.LState) int {
-		id := L.CheckString(1)
-		tbl := L.CheckTable(2)
-		patch := core.TaskPatch{}
-		if v := tbl.RawGetString("title"); v.Type() != lua.LTNil {
-			s := luaToString(v)
-			patch.Title = &s
-		}
-		if v := tbl.RawGetString("description"); v.Type() != lua.LTNil {
-			s := luaToString(v)
-			patch.Description = &s
-		}
-		if v := tbl.RawGetString("status"); v.Type() != lua.LTNil {
-			s := core.Status(strings.ToLower(luaToString(v)))
-			patch.Status = &s
-		}
-		if v := tbl.RawGetString("priority"); v.Type() != lua.LTNil {
-			p := core.Priority(luaToInt(v)).Clamp()
-			patch.Priority = &p
-		}
-		if v := tbl.RawGetString("tags"); v.Type() == lua.LTTable {
-			var ts []string
-			v.(*lua.LTable).ForEach(func(_ lua.LValue, vv lua.LValue) {
-				ts = append(ts, core.NormalizeTag(luaToString(vv)))
-			})
-			patch.Tags = &ts
-		}
-
-		updated, err := h.repo.UpdateTask(ctx, id, patch)
-		if err != nil {
-			L.Push(lua.LNil)
-			L.Push(lua.LString(err.Error()))
-			return 2
-		}
-		L.Push(taskToTable(L, updated))
-		return 1
-	}))
-
-	L.SetField(k, "delete_task", L.NewFunction(func(L *lua.LState) int {
-		id := L.CheckString(1)
-		_ = h.repo.DeleteTask(ctx, id)
-		return 0
-	}))
-
-	L.SetField(k, "list_tasks", L.NewFunction(func(L *lua.LState) int {
-		fTbl := L.OptTable(1, L.NewTable())
-		filter := core.Filter{IncludeNilDeadline: true}
-		if sts, ok := fTbl.RawGetString("statuses").(*lua.LTable); ok {
-			sts.ForEach(func(_ lua.LValue, v lua.LValue) {
-				filter.Statuses = append(filter.Statuses, core.Status(luaToString(v)))
-			})
-		}
-		if t := luaToString(fTbl.RawGetString("tag")); t != "" {
-			filter.Tag = core.NormalizeTag(t)
-		}
-		if p := fTbl.RawGetString("priority"); p.Type() == lua.LTNumber {
-			pr := core.Priority(luaToInt(p)).Clamp()
-			filter.Priority = &pr
-		}
-		if s := luaToString(fTbl.RawGetString("sort")); s != "" {
-			filter.Sort = core.SortMode(s)
-		}
-
-		tasks, err := h.repo.ListTasks(ctx, storage.ListOptions{Filter: filter, Limit: 1000})
-		if err != nil {
-			L.Push(L.NewTable())
-			return 1
-		}
-		out := L.NewTable()
-		for _, t := range tasks {
-			out.Append(taskToTable(L, t))
-		}
-		L.Push(out)
-		return 1
-	}))
-
-	// UI API
-	L.SetField(k, "notify", L.NewFunction(func(L *lua.LState) int {
-		msg := L.CheckString(1)
-		isError := L.OptBool(2, false)
-		h.mu.RLock()
-		f := h.notifyFunc
-		h.mu.RUnlock()
-		if f != nil {
-			f(msg, isError)
-		}
-		return 0
-	}))
-
-	// Info API
-	L.SetField(k, "version", lua.LString("1.0.4"))
-}
-
-func taskToTable(L *lua.LState, t core.Task) *lua.LTable {
-	tbl := L.NewTable()
-	L.SetField(tbl, "id", lua.LString(t.ID))
-	L.SetField(tbl, "title", lua.LString(t.Title))
-	L.SetField(tbl, "description", lua.LString(t.Description))
-	L.SetField(tbl, "status", lua.LString(string(t.Status)))
-	L.SetField(tbl, "priority", lua.LNumber(t.Priority))
-
-	tags := L.NewTable()
-	for _, tg := range t.Tags {
-		tags.Append(lua.LString(tg))
-	}
-	L.SetField(tbl, "tags", tags)
-
-	if t.Deadline != nil {
-		L.SetField(tbl, "deadline", lua.LString(t.Deadline.Format(time.RFC3339)))
-	}
-	L.SetField(tbl, "updated_at", lua.LString(t.UpdatedAt.Format(time.RFC3339)))
-	return tbl
 }
 
 func luaToString(v lua.LValue) string {

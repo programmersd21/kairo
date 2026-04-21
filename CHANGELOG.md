@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0]
+
+### Added
+- **Unified Extensibility System**: A shared task service layer for TUI, Lua, and CLI.
+- **Automation CLI API**: Stable `kairo api` command for external scripting and JSON integration.
+- **Enhanced Lua Plugin System**: 
+    - Full Task CRUD access via `kairo` module.
+    - Event Hook System subscribing to `task_create`, `task_update`, `task_delete`, `app_start`, and `app_stop`.
+    - Improved Plugin Host with robust error handling and unified engine.
+- **App Lifecycle Events**: Proper emission of start/stop events for plugin orchestration.
+- **Dynamic View Shortcuts**: `1-9` keys now switch to the corresponding tab index, working for all built-in and plugin-provided views.
+- **Specific Tag Filter Key**: `f` now specifically switches to the Tag View and opens the filter input modal.
+
+### Fixed
+- **Background Rendering Bleed-Through**: Resolved a visual bug where the terminal's default background color showed through in whitespace regions, creating inconsistent visuals across the entire viewport.
+  - **Root Cause**: Inline spacer strings (`strings.Repeat(" ", N)`) in the header, footer, and task rows were plain text without ANSI background escape codes. Additionally, multiple Lip Gloss styles (`Muted`, `Accent`, `Badge*`, `Tab*`) were defined without `.Background()`, causing their ANSI reset codes to clear the container's background.
+  - Added explicit `.Background(t.Bg)` to all content-level styles (`Muted`, `Accent`, `TabActive`, `TabInactive`, `Badge`, `BadgeGood`, `BadgeWarn`, `BadgeBad`, `BadgeMuted`).
+  - Wrapped all inline spacer strings in styled renders with the theme background color.
+  - Added background to the detail view outer container.
+  - The fix is robust across resizing, scrolling, theme switching, and all UI modes.
+### Changed
+- Refactored internal architecture to use `TaskService` as the single source of truth.
+- Standardized Lua plugin structure with metadata, commands, and views.
+- Improved CLI consistency with new `api` subcommand flags and JSON support.
+
 ## [1.0.4]
 
 ### Added

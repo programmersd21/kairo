@@ -1,5 +1,8 @@
 # .goreleaser.yaml
+# Latest GoReleaser v2 schema
 version: 2
+
+project_name: kairo
 
 before:
   hooks:
@@ -41,6 +44,7 @@ archives:
 
 checksum:
   name_template: 'checksums.txt'
+  algorithm: sha256
 
 snapshot:
   name_template: "{{ .Tag }}-next"
@@ -54,3 +58,20 @@ changelog:
       - 'README'
       - Merge pull request
       - Merge branch
+
+# Modern Homebrew formula
+brews:
+  - name: kairo
+    repository:
+      owner: programmersd21
+      name: homebrew-tap
+    directory: Formula
+    homepage: "https://github.com/programmersd21/kairo"
+    description: "Premium Terminal Task Manager with Lua Extensibility"
+    license: "MIT"
+    install: |
+      bin.install "kairo"
+      # Install sample plugins
+      (etc/"kairo/plugins").install Dir["plugins/*.lua"]
+    test: |
+      system "#{bin}/kairo version"
