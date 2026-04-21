@@ -13,14 +13,14 @@ type UninstallMsg struct{ ID string }
 type OpenFolderMsg struct{}
 type ReloadMsg struct{}
 
-type UninstallConfirmMsg struct{ ID string }
-
 type Model struct {
 	styles  styles.Styles
 	width   int
 	height  int
 	plugins []plugins.PluginInfo
 	sel     int
+	detail  *plugins.PluginInfo // nil means in list mode
+	confirm string              // non-empty means showing confirm for uninstalling this ID
 }
 
 func New(s styles.Styles) Model {
@@ -44,6 +44,27 @@ func (m *Model) SetPlugins(ps []plugins.PluginInfo) {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch x := msg.(type) {
 	case tea.KeyMsg:
+		if m.confirm != "" {
+			switch x.String() {
+			case "y":
+				id := m.confirm
+				m.confirm = ""
+				return m, func() tea.Msg { return UninstallMsg{ID: id} }
+			case "n", "esc":
+				m.confirm = ""
+				return m, nil
+			}
+			return m, nil
+		}
+
+		if m.detail != nil {
+			switch x.String() {
+			case "esc", "q", "enter":
+				m.detail = nil
+			}
+			return m, nil
+		}
+
 		switch x.String() {
 		case "esc", "q", "p":
 			return m, func() tea.Msg { return CloseMsg{} }
@@ -55,14 +76,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if m.sel < len(m.plugins)-1 {
 				m.sel++
 			}
-		case "o": // Open folder
-			return m, func() tea.Msg { return OpenFolderMsg{} }
-		case "r": // Reload
-			return m, func() tea.Msg { return ReloadMsg{} }
-		case "x": // Uninstall key
+		case "enter":
 			if m.sel >= 0 && m.sel < len(m.plugins) {
-				id := m.plugins[m.sel].ID
-				return m, func() tea.Msg { return UninstallConfirmMsg{ID: id} }
+				p := m.plugins[m.sel]
+				m.detail = &p
+			}
+		case "o":
+			return m, func() tea.Msg { return OpenFolderMsg{} }
+		case "r":
+			return m, func() tea.Msg { return ReloadMsg{} }
+		case "u":
+			if m.sel >= 0 && m.sel < len(m.plugins) {
+				m.confirm = m.plugins[m.sel].ID
 			}
 		}
 	}
@@ -75,6 +100,35 @@ func (m Model) View() string {
 		w = 80
 	}
 	cardW := min(80, w-4)
+
+	if m.confirm != "" {
+		return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center,
+			m.styles.Overlay.Width(cardW).Render(
+				lipgloss.JoinVertical(lipgloss.Center,
+					"Uninstall plugin?",
+					"",
+					m.styles.Accent.Render("[y] Yes  [n] No"),
+				),
+			),
+		)
+	}
+
+	if m.detail != nil {
+		p := m.detail
+		content := lipgloss.JoinVertical(lipgloss.Left,
+			m.styles.Title.Render(p.Name),
+			"",
+			"Version: "+p.Version,
+			"Author: "+p.Author,
+			"",
+			p.Description,
+			"",
+			m.styles.Muted.Render("Press Enter/Esc to return"),
+		)
+		return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center,
+			m.styles.Overlay.Width(cardW).Padding(2).Render(content),
+		)
+	}
 
 	var rows []string
 	if len(m.plugins) == 0 {

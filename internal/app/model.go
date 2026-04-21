@@ -82,7 +82,6 @@ const (
 	ModeHelp
 	ModeThemeMenu
 	ModePluginMenu
-	ModePluginUninstall
 	ModeTagFilter
 )
 
@@ -122,8 +121,6 @@ type Model struct {
 	tasks []core.Task
 	all   []core.Task
 	tags  []string
-
-	uninstallPluginID string
 
 	statusText string
 	isErr      bool
@@ -314,11 +311,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case plugin_menu.UninstallConfirmMsg:
-		m.uninstallPluginID = x.ID
-		m.mode = ModePluginUninstall
-		return m, nil
-
 	case plugin_menu.UninstallMsg:
 		if m.plugHost != nil {
 			err := m.plugHost.DeletePlugin(x.ID)
@@ -332,6 +324,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.rebuildViews()
 			m.rebuildPaletteIndex()
+		}
+		if m.mode == ModePluginMenu {
+			// Stay in plugin menu, refresh handled by SetPlugins above
+		} else {
+			m.mode = ModeList
 		}
 		return m, nil
 
@@ -452,17 +449,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if km, ok := msg.(tea.KeyMsg); ok {
-		if m.mode == ModePluginUninstall {
-			switch km.String() {
-			case "y", "enter":
-				m.mode = ModePluginMenu
-				return m, func() tea.Msg { return plugin_menu.UninstallMsg{ID: m.uninstallPluginID} }
-			case "n", "esc":
-				m.mode = ModePluginMenu
-				return m, nil
-			}
-		}
-
 		if m.mode == ModeConfirmDelete {
 			switch km.String() {
 			case "y", "enter":
@@ -727,7 +713,7 @@ func (m *Model) View() string {
 		content = m.hlp.View()
 	case ModeThemeMenu:
 		content = m.tm.View()
-	case ModePluginMenu, ModePluginUninstall:
+	case ModePluginMenu:
 		content = m.renderMainUI()
 	default:
 		content = m.renderMainUI()
@@ -763,7 +749,7 @@ func (m *Model) renderMainUI() string {
 		body = m.list.View()
 	case ModeDetail:
 		body = m.det.View()
-	case ModePluginMenu, ModePluginUninstall:
+	case ModePluginMenu:
 		body = m.pm.View()
 	default:
 		body = m.list.View()
@@ -892,9 +878,7 @@ func (m *Model) renderFooter() string {
 	case ModeThemeMenu:
 		left = " " + m.s.Muted.Render("enter select • esc/q/"+fk(m.km.CycleTheme)+" close • ↑/↓ navigate")
 	case ModePluginMenu:
-		left = " " + m.s.Muted.Render("x uninstall • esc/q/"+fk(m.km.ManagePlugins)+" close • ↑/↓ navigate")
-	case ModePluginUninstall:
-		left = m.s.BadgeBad.Render(" UNINSTALL? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
+		left = " " + m.s.Muted.Render("enter detail • u uninstall • o open folder • r reload • p/"+fk(m.km.ManagePlugins)+" close • ↑/↓ navigate")
 	default:
 		left = " " + m.s.Muted.Render(
 			fk(m.km.Palette)+" "+styles.IconPalette+" • "+

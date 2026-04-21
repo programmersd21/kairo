@@ -175,6 +175,16 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 | `?` | ❓ Show help menu |
 | `q` | ❌ Quit |
 
+### Plugin Menu Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `enter` | 👁️ View plugin details |
+| `u` | 🗑️ Uninstall plugin |
+| `o` | 📂 Open plugins folder |
+| `r` | 🔄 Reload plugins |
+| `p` / `esc` | ❌ Close menu |
+
 ### View Shortcuts
 
 | Shortcut | View |
