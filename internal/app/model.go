@@ -131,11 +131,17 @@ type Model struct {
 	plugHost *plugins.Host
 	plugCh   chan struct{}
 
-	// Animation state for strike action
-	animatingTaskID   string
-	animationStarted  time.Time
-	animationDuration time.Duration
-	animationReverse  bool // true if uncompleting (reverse strike), false if completing
+	RainbowAnimationOffset int
+	animatingTaskID        string
+	animationStarted       time.Time
+	animationDuration      time.Duration
+	animationReverse       bool
+}
+
+func (m *Model) rainbowTickCmd() tea.Cmd {
+	return tea.Tick(150*time.Millisecond, func(time.Time) tea.Msg {
+		return rainbowTickMsg{}
+	})
 }
 
 func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.Model, error) {
@@ -151,14 +157,15 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 	tagInput.Width = 40
 
 	m := &Model{
-		ctx:            ctx,
-		cfg:            cfg,
-		svc:            svc,
-		km:             km,
-		theme:          th,
-		s:              s,
-		mode:           ModeList,
-		tagFilterInput: tagInput,
+		ctx:                    ctx,
+		cfg:                    cfg,
+		svc:                    svc,
+		km:                     km,
+		theme:                  th,
+		s:                      s,
+		mode:                   ModeList,
+		tagFilterInput:         tagInput,
+		RainbowAnimationOffset: 0,
 	}
 	m.list = tasklist.New(m.s, cfg.App.VimMode, m.km)
 	m.pal = palette.New(m.s)
@@ -225,7 +232,7 @@ func applyThemeOverride(t theme.Theme, o config.ThemeConfig) theme.Theme {
 }
 
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd()}
+	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.rainbowTickCmd()}
 	if m.plugCh != nil {
 		cmds = append(cmds, m.listenPluginsCmd())
 	}
@@ -394,6 +401,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case taskDeletedMsg:
 		return m, tea.Batch(m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
+
+	case rainbowTickMsg:
+		// Linear rainbow animation: increment offset each tick
+		m.RainbowAnimationOffset = (m.RainbowAnimationOffset + 1) % 7 // 7 colors in rainbow
+		return m, m.rainbowTickCmd()
 
 	case strikeAnimationTickMsg:
 		if m.animatingTaskID != x.TaskID {
@@ -790,14 +802,26 @@ func (m *Model) rebuildComponentSizes() {
 	}
 }
 
+// Add to Model struct:
+// RainbowAnimationOffset int
+// And inside New():
+// m.RainbowAnimationOffset = 0
+
+// Updated RenderHeader:
 func (m *Model) renderHeader() string {
-	// Logo
-	logo := lipgloss.NewStyle().
-		Foreground(m.s.Theme.Accent).
-		Background(m.s.Theme.Bg).
+	// Logo with themed background container
+	logoText := "KAIRO"
+	rainbowColors := []string{"#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#0000ff", "#4b0082", "#9400d3"}
+	var logoBuilder strings.Builder
+	for i, char := range logoText {
+		color := rainbowColors[(i+m.RainbowAnimationOffset)%len(rainbowColors)]
+		logoBuilder.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(char)))
+	}
+	// Create logo with themed background that spans the header height
+	logoContent := lipgloss.NewStyle().
 		Bold(true).
-		Padding(0, 1).
-		Render("KAIRO")
+		Render(logoBuilder.String())
+	logo := logoContent
 
 	// Tabs
 	tabs := []string{}
