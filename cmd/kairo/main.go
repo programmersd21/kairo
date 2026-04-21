@@ -277,7 +277,7 @@ func getCurrentVersion() string {
 	}
 
 	// Fallback to default
-	return "1.0.0"
+	return "1.1.1"
 }
 
 type GitHubRelease struct {

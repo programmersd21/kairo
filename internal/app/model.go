@@ -920,7 +920,7 @@ func (m *Model) renderFooter() string {
 		if m.syncEngine != nil && m.syncEngine.Enabled() {
 			syncStatus = styles.IconSync + " "
 		}
-		right = m.s.Muted.Render(syncStatus + "v1.1.0 ")
+		right = m.s.Muted.Render(syncStatus + "v1.1.1 ")
 	}
 
 	line := render.BarLine(left, right, m.width, m.s.Theme.Bg)
