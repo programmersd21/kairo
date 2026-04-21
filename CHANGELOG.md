@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1]
+
+### Added
+- **20 New Themes (2026 Design Trends)**:
+  - Dark themes: `obsidian_bloom`, `neon_reef`, `carbon_sunset`, `vanta_aurora`, `plasma_grape`, `midnight_jade`, `synthwave_minimal`, `graphite_matcha`
+  - Light themes: `cloud_dancer`, `sakura_sand`, `olive_mist`, `terracotta_air`, `vanilla_sky`, `peach_fuzz_neo`, `coastal_drift`, `matcha_latte`
+  - Hybrid themes: `digital_lavender`, `neo_mint_system`, `sunset_gradient_pro`, `forest_sanctuary`
+- **Version Management**: `kairo version` command to display installed version
+- **Update Command**: `kairo update` command for one-step updates via `go install github.com/programmersd21/kairo/cmd/kairo@latest`
+
+### Changed
+- Updated theme registry to 32 total themes (12 legacy + 20 new)
+
 ## [1.1.0]
 
 ### Added

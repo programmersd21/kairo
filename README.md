@@ -74,6 +74,26 @@ kairo api update --id <task-id> --status done
 kairo api --json '{"action": "create", "payload": {"title": "API Task", "tags": ["bot"]}}'
 ```
 
+### Other CLI Commands
+
+```bash
+# Check installed version
+kairo version
+
+# Update to the latest version
+kairo update
+
+# Export tasks
+kairo export --format json --out tasks.json
+kairo export --format markdown --out tasks.md
+
+# Import tasks
+kairo import --format json --in tasks.json
+
+# Sync with Git (if configured)
+kairo sync
+```
+
 ---
 
 ## 🔌 Plugins (Lua)
