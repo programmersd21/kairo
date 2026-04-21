@@ -247,34 +247,94 @@ UI Re-render → Instant User Feedback
 
 ```
 kairo/
-├── cmd/kairo/              # Main entry point (TUI & API)
-├── internal/
-│   ├── service/            # Core Task Service (Single source of truth)
-│   ├── lua/                # Lua engine & bindings
-│   ├── api/                # CLI API implementation
-│   ├── hooks/              # Event system
-│   ├── app/                # Application state & messages
-│   ├── core/               # Task model & core logic
-│   ├── storage/            # SQLite repository
-│   ├── sync/               # Git sync engine
-│   ├── search/             # Fuzzy search index
-│   ├── plugins/            # Lua plugin host
-│   └── ui/                 # Terminal UI components
-│       ├── styles/         # Premium design system
-│       ├── theme/          # Color themes
-│       ├── tasklist/       # Main task list view
-│       ├── detail/         # Task detail view
-│       ├── editor/         # Task editor
-│       ├── palette/        # Command palette
-│       ├── keymap/         # Keyboard bindings
-│       ├── help/           # Help overlay
-│       ├── theme_menu/     # Theme switcher
-│       └── plugin_menu/    # Plugin manager
-├── configs/                # Example configuration
-├── plugins/                # Sample plugins
-├── DESIGN_SYSTEM.md        # Complete design documentation
-├── CONTRIBUTING.md         # Contributing guidelines
-└── README.md               # This file
+├── CHANGELOG.md
+├── cmd
+│   └── kairo
+│       └── main.go
+├── CODE_OF_CONDUCT.md
+├── configs
+│   └── kairo.example.toml
+├── CONTRIBUTING.md
+├── go.mod
+├── go.sum
+├── internal
+│   ├── api
+│   │   └── api.go
+│   ├── app
+│   │   ├── model.go
+│   │   └── msg.go
+│   ├── config
+│   │   ├── config.go
+│   │   └── config_test.go
+│   ├── core
+│   │   ├── codec
+│   │   │   ├── json.go
+│   │   │   └── markdown.go
+│   │   ├── core_test.go
+│   │   ├── ids.go
+│   │   ├── nlp
+│   │   │   └── deadline.go
+│   │   ├── task.go
+│   │   └── view.go
+│   ├── hooks
+│   │   └── hooks.go
+│   ├── lua
+│   │   └── engine.go
+│   ├── plugins
+│   │   └── host.go
+│   ├── search
+│   │   ├── fuzzy.go
+│   │   ├── fuzzy_test.go
+│   │   └── index.go
+│   ├── service
+│   │   └── service.go
+│   ├── storage
+│   │   ├── migrations.go
+│   │   ├── repo.go
+│   │   └── repo_test.go
+│   ├── sync
+│   │   └── engine.go
+│   ├── ui
+│   │   ├── detail
+│   │   │   └── model.go
+│   │   ├── editor
+│   │   │   └── model.go
+│   │   ├── help
+│   │   │   └── model.go
+│   │   ├── keymap
+│   │   │   ├── keymap.go
+│   │   │   ├── keymap_test.go
+│   │   │   ├── normalize.go
+│   │   │   └── normalize_test.go
+│   │   ├── palette
+│   │   │   └── model.go
+│   │   ├── plugin_menu
+│   │   │   └── model.go
+│   │   ├── render
+│   │   │   └── render.go
+│   │   ├── styles
+│   │   │   └── styles.go
+│   │   ├── tasklist
+│   │   │   └── model.go
+│   │   ├── theme
+│   │   │   └── theme.go
+│   │   └── theme_menu
+│   │       └── model.go
+│   └── util
+│       ├── paths.go
+│       └── util_test.go
+├── LICENSE
+├── Makefile
+├── plugins
+│   ├── auto-cleanup.lua
+│   ├── auto-tagger.lua
+│   ├── sample.lua
+│   └── task-logger.lua
+├── README.md
+├── screenshots
+│   └── thumbnail.png
+├── SECURITY.md
+└── VERSION.txt
 ```
 
 ---
