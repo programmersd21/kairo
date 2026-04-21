@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Version Management**: `kairo version` command to display installed version
 - **Update Command**: `kairo update` command for one-step updates via `go install github.com/programmersd21/kairo/cmd/kairo@latest`
 
+### Fixed
+- **.gorelease.yaml** was failing on homebrew step, so it was resolved.
+
 ### Changed
 - Updated theme registry to 32 total themes (12 legacy + 20 new)
 

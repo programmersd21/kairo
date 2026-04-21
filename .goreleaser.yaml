@@ -1,41 +1,37 @@
-# .goreleaser.yaml
-# Latest GoReleaser v2 schema
 version: 2
 
 project_name: kairo
+
+env:
+  - CGO_ENABLED=0
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
+  - id: kairo
     main: ./cmd/kairo
     binary: kairo
+    goos: [linux, windows, darwin]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .CommitDate }}
 
 archives:
-  - format: tar.gz
-    # use zip for windows archives
+  - formats: [tar.gz]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     name_template: >-
-      {{ .ProjectName }}_
-      {{- .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{ .ProjectName }}_{{ .Os }}_{{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+
     files:
       - LICENSE
       - README.md
@@ -43,35 +39,19 @@ archives:
       - configs/*.toml
 
 checksum:
-  name_template: 'checksums.txt'
-  algorithm: sha256
+  name_template: checksums.txt
 
 snapshot:
   name_template: "{{ .Tag }}-next"
 
 changelog:
+  use: git
   sort: asc
   filters:
     exclude:
       - '^docs:'
       - '^test:'
-      - 'README'
-      - Merge pull request
-      - Merge branch
-
-# Modern Homebrew formula
-brews:
-  - name: kairo
-    repository:
-      owner: programmersd21
-      name: homebrew-tap
-    directory: Formula
-    homepage: "https://github.com/programmersd21/kairo"
-    description: "Premium Terminal Task Manager with Lua Extensibility"
-    license: "MIT"
-    install: |
-      bin.install "kairo"
-      # Install sample plugins
-      (etc/"kairo/plugins").install Dir["plugins/*.lua"]
-    test: |
-      system "#{bin}/kairo version"
+      - '^chore:'
+      - README
+      - Merge
+      
