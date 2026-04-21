@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/programmersd21/kairo/internal/core"
+	"github.com/programmersd21/kairo/internal/ui/keymap"
 	"github.com/programmersd21/kairo/internal/ui/render"
 	"github.com/programmersd21/kairo/internal/ui/styles"
 )
@@ -16,6 +17,7 @@ import (
 type Model struct {
 	styles  styles.Styles
 	vimMode bool
+	km      keymap.Keymap
 
 	width  int
 	height int
@@ -30,8 +32,8 @@ type Model struct {
 	animationReverse bool
 }
 
-func New(s styles.Styles, vimMode bool) Model {
-	return Model{styles: s, vimMode: vimMode}
+func New(s styles.Styles, vimMode bool, km keymap.Keymap) Model {
+	return Model{styles: s, vimMode: vimMode, km: km}
 }
 
 func (m Model) Selected() (core.Task, bool) {
@@ -157,12 +159,13 @@ func (m Model) renderEmpty() string {
 		Margin(1, 0, 0, 0).
 		Render("Press 'n' to create a new task and start your journey")
 
+	paletteKeys := strings.Join(m.km.Palette.Keys(), ", ")
 	hint := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Muted).
 		Background(m.styles.Theme.Bg).
 		Italic(true).
 		Margin(2, 0, 0, 0).
-		Render("Tip: Use the command palette (Ctrl+P) to access all features")
+		Render(fmt.Sprintf("Tip: Use the command palette (%s) to access all features", paletteKeys))
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		icon,

@@ -162,7 +162,7 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 		mode:           ModeList,
 		tagFilterInput: tagInput,
 	}
-	m.list = tasklist.New(m.s, cfg.App.VimMode)
+	m.list = tasklist.New(m.s, cfg.App.VimMode, m.km)
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
@@ -1087,7 +1087,7 @@ func (m *Model) fetchOpenEditCmd(id string) tea.Cmd {
 
 func (m *Model) refreshStyles() {
 	m.s = styles.New(m.theme)
-	m.list = tasklist.New(m.s, m.cfg.App.VimMode)
+	m.list = tasklist.New(m.s, m.cfg.App.VimMode, m.km)
 	m.list.SetTasks(m.tasks)
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
