@@ -30,9 +30,9 @@ builds:
 
     ldflags:
       - -s -w
-      - -X main.version={{ .Version }}
-      - -X main.commit={{ .ShortCommit }}
-      - -X main.date={{ .CommitDate }}
+      - -X github.com/programmersd21/kairo/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/programmersd21/kairo/internal/buildinfo.Commit={{ .ShortCommit }}
+      - -X github.com/programmersd21/kairo/internal/buildinfo.Date={{ .CommitDate }}
 
 archives:
   - id: default

@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -18,6 +15,7 @@ import (
 
 	"github.com/programmersd21/kairo/internal/api"
 	"github.com/programmersd21/kairo/internal/app"
+	"github.com/programmersd21/kairo/internal/buildinfo"
 	"github.com/programmersd21/kairo/internal/config"
 	"github.com/programmersd21/kairo/internal/core"
 	"github.com/programmersd21/kairo/internal/core/codec"
@@ -25,9 +23,18 @@ import (
 	"github.com/programmersd21/kairo/internal/service"
 	"github.com/programmersd21/kairo/internal/storage"
 	ksync "github.com/programmersd21/kairo/internal/sync"
+	"github.com/programmersd21/kairo/internal/updater"
 )
 
 func main() {
+	if handled, err := updater.MaybeRunWindowsApply(os.Stdout, os.Stderr); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "kairo update:", err)
+			os.Exit(2)
+		}
+		return
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
@@ -245,144 +252,14 @@ func runImport(ctx context.Context, repo *storage.Repository, args []string) err
 }
 
 func runVersion() {
-	version := getCurrentVersion()
-	fmt.Printf("kairo version %s\n", version)
-}
-
-func getCurrentVersion() string {
-	// Try current working directory first (most common for development/running)
-	if data, err := os.ReadFile("VERSION.txt"); err == nil {
-		return strings.TrimSpace(string(data))
-	}
-
-	// Try repository root relative to binary location
-	if ex, err := os.Executable(); err == nil {
-		versionPath := filepath.Join(filepath.Dir(ex), "VERSION.txt")
-		if data, err := os.ReadFile(versionPath); err == nil {
-			return strings.TrimSpace(string(data))
-		}
-
-		// Try going up from the binary directory (for development builds)
-		versionPath = filepath.Join(filepath.Dir(ex), "..", "VERSION.txt")
-		if data, err := os.ReadFile(versionPath); err == nil {
-			return strings.TrimSpace(string(data))
-		}
-	}
-
-	// If not found in expected locations, try home config directory
-	homeDir, _ := os.UserHomeDir()
-	altPath := filepath.Join(homeDir, ".config", "kairo", "VERSION.txt")
-	if data, err := os.ReadFile(altPath); err == nil {
-		return strings.TrimSpace(string(data))
-	}
-
-	// Fallback to default
-	return "1.1.2"
-}
-
-type GitHubRelease struct {
-	TagName    string `json:"tag_name"`
-	Draft      bool   `json:"draft"`
-	Prerelease bool   `json:"prerelease"`
-}
-
-func getLatestGitHubRelease(ctx context.Context) (string, error) {
-	// Query GitHub API for the latest release
-	url := "https://api.github.com/repos/programmersd21/kairo/releases/latest"
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var release GitHubRelease
-	if err := json.Unmarshal(body, &release); err != nil {
-		return "", err
-	}
-
-	// Remove 'v' prefix if present
-	version := strings.TrimPrefix(release.TagName, "v")
-	return version, nil
-}
-
-func compareVersions(current, latest string) int {
-	// Parse semantic versions: x.y.z
-	currentParts := strings.Split(strings.TrimPrefix(current, "v"), ".")
-	latestParts := strings.Split(strings.TrimPrefix(latest, "v"), ".")
-
-	// Pad with zeros if needed
-	for len(currentParts) < 3 {
-		currentParts = append(currentParts, "0")
-	}
-	for len(latestParts) < 3 {
-		latestParts = append(latestParts, "0")
-	}
-
-	// Simple numeric comparison
-	for i := 0; i < 3; i++ {
-		var curr, last int
-		_, _ = fmt.Sscanf(currentParts[i], "%d", &curr)
-		_, _ = fmt.Sscanf(latestParts[i], "%d", &last)
-
-		if last > curr {
-			return -1 // latest is newer
-		}
-		if last < curr {
-			return 1 // current is newer
-		}
-	}
-	return 0 // equal
+	fmt.Printf("kairo %s\n", buildinfo.VersionWithCommit())
 }
 
 func runUpdate(ctx context.Context) error {
-	currentVersion := getCurrentVersion()
-	fmt.Printf("Checking for updates (current: %s)...\n", currentVersion)
-
-	latestVersion, err := getLatestGitHubRelease(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch latest release: %w", err)
-	}
-
-	cmp := compareVersions(currentVersion, latestVersion)
-	if cmp >= 0 {
-		// Already on latest or newer version
-		fmt.Printf("✓ Updated to latest version %s\n", currentVersion)
-		return nil
-	}
-
-	// There's a newer version available
-	fmt.Printf("Found newer version: %s\n", latestVersion)
-	fmt.Println("Updating kairo...")
-
-	// Execute: go install github.com/programmersd21/kairo/cmd/kairo@latest
-	cmd := exec.CommandContext(ctx, "go", "install", "github.com/programmersd21/kairo/cmd/kairo@latest")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to update: %w", err)
-	}
-
-	fmt.Printf("✓ Kairo updated to version %s successfully!\n", latestVersion)
-	return nil
+	cfg := updater.DefaultConfig()
+	return cfg.Update(ctx, updater.UpdateOptions{
+		CurrentVersion: buildinfo.EffectiveVersion(),
+		Stdout:         os.Stdout,
+		Stderr:         os.Stderr,
+	})
 }

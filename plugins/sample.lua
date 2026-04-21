@@ -10,8 +10,8 @@ local plugin = {
     -- Brief description of what the plugin does
     description = "Demonstrates the expanded Kairo Lua API",
     -- Metadata for the user
-    author = "Kairo Team",
-    version = "1.1.0",
+    author = "Kairo",
+    version = "1.0.0",
 
     -- Commands are actions that appear in the Command Palette (ctrl+p)
     commands = {

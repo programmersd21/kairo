@@ -140,7 +140,13 @@ func (m Model) View() string {
 	}
 
 	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center,
-		m.styles.Overlay.Width(cardW).Render(lipgloss.JoinVertical(lipgloss.Left, rows...)),
+		m.styles.Overlay.Width(cardW).Render(
+			lipgloss.JoinVertical(lipgloss.Left,
+				lipgloss.JoinVertical(lipgloss.Left, rows...),
+				"",
+				m.styles.Muted.Padding(0, 1).Render("enter detail • u uninstall • o open folder • r reload • esc/p close • ↑/↓ navigate"),
+			),
+		),
 		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
 	)
 }

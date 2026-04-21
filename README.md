@@ -54,6 +54,35 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framewo
 
 ---
 
+## 📦 Installation
+
+### Linux / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/programmersd21/kairo/main/scripts/install.sh | bash
+```
+
+Installs to `$HOME/.local/bin/kairo` (fallback: `/usr/local/bin/kairo`) and attempts to persist the PATH update in your shell profile when needed.
+
+### Windows (PowerShell)
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/programmersd21/kairo/main/scripts/install.ps1 | iex
+```
+
+Installs to `%USERPROFILE%\\AppData\\Local\\Programs\\kairo\\kairo.exe` and adds the install directory to your user PATH.
+
+### Updates
+
+```bash
+kairo update
+```
+
+Downloads the latest GitHub Release for your OS/arch, verifies it against `checksums.txt`, and safely replaces the installed binary.
+On Windows, the update is applied after `kairo update` exits; run `kairo` again once it completes.
+
+---
+
 ## 🤖 Automation & CLI API
 
 Kairo provides a stable CLI API for external automation. Every operation available in the TUI can be performed via the `api` subcommand.
@@ -293,6 +322,8 @@ kairo/
 │   ├── app
 │   │   ├── model.go
 │   │   └── msg.go
+│   ├── buildinfo
+│   │   └── buildinfo.go
 │   ├── config
 │   │   ├── config.go
 │   │   └── config_test.go
@@ -350,6 +381,13 @@ kairo/
 │   │   │   └── theme.go
 │   │   └── theme_menu
 │   │       └── model.go
+│   ├── updater
+│   │   ├── checksums.go
+│   │   ├── download.go
+│   │   ├── extract.go
+│   │   ├── github.go
+│   │   ├── updater.go
+│   │   └── windows_helper.go
 │   └── util
 │       ├── paths.go
 │       └── util_test.go
@@ -363,6 +401,9 @@ kairo/
 ├── README.md
 ├── screenshots
 │   └── thumbnail.png
+├── scripts
+│   ├── install.ps1
+│   └── install.sh
 ├── SECURITY.md
 └── VERSION.txt
 ```

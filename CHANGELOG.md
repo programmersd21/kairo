@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3]
+
+### Added
+- **Self-updating binary updater**: `kairo update` now downloads the correct GitHub Release asset for your OS/arch, verifies it against `checksums.txt`, and performs a safe in-place binary swap (with `.old` backup/rollback).
+- **Cross-platform install scripts**: `scripts/install.sh` (Linux/macOS) and `scripts/install.ps1` (Windows) install into standard user locations and add the install directory to PATH when possible.
+- **Plugin menu keybind footer**: plugin manager overlay now shows a quick keybind legend (`enter`, `u`, `esc`, etc.).
+
+### Changed
+- `kairo version` now prints build version + commit (when available).
+- GoReleaser now injects build metadata into `internal/buildinfo` (instead of `main.*`).
+
+### Removed
+- `go install`-based updater flow (replaced by the GitHub Releases updater).
+
 ## [1.1.2]
 
 ### Added

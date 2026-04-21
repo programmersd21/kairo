@@ -16,6 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/programmersd21/kairo/internal/buildinfo"
 	"github.com/programmersd21/kairo/internal/config"
 	"github.com/programmersd21/kairo/internal/core"
 	"github.com/programmersd21/kairo/internal/plugins"
@@ -872,7 +873,7 @@ func (m *Model) renderFooter() string {
 	case ModeEditor:
 		left = " " + m.s.Muted.Render("ctrl+s save • esc cancel • tab next field")
 	case ModePalette:
-		left = " " + m.s.Muted.Render("enter select • esc close • ↑/↓ navigate")
+		left = " " + m.s.Muted.Render("enter select • esc/p close • ↑/↓ navigate")
 	case ModeHelp:
 		left = " " + m.s.Muted.Render("esc/q/"+fk(m.km.Help)+" close")
 	case ModeThemeMenu:
@@ -904,7 +905,7 @@ func (m *Model) renderFooter() string {
 		if m.syncEngine != nil && m.syncEngine.Enabled() {
 			syncStatus = styles.IconSync + " "
 		}
-		right = m.s.Muted.Render(syncStatus + "v1.1.2 ")
+		right = m.s.Muted.Render(syncStatus + buildinfo.VersionTag() + " ")
 	}
 
 	line := render.BarLine(left, right, m.width, m.s.Theme.Bg)
