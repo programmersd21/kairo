@@ -162,7 +162,7 @@ func (m Model) renderEmpty() string {
 		Background(m.styles.Theme.Bg).
 		Italic(true).
 		Margin(2, 0, 0, 0).
-		Render("Tip: Use the command palette (Ctrl+K) to access all features")
+		Render("Tip: Use the command palette (Ctrl+P) to access all features")
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		icon,
