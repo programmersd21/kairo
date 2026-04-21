@@ -2,36 +2,36 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-        cache: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
-    - run: go build ./...
-    - run: go test -v ./...
+      - run: go build ./...
+      - run: go test -v ./...
 
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-        cache: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
-    - uses: golangci/golangci-lint-action@v7
-      with:
-        version: v2.10.0
-        
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.11.4
+          
