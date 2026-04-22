@@ -241,6 +241,8 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 | `enter` | 👁️ View task details |
 | `d` | 🗑️ Delete task |
 | `t` | 🎨 Cycle themes |
+| `i` | 📢 Open GitHub issues |
+| `c` | 📝 Show changelog |
 | `?` | ❓ Show help menu |
 | `q` | ❌ Quit |
 
