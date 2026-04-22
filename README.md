@@ -71,8 +71,8 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framewo
 ### macOS (Homebrew)
 
 ```bash
-brew tap programmersd21/kairo
-brew install kairo
+brew tap programmersd21/kairo https://github.com/programmersd21/kairo
+brew install --cask programmersd21/kairo/kairo
 ```
 
 ### Linux / macOS (curl)
@@ -89,15 +89,15 @@ Installs to `$HOME/.local/bin/kairo` (fallback: `/usr/local/bin/kairo`) and atte
 iwr -useb https://raw.githubusercontent.com/programmersd21/kairo/main/scripts/install.ps1 | iex
 ```
 
-Installs to `%USERPROFILE%\\AppData\\Local\\Programs\\kairo\\kairo.exe` and adds the install directory to your user PATH.
+Installs to `%USERPROFILE%\AppData\Local\Programs\kairo\kairo.exe` and adds the install directory to your user PATH.
 
-## For any OS out of these:
+### Any other OS
 
 ```bash
 go install github.com/programmersd21/kairo/cmd/kairo@latest
 ```
 
-**OR** use the [PREBUILTS](https://https://github.com/programmersd21/kairo/releases).
+**OR** download a prebuilt binary from the [Releases page](https://github.com/programmersd21/kairo/releases).
 
 ### Updates
 

@@ -73,22 +73,16 @@ release:
   draft: false
   prerelease: auto
 
-brews:
+homebrew_casks:
   - repository:
       owner: programmersd21
-      name: homebrew-kairo
+      name: kairo
 
-    directory: Formula
+    directory: HomebrewCask
 
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} {{ .Tag }}"
+    commit_msg_template: "Brew cask update for {{ .ProjectName }} {{ .Tag }}"
 
     homepage: "https://github.com/programmersd21/kairo"
     description: "Minimal, powerful task management"
     license: "MIT"
-
-    test: |
-      system "#{bin}/kairo", "--version"
-
-    install: |
-      bin.install "kairo"
-      
+    
