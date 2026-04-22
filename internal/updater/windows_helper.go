@@ -37,14 +37,19 @@ func MaybeRunWindowsApply(stdout, stderr io.Writer) (handled bool, err error) {
 		*backup = *target + ".old"
 	}
 
-	_, _ = fmt.Fprintln(stdout, "Finishing update...")
-	if err := applyWithRetry(*target, *backup, *source, 45*time.Second); err != nil {
-		return true, err
+	// Give parent process time to exit
+	time.Sleep(1 * time.Second)
+
+	if err := applyWithRetry(*target, *backup, *source, 30*time.Second); err != nil {
+		// Since we're in a detached-like process, we might want to log to a file
+		// but for now, we'll try to use stderr if it's still connected.
+		return true, fmt.Errorf("failed to apply update: %w", err)
 	}
 
 	_ = os.Remove(*source)
+	// We don't necessarily need to delete ourselves if we're in a temp dir,
+	// but it's cleaner.
 	scheduleSelfDelete()
-	_, _ = fmt.Fprintln(stdout, "✓ Update applied. Re-run `kairo`.")
 	return true, nil
 }
 

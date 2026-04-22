@@ -106,7 +106,7 @@ kairo update
 ```
 
 Downloads the latest GitHub Release for your OS/arch, verifies it against `checksums.txt`, and safely replaces the installed binary.
-On Windows, the update is applied after `kairo update` exits; run `kairo` again once it completes.
+On Windows, Kairo will automatically close to apply the update; simply re-run `kairo` once the terminal returns.
 
 ---
 

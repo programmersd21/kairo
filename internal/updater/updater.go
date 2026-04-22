@@ -239,14 +239,14 @@ func applyWindows(target, backup, newBinPath string, stdout, stderr io.Writer) e
 	}
 
 	cmd := exec.Command(helper, args...)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-
+	// On Windows, we need to detach or at least not wait for it.
+	// We'll use os.StartProcess style via cmd.Start() but then we MUST exit.
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 
 	_, _ = fmt.Fprintln(stdout, "Update staged. Closing to finish update...")
+	os.Exit(0)
 	return nil
 }
 
