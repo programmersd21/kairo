@@ -23,6 +23,7 @@ import (
 	"github.com/programmersd21/kairo/internal/search"
 	"github.com/programmersd21/kairo/internal/service"
 	ksync "github.com/programmersd21/kairo/internal/sync"
+	"github.com/programmersd21/kairo/internal/ui/changelog"
 	"github.com/programmersd21/kairo/internal/ui/detail"
 	"github.com/programmersd21/kairo/internal/ui/editor"
 	"github.com/programmersd21/kairo/internal/ui/help"
@@ -84,6 +85,7 @@ const (
 	ModeThemeMenu
 	ModePluginMenu
 	ModeTagFilter
+	ModeChangelog
 )
 
 type Model struct {
@@ -110,6 +112,7 @@ type Model struct {
 	det  detail.Model
 	edit *editor.Model
 	hlp  help.Model
+	cl   changelog.Model
 	tm   theme_menu.Model
 	pm   plugin_menu.Model
 
@@ -171,6 +174,7 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
+	m.cl = changelog.New(m.s)
 	m.tm = theme_menu.New(m.s)
 	m.pm = plugin_menu.New(m.s)
 
@@ -262,11 +266,26 @@ func (m *Model) isInputFocused() bool {
 	}
 }
 
+type changelogLoadedMsg struct {
+	Content string
+}
+
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch x := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = x.Width, x.Height
 		m.rebuildComponentSizes()
+		return m, nil
+
+	case changelogLoadedMsg:
+		m.cl.SetContent(x.Content)
+		m.mode = ModeChangelog
+		return m, nil
+
+	case changelog.CloseMsg:
+		if m.mode == ModeChangelog {
+			m.mode = ModeList
+		}
 		return m, nil
 
 	case errMsg:
@@ -569,6 +588,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if keymapMatch(m.km.Help, km) {
 				m.mode = ModeHelp
 				return m, nil
+			}
+			if keymapMatch(m.km.Issues, km) {
+				return m, openURLCmd("https://github.com/programmersd21/kairo/issues")
+			}
+			if keymapMatch(m.km.Changelog, km) {
+				return m, m.loadChangelogCmd()
 			}
 
 			// Plugin reload - single character keybinding only valid in ModeList
@@ -1100,6 +1125,7 @@ func (m *Model) refreshStyles() {
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
+	m.cl = changelog.New(m.s)
 	m.tm = theme_menu.New(m.s)
 	m.pm = plugin_menu.New(m.s)
 

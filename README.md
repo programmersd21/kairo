@@ -398,6 +398,8 @@ UI Re-render → Instant User Feedback
 │   ├── sync
 │   │   └── engine.go
 │   ├── ui
+│   │   ├── changelog
+│   │   │   └── model.go
 │   │   ├── detail
 │   │   │   └── model.go
 │   │   ├── editor

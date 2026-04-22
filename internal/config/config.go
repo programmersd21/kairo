@@ -79,6 +79,8 @@ type KeymapConfig struct {
 	ManagePlugins string `toml:"manage_plugins"`
 	ToggleStrike  string `toml:"toggle_strike"`
 	Help          string `toml:"help"`
+	Issues        string `toml:"issues"`
+	Changelog     string `toml:"changelog"`
 }
 
 func Default() Config {
@@ -135,6 +137,8 @@ func Default() Config {
 			ManagePlugins: "p",
 			ToggleStrike:  "z",
 			Help:          "?",
+			Issues:        "i",
+			Changelog:     "c",
 		},
 	}
 }
@@ -257,6 +261,12 @@ func Load() (Config, error) {
 	}
 	if cfg.Keymap.Help == "" {
 		cfg.Keymap.Help = defaults.Keymap.Help
+	}
+	if cfg.Keymap.Issues == "" {
+		cfg.Keymap.Issues = defaults.Keymap.Issues
+	}
+	if cfg.Keymap.Changelog == "" {
+		cfg.Keymap.Changelog = defaults.Keymap.Changelog
 	}
 
 	appDir, _ := util.AppDataDir(appName)

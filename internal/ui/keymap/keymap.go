@@ -30,6 +30,8 @@ type Keymap struct {
 	ManagePlugins key.Binding
 	ToggleStrike  key.Binding
 	Help          key.Binding
+	Issues        key.Binding
+	Changelog     key.Binding
 }
 
 func FromConfig(c config.KeymapConfig) Keymap {
@@ -55,6 +57,8 @@ func FromConfig(c config.KeymapConfig) Keymap {
 		ManagePlugins: bind(c.ManagePlugins, "manage-plugins", "manage plugins"),
 		ToggleStrike:  bind(c.ToggleStrike, "strike", "toggle completion with animation"),
 		Help:          bind(c.Help, "help", "show help"),
+		Issues:        bind(c.Issues, "issues", "open github issues"),
+		Changelog:     bind(c.Changelog, "changelog", "show changelog"),
 	}
 }
 
