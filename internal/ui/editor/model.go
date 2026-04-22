@@ -177,7 +177,14 @@ func (m Model) View() string {
 	}
 	cardW := min(84, w-6)
 
+	titleText := "NEW TASK"
+	if m.mode == ModeEdit {
+		titleText = "EDIT TASK"
+	}
+	header := m.styles.Title.Padding(0, 1).MarginBottom(1).Render(titleText)
+
 	fields := []string{
+		header,
 		m.renderField("Title", m.title.View(), m.focus == 0),
 		m.renderField("Tags", m.tags.View(), m.focus == 1),
 		lipgloss.JoinHorizontal(lipgloss.Left,

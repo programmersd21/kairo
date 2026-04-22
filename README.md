@@ -68,7 +68,14 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framewo
 
 ## 📦 Installation
 
-### Linux / macOS
+### macOS (Homebrew)
+
+```bash
+brew tap programmersd21/kairo
+brew install kairo
+```
+
+### Linux / macOS (curl)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/programmersd21/kairo/main/scripts/install.sh | bash
@@ -83,6 +90,14 @@ iwr -useb https://raw.githubusercontent.com/programmersd21/kairo/main/scripts/in
 ```
 
 Installs to `%USERPROFILE%\\AppData\\Local\\Programs\\kairo\\kairo.exe` and adds the install directory to your user PATH.
+
+## For any OS out of these:
+
+```bash
+go install github.com/programmersd21/kairo/cmd/kairo@latest
+```
+
+**OR** use the [PREBUILTS](https://https://github.com/programmersd21/kairo/releases).
 
 ### Updates
 
@@ -130,6 +145,19 @@ kairo export --format markdown --out tasks.md
 
 # Import tasks
 kairo import --format json --in tasks.json
+
+# Shell completion (bash, zsh, fish, powershell)
+# Automatic install:
+kairo completion zsh install
+
+# Manual install (add to your shell profile):
+# source <(kairo completion zsh)
+kairo completion zsh
+
+# Get help for any command
+kairo help
+kairo help api
+kairo help export
 
 # Sync with Git (if configured)
 kairo sync
@@ -317,7 +345,7 @@ UI Re-render → Instant User Feedback
 ## 🌴 Project Structure
 
 ```
-kairo/
+.
 ├── CHANGELOG.md
 ├── cmd
 │   └── kairo
@@ -336,6 +364,8 @@ kairo/
 │   │   └── msg.go
 │   ├── buildinfo
 │   │   └── buildinfo.go
+│   ├── completion
+│   │   └── completion.go
 │   ├── config
 │   │   ├── config.go
 │   │   └── config_test.go

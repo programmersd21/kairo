@@ -2,6 +2,7 @@
 theme = "catppuccin"
 vim_mode = false
 show_help = true
+rainbow = false
 
 [theme]
 # Any field set here overrides the built-in theme colors.

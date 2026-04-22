@@ -58,6 +58,10 @@ data/
 # Local config (user-specific)
 config.toml
 
+# tasks metdata
+tasks.json
+tasks.md
+
 # =========================
 # 🔐 Optional (future-proof)
 # =========================

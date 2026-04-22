@@ -46,3 +46,4 @@ This section guides you through submitting an enhancement suggestion for Kairo, 
 ## Style Guide
 
 We follow the standard Go coding style. Please run `go fmt ./...` before committing.
+

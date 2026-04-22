@@ -140,8 +140,8 @@ func New(t theme.Theme) Styles {
 
 		// Tabs & Navigation
 		TabActive: lipgloss.NewStyle().
-			Foreground(t.Accent).
-			Background(t.Bg).
+			Foreground(t.Bg).
+			Background(t.Accent).
 			Bold(true).
 			Padding(0, 1),
 		TabInactive: lipgloss.NewStyle().

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
 project_name: kairo
@@ -36,16 +37,14 @@ builds:
 
 archives:
   - id: default
-    formats:
-      - tar.gz
+    formats: [tar.gz]
 
     format_overrides:
       - goos: windows
-        formats:
-          - zip
+        formats: [zip]
 
     name_template: >-
-      {{ .ProjectName }}_{{ .Os }}_{{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+      {{ .ProjectName }}_{{ .Os }}_{{ if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
 
     files:
       - LICENSE
@@ -67,10 +66,29 @@ changelog:
       - '^docs:'
       - '^test:'
       - '^chore:'
-      - README
-      - Merge
+      - '^README'
+      - '^Merge'
 
 release:
   draft: false
   prerelease: auto
-  
+
+brews:
+  - repository:
+      owner: programmersd21
+      name: homebrew-kairo
+
+    directory: Formula
+
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} {{ .Tag }}"
+
+    homepage: "https://github.com/programmersd21/kairo"
+    description: "Minimal, powerful task management"
+    license: "MIT"
+
+    test: |
+      system "#{bin}/kairo", "--version"
+
+    install: |
+      bin.install "kairo"
+      

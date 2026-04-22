@@ -232,7 +232,10 @@ func applyThemeOverride(t theme.Theme, o config.ThemeConfig) theme.Theme {
 }
 
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.rainbowTickCmd()}
+	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd()}
+	if m.cfg.App.Rainbow {
+		cmds = append(cmds, m.rainbowTickCmd())
+	}
 	if m.plugCh != nil {
 		cmds = append(cmds, m.listenPluginsCmd())
 	}
@@ -439,8 +442,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case openEditMsg:
 		e := editor.New(m.s, editor.ModeEdit, x.Task)
-		e.SetSize(m.width, m.height)
 		m.edit = &e
+		m.rebuildComponentSizes()
 		m.mode = ModeEditor
 		return m, m.edit.Init()
 
@@ -613,8 +616,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					task := core.Task{Status: core.StatusTodo, Priority: core.P1}
 					m.activeFilter().ApplyToTask(&task)
 					e := editor.New(m.s, editor.ModeNew, task)
-					e.SetSize(m.width, m.height)
 					m.edit = &e
+					m.rebuildComponentSizes()
 					m.mode = ModeEditor
 					return m, m.edit.Init()
 				case keymapMatch(m.km.EditTask, km):
@@ -712,22 +715,12 @@ func (m *Model) View() string {
 	var content string
 
 	switch m.mode {
-	case ModeTagFilter:
-		content = m.renderTagFilterOverlay()
 	case ModePalette:
 		content = m.pal.View()
-	case ModeEditor:
-		if m.edit != nil {
-			content = m.edit.View()
-		} else {
-			content = m.renderMainUI()
-		}
 	case ModeHelp:
 		content = m.hlp.View()
 	case ModeThemeMenu:
 		content = m.tm.View()
-	case ModePluginMenu:
-		content = m.renderMainUI()
 	default:
 		content = m.renderMainUI()
 	}
@@ -764,6 +757,14 @@ func (m *Model) renderMainUI() string {
 		body = m.det.View()
 	case ModePluginMenu:
 		body = m.pm.View()
+	case ModeTagFilter:
+		body = m.renderTagFilterOverlay(availableHeight)
+	case ModeEditor:
+		if m.edit != nil {
+			body = m.edit.View()
+		} else {
+			body = m.list.View()
+		}
 	default:
 		body = m.list.View()
 	}
@@ -798,7 +799,7 @@ func (m *Model) rebuildComponentSizes() {
 	m.hlp.SetSize(m.width, m.height)
 	m.tm.SetSize(m.width, m.height)
 	if m.edit != nil {
-		m.edit.SetSize(m.width, m.height)
+		m.edit.SetSize(m.width, avail)
 	}
 }
 
@@ -811,27 +812,25 @@ func (m *Model) rebuildComponentSizes() {
 func (m *Model) renderHeader() string {
 	// Logo with themed background container
 	logoText := "KAIRO"
-	rainbowColors := []string{"#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#0000ff", "#4b0082", "#9400d3"}
-	var logoBuilder strings.Builder
-	for i, char := range logoText {
-		color := rainbowColors[(i+m.RainbowAnimationOffset)%len(rainbowColors)]
-		logoBuilder.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(char)))
+	var logo string
+	if m.cfg.App.Rainbow {
+		rainbowColors := []string{"#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#0000ff", "#4b0082", "#9400d3"}
+		var logoBuilder strings.Builder
+		for i, char := range logoText {
+			color := rainbowColors[(i+m.RainbowAnimationOffset)%len(rainbowColors)]
+			logoBuilder.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(string(char)))
+		}
+		logo = lipgloss.NewStyle().Bold(true).Render(logoBuilder.String())
+	} else {
+		logo = lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Bold(true).Render(logoText)
 	}
-	// Create logo with themed background that spans the header height
-	logoContent := lipgloss.NewStyle().
-		Bold(true).
-		Render(logoBuilder.String())
-	logo := logoContent
 
 	// Tabs
 	tabs := []string{}
 	for i, v := range m.views {
 		style := m.s.TabInactive
 		if i == m.activeIdx {
-			style = m.s.TabActive.
-				Border(lipgloss.NormalBorder(), false, false, true, false).
-				BorderBottomForeground(m.s.Theme.Accent).
-				BorderBackground(m.s.Theme.Bg)
+			style = m.s.TabActive
 		}
 		tabs = append(tabs, style.Render(v.Title))
 	}
@@ -895,7 +894,7 @@ func (m *Model) renderFooter() string {
 				fk(m.km.Help)+" help",
 		)
 	case ModeEditor:
-		left = " " + m.s.Muted.Render("ctrl+s save • esc cancel • tab next field")
+		left = " " + m.s.Muted.Render("ctrl+s "+styles.IconDone+"save • esc "+styles.IconError+"cancel • tab navigate")
 	case ModePalette:
 		left = " " + m.s.Muted.Render("enter select • esc/p close • ↑/↓ navigate")
 	case ModeHelp:
@@ -944,7 +943,7 @@ func (m *Model) renderFooter() string {
 }
 
 // renderTagFilterOverlay renders the tag filter input modal
-func (m *Model) renderTagFilterOverlay() string {
+func (m *Model) renderTagFilterOverlay(h int) string {
 	// Create filter input modal
 	inputLabel := m.s.Title.Render("Filter by Tag")
 	input := lipgloss.NewStyle().Padding(0, 1).Render(m.tagFilterInput.View())
@@ -963,7 +962,7 @@ func (m *Model) renderTagFilterOverlay() string {
 	card := cardStyle.Render(modal)
 
 	// Overlay the modal on top of the screen with proper background
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card,
+	return lipgloss.Place(m.width, h, lipgloss.Center, lipgloss.Center, card,
 		lipgloss.WithWhitespaceChars(" "),
 		lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
 	)
@@ -1185,8 +1184,8 @@ func (m *Model) runCommand(id string) tea.Cmd {
 	switch id {
 	case "cmd:new":
 		e := editor.New(m.s, editor.ModeNew, core.Task{Status: core.StatusTodo, Priority: core.P1})
-		e.SetSize(m.width, m.height)
 		m.edit = &e
+		m.rebuildComponentSizes()
 		m.mode = ModeEditor
 		return m.edit.Init()
 	case "cmd:theme":

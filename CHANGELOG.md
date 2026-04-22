@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.5]
+
+### Added
+- **New `help` Command**: Added a comprehensive `kairo help` command to explore subcommands and their usage.
+- **Shell Tab Completions**: Added `kairo completion [bash|zsh|fish|powershell]` for full command and dynamic task ID completion.
+- **Completion Auto-Install**: Use `kairo completion <shell> install` to automatically add completion to your shell profile (Bash, Zsh, Fish).
+- **Task ID in Detail View**: Task details now display the unique task ID in the metadata section for easier API/plugin reference.
+- **Editor Shortcut Toolbar**: Added a visual footer to the New/Edit Task screen with keybind hints (`ctrl+s` save, `esc` cancel, `tab` navigate).
+- **Editor Clarity**: Added prominent "NEW TASK" and "EDIT TASK" titles to the editor card.
+- **Multi-location Config Loading**: Kairo now searches for `config.toml` in `~/.kairo/` and `~/.config/kairo/` in addition to standard platform paths.
+
+### Fixed
+- **Rainbow Toggle**: Fixed the `rainbow` configuration setting not being correctly detected and applied to the animated logo.
+
+### Changed
+- **Active Tab Styling**: The active view tab now uses the theme's accent color as a background with contrasting text for significantly better visibility.
+
 ## [1.1.4]
 
 ### Changed

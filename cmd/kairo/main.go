@@ -16,6 +16,7 @@ import (
 	"github.com/programmersd21/kairo/internal/api"
 	"github.com/programmersd21/kairo/internal/app"
 	"github.com/programmersd21/kairo/internal/buildinfo"
+	"github.com/programmersd21/kairo/internal/completion"
 	"github.com/programmersd21/kairo/internal/config"
 	"github.com/programmersd21/kairo/internal/core"
 	"github.com/programmersd21/kairo/internal/core/codec"
@@ -33,6 +34,41 @@ func main() {
 			os.Exit(2)
 		}
 		return
+	}
+
+	// Immediate subcommands (no config/DB needed)
+	if len(os.Args) > 1 {
+		switch strings.ToLower(os.Args[1]) {
+		case "completion":
+			if len(os.Args) < 3 {
+				fmt.Println("Usage: kairo completion [bash|zsh|fish|powershell] [install]")
+				fmt.Println("       kairo completion --complete [args...]")
+				os.Exit(1)
+			}
+			if os.Args[2] != "--complete" {
+				shell := os.Args[2]
+				if len(os.Args) > 3 && os.Args[3] == "install" {
+					if err := completion.Install(shell); err != nil {
+						fmt.Fprintln(os.Stderr, "Error:", err)
+						os.Exit(1)
+					}
+					return
+				}
+				script, err := completion.Script(shell)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(1)
+				}
+				fmt.Print(script)
+				return
+			}
+		case "version":
+			runVersion()
+			return
+		case "help":
+			runHelp(os.Args[2:])
+			return
+		}
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -59,12 +95,16 @@ func main() {
 	hks := hooks.New()
 	svc := service.New(repo, hks)
 
-	// Emit app start event (plugins can listen to this)
-	hks.AppStarted()
-	defer hks.AppStopped()
-
 	if len(os.Args) > 1 {
 		switch strings.ToLower(os.Args[1]) {
+		case "completion":
+			if os.Args[2] == "--complete" {
+				results := completion.Complete(ctx, svc, os.Args[3:])
+				for _, r := range results {
+					fmt.Println(r)
+				}
+				return
+			}
 		case "api":
 			if err := runAPI(ctx, svc, os.Args[2:]); err != nil {
 				fmt.Fprintln(os.Stderr, "kairo api:", err)
@@ -94,9 +134,6 @@ func main() {
 				os.Exit(2)
 			}
 			return
-		case "version":
-			runVersion()
-			return
 		case "update":
 			if err := runUpdate(ctx); err != nil {
 				fmt.Fprintln(os.Stderr, "kairo update:", err)
@@ -105,6 +142,10 @@ func main() {
 			return
 		}
 	}
+
+	// Emit app start event (plugins can listen to this)
+	hks.AppStarted()
+	defer hks.AppStopped()
 
 	m, err := app.New(ctx, cfg, svc)
 	if err != nil {
@@ -262,4 +303,53 @@ func runUpdate(ctx context.Context) error {
 		Stdout:         os.Stdout,
 		Stderr:         os.Stderr,
 	})
+}
+
+func runHelp(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Kairo — Minimal, powerful task management.")
+		fmt.Println("\nUsage:")
+		fmt.Println("  kairo [command]")
+		fmt.Println("\nAvailable Commands:")
+		fmt.Println("  api         Headless API for external automation")
+		fmt.Println("  completion  Generate shell completion scripts")
+		fmt.Println("  export      Export tasks to JSON or Markdown")
+		fmt.Println("  import      Import tasks from JSON or Markdown")
+		fmt.Println("  sync        Sync tasks with Git repository")
+		fmt.Println("  update      Update Kairo to the latest version")
+		fmt.Println("  version     Show the current version")
+		fmt.Println("  help        Help about any command")
+		fmt.Println("\nUse \"kairo help [command]\" for more information about a command.")
+		return
+	}
+
+	switch args[0] {
+	case "api":
+		fmt.Println("Headless API for external automation.")
+		fmt.Println("\nUsage:")
+		fmt.Println("  kairo api [action] [flags]")
+		fmt.Println("\nActions:")
+		fmt.Println("  create, list, update, delete, get, list-tags")
+	case "completion":
+		fmt.Println("Generate shell completion scripts.")
+		fmt.Println("\nUsage:")
+		fmt.Println("  kairo completion [bash|zsh|fish|powershell] [install]")
+		fmt.Println("  kairo completion --complete [args...]")
+		fmt.Println("\nExample:")
+		fmt.Println("  kairo completion zsh install")
+	case "export":
+		fmt.Println("Export tasks to JSON or Markdown.")
+		fmt.Println("\nUsage:")
+		fmt.Println("  kairo export --format [json|md] --out [file]")
+	case "import":
+		fmt.Println("Import tasks from JSON or Markdown.")
+		fmt.Println("\nUsage:")
+		fmt.Println("  kairo import --format [json|md] --in [file]")
+	case "sync":
+		fmt.Println("Sync tasks with Git repository.")
+		fmt.Println("\nUsage:")
+		fmt.Println("  kairo sync")
+	default:
+		fmt.Printf("Unknown help topic %q\n", args[0])
+	}
 }

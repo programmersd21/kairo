@@ -114,6 +114,13 @@ func (m *Model) View() string {
 func (m Model) renderMeta() string {
 	var meta []string
 
+	// ID
+	idLine := lipgloss.JoinHorizontal(lipgloss.Left,
+		m.styles.Muted.Render("ID:       "),
+		m.styles.DetailValue.Render(m.task.ID),
+	)
+	meta = append(meta, lipgloss.NewStyle().Padding(1, 2, 0, 2).Render(idLine))
+
 	// Status & Priority in one line
 	status := lipgloss.JoinHorizontal(lipgloss.Left,
 		m.styles.Muted.Render("Status:   "),
@@ -124,8 +131,8 @@ func (m Model) renderMeta() string {
 		m.styles.PriorityBadge(m.task.Priority),
 	)
 	meta = append(meta, lipgloss.JoinHorizontal(lipgloss.Left,
-		lipgloss.NewStyle().Padding(1, 2).Render(status),
-		lipgloss.NewStyle().Padding(1, 4).Render(priority),
+		lipgloss.NewStyle().Padding(0, 2).Render(status),
+		lipgloss.NewStyle().Padding(0, 4).Render(priority),
 	))
 
 	// Deadline & Tags

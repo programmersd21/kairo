@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +25,7 @@ type AppConfig struct {
 	Theme    string `toml:"theme"`
 	VimMode  bool   `toml:"vim_mode"`
 	ShowHelp bool   `toml:"show_help"`
+	Rainbow  bool   `toml:"rainbow"`
 }
 
 type StorageConfig struct {
@@ -87,6 +87,7 @@ func Default() Config {
 			Theme:    "catppuccin",
 			VimMode:  false,
 			ShowHelp: true,
+			Rainbow:  false,
 		},
 		Theme: ThemeConfig{
 			Bg:      "", // Use theme default
@@ -158,13 +159,42 @@ func Load() (Config, error) {
 		return cfg, err
 	}
 
-	b, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return cfg, nil
-		}
-		return cfg, err
+	// Try multiple locations
+	var b []byte
+	found := false
+
+	// 1. Primary path (AppData/Roaming/kairo/config.toml or ~/.config/kairo/config.toml)
+	if data, err := os.ReadFile(path); err == nil {
+		b = data
+		found = true
 	}
+
+	// 2. Fallback: ~/.kairo/config.toml (traditional CLI location)
+	if !found {
+		if home, err := os.UserHomeDir(); err == nil {
+			fallback := filepath.Join(home, ".kairo", "config.toml")
+			if data, err := os.ReadFile(fallback); err == nil {
+				b = data
+				found = true
+			}
+		}
+	}
+
+	// 3. Fallback: ~/.config/kairo/config.toml (explicit if AppDataDir failed to find it there)
+	if !found {
+		if home, err := os.UserHomeDir(); err == nil {
+			fallback := filepath.Join(home, ".config", "kairo", "config.toml")
+			if data, err := os.ReadFile(fallback); err == nil {
+				b = data
+				found = true
+			}
+		}
+	}
+
+	if !found {
+		return cfg, nil
+	}
+
 	if err := toml.Unmarshal(b, &cfg); err != nil {
 		return cfg, err
 	}
