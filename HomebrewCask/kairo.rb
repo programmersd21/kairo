@@ -4,22 +4,22 @@ cask "kairo" do
 
   on_macos do
     on_intel do
-      sha256 "5063777064fa6a1693c00b884c39e26a052495573d4f2990a43e44d7303b4926"
+      sha256 "4ca9ba92d9eacba8b857f88ff6d98b361016bc16d05b0e641b7fa9d515a8ca4e"
       url "https://github.com/programmersd21/kairo/releases/download/#{version}/kairo_darwin_x86_64.tar.gz"
     end
     on_arm do
-      sha256 "88ec3dbfa56d5be9f94cc8404e5b5d7c610c38f0c2492379770f25255505261e"
+      sha256 "4d5925aaa322b17725272c8962640148f010bb85a73959231831d70ee3f9343c"
       url "https://github.com/programmersd21/kairo/releases/download/#{version}/kairo_darwin_arm64.tar.gz"
     end
   end
 
   on_linux do
     on_intel do
-      sha256 "514f8f35f82dabdc506438139f0bc38ed77d99ffbb862d5cb887b20d8df2ae69"
+      sha256 "b267ea8aed140f8a145954b0a8bbcb1573a5286e910e766f89b041a87df900f0"
       url "https://github.com/programmersd21/kairo/releases/download/#{version}/kairo_linux_x86_64.tar.gz"
     end
     on_arm do
-      sha256 "fb7874b6d964926a6c8eab0795a3f92aa84004e33310d0d114c9f8e4f4b00551"
+      sha256 "124c101ba9a50ddd2962f415e15f681e967ecfc5e55f653d511867890abc9bd6"
       url "https://github.com/programmersd21/kairo/releases/download/#{version}/kairo_linux_arm64.tar.gz"
     end
   end
