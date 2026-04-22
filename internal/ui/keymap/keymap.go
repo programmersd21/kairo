@@ -58,10 +58,9 @@ func FromConfig(c config.KeymapConfig) Keymap {
 		ToggleStrike:  bind(c.ToggleStrike, "strike", "toggle completion with animation"),
 		Help:          bind(c.Help, "help", "show help"),
 		Issues:        bind(c.Issues, "issues", "open github issues"),
-		Changelog:     bind(c.Changelog, "changelog", "show changelog"),
+		Changelog:     bind(c.Changelog, "changelog", "open changelog"),
 	}
 }
-
 func bind(keys, helpKey, helpDesc string) key.Binding {
 	ks := parseKeys(keys)
 	return key.NewBinding(key.WithKeys(ks...), key.WithHelp(helpKey, helpDesc))

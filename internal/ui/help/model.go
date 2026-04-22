@@ -90,6 +90,8 @@ func (m Model) View() string {
 				{getK(m.km.OpenPluginDir), "Open plugins folder"},
 				{getK(m.km.ManagePlugins), "Manage plugins"},
 				{getK(m.km.Help), "Show help"},
+				{getK(m.km.Issues), "Open GitHub issues"},
+				{getK(m.km.Changelog), "Show changelog"},
 				{getK(m.km.Quit), "Quit"},
 			},
 		},
