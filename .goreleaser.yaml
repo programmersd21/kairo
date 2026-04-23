@@ -78,7 +78,7 @@ homebrew_casks:
       owner: programmersd21
       name: kairo
 
-    directory: HomebrewCask
+    directory: Casks
 
     commit_msg_template: "Brew cask update for {{ .ProjectName }} {{ .Tag }}"
 
