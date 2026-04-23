@@ -11,9 +11,9 @@
 
 ---
 
-| **Static Overview** | **Interactive Demo** |
-|:---:|:---:|
-| ![Main App](screenshots/thumbnail.png) | ![Demo](screenshots/demo.gif) |
+![Main App](screenshots/thumbnail.png)
+
+![Demo](screenshots/demo.gif)
 
 **⌛ Time, executed well.**
 
