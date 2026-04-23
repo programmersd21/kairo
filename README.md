@@ -224,8 +224,6 @@ return plugin
 
 Kairo features a **minimalist design system** optimized for clarity and focus.
 
-![Main App](screenshots/thumbnail.png)
-
 ### Design Philosophy
 
 - **Breathable Layout** — Reduced padding and thin borders for a clean, modern look
