@@ -25,5 +25,6 @@ type updateAvailableMsg struct {
 }
 
 type rainbowTickMsg struct{}
+type cleanupTickMsg struct{}
 
 type strikeAnimationTickMsg struct{ TaskID string }

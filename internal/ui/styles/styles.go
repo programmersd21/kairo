@@ -91,6 +91,9 @@ type Styles struct {
 	DetailKey   lipgloss.Style
 	DetailValue lipgloss.Style
 	DetailLabel lipgloss.Style
+	Tag         lipgloss.Style
+	TagLeft     lipgloss.Style
+	TagRight    lipgloss.Style
 	FormLabel   lipgloss.Style
 
 	// Components
@@ -238,7 +241,14 @@ func New(t theme.Theme) Styles {
 			MarginRight(1),
 		DetailValue: base,
 		DetailLabel: mutedStyle.Bold(true),
-		FormLabel:   mutedStyle.Bold(true),
+		Tag: lipgloss.NewStyle().
+			Foreground(t.Bg).
+			Background(t.Accent).
+			Padding(0, 1).
+			Bold(true),
+		TagLeft:   lipgloss.NewStyle().Foreground(t.Accent).Background(t.Bg).SetString(""),
+		TagRight:  lipgloss.NewStyle().Foreground(t.Accent).Background(t.Bg).SetString(""),
+		FormLabel: mutedStyle.Bold(true),
 
 		// Components
 		Card: lipgloss.NewStyle().

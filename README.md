@@ -268,7 +268,7 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 | Shortcut | View |
 |----------|------|
 | `1` - `9` | **Switch Views** — Instant access to all tabs (Inbox, Today, Plugins, etc.) |
-| `f` | **Tag Filter** — Quickly jump to Tag View and filter by name |
+| `f` | **Tag Filter** — Quickly jump to Tag View and filter by one or multiple tags (e.g., `work dev kairo`) |
 | `tab` / `shift+tab` | **Cycle Views** — Move through all available tabs |
 
 ### Pro Tips

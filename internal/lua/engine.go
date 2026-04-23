@@ -55,7 +55,7 @@ func (e *Engine) SetupKairoAPI(L *lua.LState) {
 	L.SetField(kairo, "notify", L.NewFunction(e.luaNotify))
 
 	// Meta
-	L.SetField(kairo, "version", lua.LString("1.1.9"))
+	L.SetField(kairo, "version", lua.LString("1.2.0"))
 
 	// Set as global
 	L.SetGlobal("kairo", kairo)
@@ -161,8 +161,12 @@ func (e *Engine) luaListTasks(L *lua.LState) int {
 		if v := L.GetField(tbl, "statuses"); v.Type() == lua.LTTable {
 			filter.Statuses = e.luaTableToStatusArray(L, v)
 		}
-		if v := L.GetField(tbl, "tag"); v.Type() == lua.LTString {
-			filter.Tag = lua.LVAsString(v)
+		if v := L.GetField(tbl, "tags"); v.Type() == lua.LTTable {
+			var tags []string
+			v.(*lua.LTable).ForEach(func(_, val lua.LValue) {
+				tags = append(tags, lua.LVAsString(val))
+			})
+			filter.Tags = tags
 		}
 		if v := L.GetField(tbl, "priority"); v.Type() == lua.LTNumber {
 			p := core.Priority(lua.LVAsNumber(v))

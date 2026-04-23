@@ -48,13 +48,28 @@ func (api *TaskAPI) Execute(ctx context.Context, req Request) Response {
 		return api.handleDelete(ctx, req.Payload)
 	case "list":
 		return api.handleList(ctx, req.Payload)
-	case "list-tags":
+	case "list_tags":
 		return api.handleListTags(ctx)
+	case "cleanup":
+		return api.cleanup(ctx)
 	default:
 		return Response{
 			Success: false,
 			Error:   fmt.Sprintf("unknown action: %s", req.Action),
 		}
+	}
+}
+
+func (api *TaskAPI) cleanup(ctx context.Context) Response {
+	if err := api.service.Prune(ctx); err != nil {
+		return Response{
+			Success: false,
+			Error:   err.Error(),
+		}
+	}
+	return Response{
+		Success: true,
+		Data:    "database cleaned successfully",
 	}
 }
 
@@ -277,7 +292,7 @@ func (api *TaskAPI) handleDelete(ctx context.Context, payload json.RawMessage) R
 func (api *TaskAPI) handleList(ctx context.Context, payload json.RawMessage) Response {
 	type ListPayload struct {
 		Statuses []string `json:"statuses,omitempty"`
-		Tag      string   `json:"tag,omitempty"`
+		Tags     []string `json:"tags,omitempty"`
 		Priority *int     `json:"priority,omitempty"`
 		Sort     string   `json:"sort,omitempty"`
 	}
@@ -288,7 +303,7 @@ func (api *TaskAPI) handleList(ctx context.Context, payload json.RawMessage) Res
 	}
 
 	filter := core.Filter{
-		Tag:  p.Tag,
+		Tags: p.Tags,
 		Sort: core.SortMode(p.Sort),
 	}
 

@@ -34,7 +34,7 @@ const (
 
 type Filter struct {
 	Statuses           []Status
-	Tag                string
+	Tags               []string
 	Priority           *Priority
 	From               *time.Time
 	To                 *time.Time
@@ -46,16 +46,18 @@ func (f Filter) ApplyToTask(t *Task) {
 	if len(f.Statuses) > 0 {
 		t.Status = f.Statuses[0]
 	}
-	if f.Tag != "" {
-		exists := false
-		for _, existing := range t.Tags {
-			if existing == f.Tag {
-				exists = true
-				break
+	if len(f.Tags) > 0 {
+		for _, required := range f.Tags {
+			exists := false
+			for _, existing := range t.Tags {
+				if existing == required {
+					exists = true
+					break
+				}
 			}
-		}
-		if !exists {
-			t.Tags = append(t.Tags, f.Tag)
+			if !exists {
+				t.Tags = append(t.Tags, required)
+			}
 		}
 	}
 	if f.Priority != nil {

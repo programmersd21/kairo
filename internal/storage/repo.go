@@ -321,9 +321,13 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 		where = append(where, "t.deadline_ms IS NOT NULL AND t.deadline_ms < ?")
 		args = append(args, opt.Filter.To.UTC().UnixMilli())
 	}
-	if opt.Filter.Tag != "" {
-		where = append(where, "EXISTS (SELECT 1 FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id AND g.name=?)")
-		args = append(args, core.NormalizeTag(opt.Filter.Tag))
+	if len(opt.Filter.Tags) > 0 {
+		holders := make([]string, 0, len(opt.Filter.Tags))
+		for _, tag := range opt.Filter.Tags {
+			holders = append(holders, "?")
+			args = append(args, core.NormalizeTag(tag))
+		}
+		where = append(where, "EXISTS (SELECT 1 FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id AND g.name IN ("+strings.Join(holders, ",")+"))")
 	}
 	if opt.Filter.Priority != nil {
 		where = append(where, "t.priority=?")
@@ -606,6 +610,35 @@ func (r *Repository) UpsertTask(ctx context.Context, t core.Task) error {
 		}
 		return setTaskTags(ctx, tx, t.ID, t.Tags)
 	})
+}
+
+func (r *Repository) Prune(ctx context.Context) error {
+	return withTx(ctx, r.db, func(tx *sql.Tx) error {
+		// 1. Delete all tasks marked as deleted
+		if _, err := tx.ExecContext(ctx, `DELETE FROM tasks WHERE deleted_at_ms IS NOT NULL`); err != nil {
+			return err
+		}
+
+		// 2. Delete task_tags that point to non-existent tasks
+		if _, err := tx.ExecContext(ctx, `DELETE FROM task_tags WHERE task_id NOT IN (SELECT id FROM tasks)`); err != nil {
+			return err
+		}
+
+		// 3. Delete tags that are not used by any task
+		if _, err := tx.ExecContext(ctx, `DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM task_tags)`); err != nil {
+			return err
+		}
+
+		// 4. Vacuum cannot be run inside a transaction in some SQLite versions/configs,
+		// but modernc.org/sqlite usually allows it if not in WAL.
+		// To be safe, we'll run it after the transaction.
+		return nil
+	})
+}
+
+func (r *Repository) Vacuum(ctx context.Context) error {
+	_, err := r.db.ExecContext(ctx, "VACUUM")
+	return err
 }
 
 func (r *Repository) taskTags(ctx context.Context, id string) ([]string, error) {

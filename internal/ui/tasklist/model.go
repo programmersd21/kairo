@@ -255,14 +255,16 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 
 	// Tags
 	if len(t.Tags) > 0 {
-		tagStr := ""
-		for i, tag := range t.Tags {
-			if i > 0 {
-				tagStr += " "
-			}
-			tagStr += "#" + tag
+		tagParts := []string{}
+		for _, tag := range t.Tags {
+			pill := lipgloss.JoinHorizontal(lipgloss.Left,
+				m.styles.TagLeft.Render(),
+				m.styles.Tag.Render(tag),
+				m.styles.TagRight.Render(),
+			)
+			tagParts = append(tagParts, pill)
 		}
-		rightParts = append(rightParts, m.styles.Muted.Render(truncate(tagStr, max(10, m.width/6))))
+		rightParts = append(rightParts, strings.Join(tagParts, " "))
 	}
 
 	right := strings.Join(rightParts, lipgloss.NewStyle().Background(rowBg).Render("  "))

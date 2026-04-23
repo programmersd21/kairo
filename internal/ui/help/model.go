@@ -68,15 +68,15 @@ func (m Model) View() string {
 			[]struct{ key, desc string }{
 				{"1-9", styles.IconView + "Switch views (tabs)"},
 				{"f", styles.IconTag + "Filter by tag (Tag view)"},
-				{getK(m.km.OpenTask), "👁️ View task details"},
-				{getK(m.km.Back), "󰌍 Back / Close"},
+				{getK(m.km.OpenTask), styles.IconView + "View task details"},
+				{getK(m.km.Back), "󰌍 " + "Back / Close"},
 			},
 		},
 		{
 			"Tasks",
 			[]struct{ key, desc string }{
 				{getK(m.km.NewTask), styles.IconNew + "New task"},
-				{getK(m.km.EditTask), "󰏫 Edit task"},
+				{getK(m.km.EditTask), "󰏫 " + "Edit task"},
 				{getK(m.km.ToggleStrike), styles.IconStrike + "Toggle completion"},
 				{getK(m.km.DeleteTask), styles.IconDelete + "Delete task"},
 			},
@@ -85,14 +85,14 @@ func (m Model) View() string {
 			"App",
 			[]struct{ key, desc string }{
 				{getK(m.km.Palette), styles.IconPalette + "Command palette"},
-				{getK(m.km.TaskSearch), "󰍉 Search tasks"},
-				{getK(m.km.CycleTheme), "󰏘 Theme menu"},
-				{getK(m.km.OpenPluginDir), "󰝰 Open plugins folder"},
+				{getK(m.km.TaskSearch), "󰍉 " + "Search tasks"},
+				{getK(m.km.CycleTheme), "󰏘 " + "Theme menu"},
+				{getK(m.km.OpenPluginDir), "󰝰 " + "Open plugins folder"},
 				{getK(m.km.ManagePlugins), styles.IconPlugin + "Manage plugins"},
 				{getK(m.km.Help), styles.IconHelp + "Show help"},
 				{getK(m.km.Issues), styles.IconIssues + "Open GitHub issues"},
 				{getK(m.km.Changelog), styles.IconChangelog + "Show changelog"},
-				{getK(m.km.Quit), "󰈆 Quit"},
+				{getK(m.km.Quit), "󰈆 " + "Quit"},
 			},
 		},
 	}

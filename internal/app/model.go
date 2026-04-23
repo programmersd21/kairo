@@ -148,6 +148,12 @@ func (m *Model) rainbowTickCmd() tea.Cmd {
 	})
 }
 
+func (m *Model) cleanupTickCmd() tea.Cmd {
+	return tea.Tick(1*time.Hour, func(time.Time) tea.Msg {
+		return cleanupTickMsg{}
+	})
+}
+
 func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.Model, error) {
 	th := applyThemeOverride(theme.ByName(cfg.App.Theme), cfg.Theme)
 	s := styles.New(th)
@@ -236,7 +242,7 @@ func applyThemeOverride(t theme.Theme, o config.ThemeConfig) theme.Theme {
 }
 
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.checkUpdateCmd()}
+	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.checkUpdateCmd(), m.cleanupTickCmd()}
 	if m.cfg.App.Rainbow {
 		cmds = append(cmds, m.rainbowTickCmd())
 	}
@@ -414,6 +420,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.RainbowAnimationOffset = (m.RainbowAnimationOffset + 1) % 7 // 7 colors in rainbow
 		return m, m.rainbowTickCmd()
 
+	case cleanupTickMsg:
+		_ = m.svc.Prune(m.ctx)
+		return m, m.cleanupTickCmd()
+
 	case strikeAnimationTickMsg:
 		if m.animatingTaskID != x.TaskID {
 			return m, nil
@@ -509,23 +519,40 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				// Apply the filter and return to list view
 				tagValue := strings.TrimSpace(m.tagFilterInput.Value())
-				m.tagFilterInput.Blur()
-				if tagValue != "" {
-					m.tagFilter.Set(tagValue)
-					m.setActiveView(core.ViewTag)
-					m.rebuildComponentSizes() // Recalculate layout when filter changes
-					m.mode = ModeList
-					return m, m.loadTasksCmd()
+
+				// Validate
+				parts := core.ParseTags(tagValue)
+				allValid := true
+				for _, p := range parts {
+					found := false
+					for _, t := range m.tags {
+						if t == p {
+							found = true
+							break
+						}
+					}
+					if !found {
+						allValid = false
+						break
+					}
 				}
-				// Empty input: just close without applying
-				m.mode = ModeList
-				return m, nil
-			case "esc":
-				// Cancel and clear input
+
+				if !allValid && tagValue != "" {
+					return m, nil // Don't submit
+				}
+
 				m.tagFilterInput.Blur()
-				m.tagFilterInput.SetValue("")
+				// Handle clear
+				if tagValue == "" {
+					m.tagFilter.Clear()
+				} else {
+					m.tagFilter.Set(tagValue)
+				}
+
+				m.setActiveView(core.ViewTag)
+				m.rebuildComponentSizes()
 				m.mode = ModeList
-				return m, nil
+				return m, m.loadTasksCmd()
 			case "ctrl+u":
 				// Clear the entire input
 				m.tagFilterInput.SetValue("")
@@ -623,11 +650,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				switch {
 				case km.String() == "f":
-					m.setActiveView(core.ViewTag)
 					m.tagFilterInput.SetValue(m.tagFilter.Value())
 					m.tagFilterInput.Focus()
 					m.mode = ModeTagFilter
-					return m, m.loadTasksCmd()
+					return m, nil
 				case km.String() == "tab":
 					m.activeIdx = (m.activeIdx + 1) % len(m.views)
 					return m, m.loadTasksCmd()
@@ -695,6 +721,34 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle text input for tag filtering
 		var cmd tea.Cmd
 		m.tagFilterInput, cmd = m.tagFilterInput.Update(msg)
+
+		// Validate tags in real-time
+		input := m.tagFilterInput.Value()
+		if input != "" {
+			parts := core.ParseTags(input)
+			valid := true
+			for _, p := range parts {
+				found := false
+				for _, t := range m.tags {
+					if t == p {
+						found = true
+						break
+					}
+				}
+				if !found {
+					valid = false
+					break
+				}
+			}
+			if !valid {
+				m.tagFilterInput.TextStyle = m.s.BadgeDelete
+			} else {
+				m.tagFilterInput.TextStyle = m.s.Text
+			}
+		} else {
+			m.tagFilterInput.TextStyle = m.s.Text
+		}
+
 		return m, cmd
 	case ModeList, ModeConfirmDelete:
 		var cmd tea.Cmd
@@ -872,7 +926,7 @@ func (m *Model) renderHeader() string {
 	// Detail line (tag/priority info)
 	detailLine := ""
 	v := m.views[m.activeIdx]
-	if v.ID == core.ViewTag && m.tagFilter.IsActive() {
+	if v.ID == core.ViewTag && m.tagFilter.IsActive() && m.tagFilter.Value() != "" {
 		detailLine = "  " + m.s.Muted.Render(styles.IconTag) + m.s.Title.Render(m.tagFilter.Value()) + "  " + m.s.Muted.Render("[press f to edit]")
 	} else if v.ID == core.ViewPriority && m.priParam != nil {
 		detailLine = "  " + m.s.Muted.Render("Priority: ") + m.s.PriorityBadge(*m.priParam)
@@ -992,12 +1046,32 @@ func (m *Model) renderFooter() string {
 // renderTagFilterOverlay renders the tag filter input modal
 func (m *Model) renderTagFilterOverlay(h int) string {
 	// Create filter input modal
-	inputLabel := m.s.Title.Render("Filter by Tag")
+	inputLabel := m.s.Title.Render("Filter by Tag (space/comma separated)")
 	input := lipgloss.NewStyle().Padding(0, 1).Render(m.tagFilterInput.View())
-	hint := m.s.Muted.Render("Current tags: " + strings.Join(m.tags, ", "))
-	if len(m.tags) > 10 {
-		hint = m.s.Muted.Render("(Showing available tags)")
+
+	// Show hints for invalid tags
+	hintText := "Available: " + strings.Join(m.tags, ", ")
+	inputVal := m.tagFilterInput.Value()
+	if inputVal != "" {
+		parts := core.ParseTags(inputVal)
+		var invalid []string
+		for _, p := range parts {
+			found := false
+			for _, t := range m.tags {
+				if t == p {
+					found = true
+					break
+				}
+			}
+			if !found {
+				invalid = append(invalid, p)
+			}
+		}
+		if len(invalid) > 0 {
+			hintText = m.s.BadgeDelete.Render("Invalid tags: " + strings.Join(invalid, ", "))
+		}
 	}
+	hint := m.s.Muted.Render(hintText)
 
 	modal := lipgloss.JoinVertical(lipgloss.Left,
 		inputLabel,
@@ -1043,7 +1117,14 @@ func (m *Model) activeFilter() core.Filter {
 
 	// Apply dynamic parameters if it's a built-in view that supports them
 	if v.ID == core.ViewTag {
-		f.Tag = m.tagFilter.Value() // Use the new FilterState
+		tags := core.ParseTags(m.tagFilter.Value())
+		if len(tags) == 0 {
+			m.tagFilter.Clear()
+			m.mode = ModeList
+		} else {
+			m.tagFilter.Set(strings.Join(tags, " "))
+		}
+		f.Tags = tags
 	}
 	if v.ID == core.ViewPriority && m.priParam != nil {
 		f.Priority = m.priParam

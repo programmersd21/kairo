@@ -14,7 +14,7 @@ func TestDefaultViews(t *testing.T) {
 
 func TestFilter_ApplyToTask(t *testing.T) {
 	f := Filter{
-		Tag:      "test",
+		Tags:     []string{"test"},
 		Priority: new(Priority),
 	}
 	*f.Priority = P0

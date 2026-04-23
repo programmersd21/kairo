@@ -145,6 +145,12 @@ func main() {
 
 	// Emit app start event (plugins can listen to this)
 	hks.AppStarted()
+
+	// Perform database cleanup on startup
+	if err := svc.Prune(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "kairo: database cleanup:", err)
+	}
+
 	defer hks.AppStopped()
 
 	m, err := app.New(ctx, cfg, svc)
@@ -162,7 +168,7 @@ func main() {
 
 func runAPI(ctx context.Context, svc service.TaskService, args []string) error {
 	if len(args) == 0 {
-		return errors.New("missing action (create, list, update, delete, get, list-tags)")
+		return errors.New("missing action (create, list, update, delete, get, list-tags, cleanup)")
 	}
 
 	taskAPI := api.New(svc)
@@ -329,7 +335,7 @@ func runHelp(args []string) {
 		fmt.Println("\nUsage:")
 		fmt.Println("  kairo api [action] [flags]")
 		fmt.Println("\nActions:")
-		fmt.Println("  create, list, update, delete, get, list-tags")
+		fmt.Println("  create, list, update, delete, get, list-tags, cleanup")
 	case "completion":
 		fmt.Println("Generate shell completion scripts.")
 		fmt.Println("\nUsage:")

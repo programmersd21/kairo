@@ -355,8 +355,15 @@ func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, map[
 				})
 				f.Statuses = ss
 			}
-			if tag := luaToString(filterTbl.RawGetString("tag")); tag != "" {
-				f.Tag = core.NormalizeTag(tag)
+			if tagsTbl, ok := filterTbl.RawGetString("tags").(*lua.LTable); ok {
+				var tags []string
+				tagsTbl.ForEach(func(_ lua.LValue, vv lua.LValue) {
+					t := core.NormalizeTag(luaToString(vv))
+					if t != "" {
+						tags = append(tags, t)
+					}
+				})
+				f.Tags = tags
 			}
 			if minP := luaToInt(filterTbl.RawGetString("min_priority")); minP >= 0 {
 				p := core.Priority(minP).Clamp()

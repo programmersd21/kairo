@@ -50,6 +50,9 @@ type TaskService interface {
 	// UpsertTask inserts or replaces a task (for sync merge).
 	UpsertTask(ctx context.Context, task core.Task) error
 
+	// Prune performs a hard delete of soft-deleted tasks and optimizes the database.
+	Prune(ctx context.Context) error
+
 	// Hooks returns the event manager for this service.
 	Hooks() *hooks.Manager
 
@@ -185,6 +188,17 @@ func (s *taskService) ApplyTombstone(ctx context.Context, tombstone storage.Tomb
 func (s *taskService) UpsertTask(ctx context.Context, task core.Task) error {
 	if err := s.repo.UpsertTask(ctx, task); err != nil {
 		return fmt.Errorf("failed to upsert task: %w", err)
+	}
+	return nil
+}
+
+// Prune performs a hard delete and vacuum.
+func (s *taskService) Prune(ctx context.Context) error {
+	if err := s.repo.Prune(ctx); err != nil {
+		return fmt.Errorf("failed to prune tasks: %w", err)
+	}
+	if err := s.repo.Vacuum(ctx); err != nil {
+		return fmt.Errorf("failed to vacuum database: %w", err)
 	}
 	return nil
 }
