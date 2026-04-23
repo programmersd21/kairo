@@ -19,6 +19,11 @@ type pluginChangedMsg struct{}
 
 type syncDoneMsg struct{ Err error }
 
+type updateAvailableMsg struct {
+	Current string
+	Latest  string
+}
+
 type rainbowTickMsg struct{}
 
 type strikeAnimationTickMsg struct{ TaskID string }

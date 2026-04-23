@@ -1,13 +1,19 @@
 <div align="center">
 
-# 📝 Kairo — 🌿 Minimal, powerful task management.
+# 📝 Kairo
 
-![Main App](screenshots/thumbnail.png)
+### 🌿 Minimal, powerful task management for the modern terminal.
 
 [![Release](https://img.shields.io/github/v/release/programmersd21/kairo?sort=semver&style=for-the-badge&logo=github&color=7c3aed)](https://github.com/programmersd21/kairo/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/programmersd21/kairo/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&color=2563eb)](https://github.com/programmersd21/kairo/actions)
 [![Go Report Card](https://img.shields.io/badge/go%20report-A%2B-brightgreen?style=for-the-badge&logo=go&logoColor=white&color=10b981)](https://goreportcard.com/report/github.com/programmersd21/kairo)
 [![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge&logo=open-source-initiative&logoColor=white)](https://opensource.org/licenses/MIT)
+
+---
+
+| **Static Overview** | **Interactive Demo** |
+|:---:|:---:|
+| ![Main App](screenshots/thumbnail.png) | ![Demo](screenshots/demo.gif) |
 
 **⌛ Time, executed well.**
 
@@ -107,6 +113,9 @@ kairo update
 
 Downloads the latest GitHub Release for your OS/arch, verifies it against `checksums.txt`, and safely replaces the installed binary.
 On Windows, Kairo will automatically close to apply the update; simply re-run `kairo` once the terminal returns.
+
+**Startup Notifications:**
+Kairo automatically checks for updates on startup. If a newer version is available, a notification will appear in the footer (e.g., `Update: v1.1.7 → v1.1.8`) directing you to run the update command.
 
 ---
 
@@ -217,6 +226,8 @@ return plugin
 
 Kairo features a **minimalist design system** optimized for clarity and focus.
 
+![Main App](screenshots/thumbnail.png)
+
 ### Design Philosophy
 
 - **Breathable Layout** — Reduced padding and thin borders for a clean, modern look
@@ -291,9 +302,10 @@ cp configs/kairo.example.toml ~/.config/kairo/config.toml
 ```
 
 Then edit to customize:
-- **Theme selection** — Choose from 12 built-in themes:
-    - **Dark:** Catppuccin (Default), Midnight, Aurora, Cyberpunk, Dracula, Nord
-    - **Light:** Vanilla, Solarized, Rose, Matcha, Cloud, Sepia
+- **Theme selection** — Choose from 32 built-in themes:
+    - **Premium Dark:** `catppuccin` (Default), `midnight`, `aurora`, `cyberpunk`, `dracula`, `nord`, `obsidian_bloom`, `neon_reef`, `carbon_sunset`, `vanta_aurora`, `plasma_grape`, `midnight_jade`, `synthwave_minimal`, `graphite_matcha`
+    - **Premium Light:** `vanilla`, `solarized`, `rose`, `matcha`, `cloud`, `sepia`, `cloud_dancer`, `sakura_sand`, `olive_mist`, `terracotta_air`, `vanilla_sky`, `peach_fuzz_neo`, `coastal_drift`, `matcha_latte`
+    - **Hybrid/Specialized:** `digital_lavender`, `neo_mint_system`, `sunset_gradient_pro`, `forest_sanctuary`
 - **Keybindings** — Rebind any keyboard shortcut
 - **View ordering** — Customize your task view tabs
 - **Sync settings** — Configure Git repository sync

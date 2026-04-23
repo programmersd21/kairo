@@ -34,6 +34,7 @@ import (
 	"github.com/programmersd21/kairo/internal/ui/tasklist"
 	"github.com/programmersd21/kairo/internal/ui/theme"
 	"github.com/programmersd21/kairo/internal/ui/theme_menu"
+	"github.com/programmersd21/kairo/internal/updater"
 	"github.com/programmersd21/kairo/internal/util"
 )
 
@@ -125,6 +126,8 @@ type Model struct {
 
 	statusText string
 	isErr      bool
+
+	updateAvailable *updateAvailableMsg
 
 	syncEngine *ksync.Engine
 
@@ -232,7 +235,7 @@ func applyThemeOverride(t theme.Theme, o config.ThemeConfig) theme.Theme {
 }
 
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd()}
+	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.checkUpdateCmd()}
 	if m.cfg.App.Rainbow {
 		cmds = append(cmds, m.rainbowTickCmd())
 	}
@@ -461,6 +464,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusText = x.Err.Error()
 			m.isErr = true
 		}
+		return m, nil
+
+	case updateAvailableMsg:
+		m.updateAvailable = &x
 		return m, nil
 	}
 
@@ -938,7 +945,22 @@ func (m *Model) renderFooter() string {
 		if m.syncEngine != nil && m.syncEngine.Enabled() {
 			syncStatus = styles.IconSync + " "
 		}
-		right = m.s.Muted.Render(syncStatus + buildinfo.VersionTag() + " ")
+
+		versionText := buildinfo.VersionTag()
+		if m.updateAvailable != nil {
+			cur := m.updateAvailable.Current
+			if !strings.HasPrefix(cur, "v") {
+				cur = "v" + cur
+			}
+			lat := m.updateAvailable.Latest
+			if !strings.HasPrefix(lat, "v") {
+				lat = "v" + lat
+			}
+			versionText = fmt.Sprintf("Update: %s → %s (run `kairo update`)", cur, lat)
+			right = m.s.Muted.Foreground(m.s.Theme.Accent).Bold(true).Render(syncStatus + versionText + " ")
+		} else {
+			right = m.s.Muted.Render(syncStatus + versionText + " ")
+		}
 	}
 
 	line := render.BarLine(left, right, m.width, m.s.Theme.Bg)
@@ -1272,6 +1294,27 @@ func (m *Model) syncNowCmd() tea.Cmd {
 	return func() tea.Msg {
 		err := m.syncEngine.SyncNow(m.ctx)
 		return syncDoneMsg{Err: err}
+	}
+}
+
+func (m *Model) checkUpdateCmd() tea.Cmd {
+	return func() tea.Msg {
+		v := buildinfo.EffectiveVersion()
+		if v == "dev" {
+			return nil
+		}
+		cfg := updater.DefaultConfig()
+		res, _, err := cfg.Check(m.ctx, v)
+		if err != nil {
+			return nil // Silently fail update check
+		}
+		if res.Update {
+			return updateAvailableMsg{
+				Current: res.Current,
+				Latest:  res.Latest,
+			}
+		}
+		return nil
 	}
 }
 
