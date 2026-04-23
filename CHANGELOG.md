@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.9]
+
+### Added
+- **Premium Icon Overhaul**: A complete redesign of the application's iconography using a curated set of "Premium & Sentimental" symbols (Nerd Font optimized).
+- **Footer UX Enhancement**: The footer now features descriptive icons for all key actions, including new dedicated symbols for GitHub Issues and Changelog access, and the restoration of the `f` tag filter shortcut.
+- **Help Menu Redesign**: The help menu has been enhanced with professional icons for every keybinding category and action, providing a more intuitive and visually appealing reference.
+- **Safety First**: Added a professional quit confirmation dialog to prevent accidental application closure.
+- **Interactive Demo**: Added a new, high-fidelity demo GIF to the documentation for better visual clarity of the application's workflow and animations.
+
+### Changed
+- **Enhanced Priority Badges**: Task priority labels (P0-P3) now feature a colored outline matching the priority level for improved visual hierarchy and recognition.
+- **Improved Delete Confirmation**: The delete confirmation badge in the footer now uses a high-contrast red background with white text for better visibility and safety.
+
+### Fixed
+- **Priority Icon Mapping**: Corrected an off-by-one error where priority icons were displaying $n+1$ for priority $n$.
+
 ## [1.1.8]
 
 ### Added

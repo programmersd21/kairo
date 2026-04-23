@@ -11,29 +11,31 @@ import (
 )
 
 // Icons used throughout the app.
-// Using standard Unicode symbols and emojis for maximum compatibility.
+// Designed with a "Premium & Sentimental" aesthetic for modern terminals.
 const (
-	IconTodo      = "○ "
-	IconDoing     = "◐ "
-	IconDone      = "● "
-	IconPriority0 = "0 "
-	IconPriority1 = "1 "
-	IconPriority2 = "2 "
-	IconPriority3 = "3 "
-	IconDeadline  = "⏲ "
-	IconTag       = "# "
-	IconSync      = "↻ "
-	IconError     = "✖ "
-	IconInfo      = "ℹ "
-	IconHelp      = "help"
-	IconTask      = "❖ "
-	IconPlugin    = "🧩 "
-	// Additional safe icons for UI affordances
-	IconPalette = "🔎"
-	IconNew     = "✚"
-	IconDelete  = "🗑"
-	IconView    = "▣"
-	IconStrike  = "⚡"
+	IconTodo      = "󰄱 "
+	IconDoing     = "󰔟 "
+	IconDone      = "󰄲 "
+	IconPriority0 = "󰼎 "
+	IconPriority1 = "󰼏 "
+	IconPriority2 = "󰼐 "
+	IconPriority3 = "󰼑 "
+	IconDeadline  = "󰃰 "
+	IconTag       = "󰓹 "
+	IconSync      = "󰑓 "
+	IconError     = "󰅚 "
+	IconInfo      = "󰋽 "
+	IconHelp      = "󰋗 "
+	IconTask      = "󰈈 "
+	IconPlugin    = "󰡀 "
+	// UI Affordances
+	IconPalette   = "󰳟 "
+	IconNew       = "󰐕 "
+	IconDelete    = "󰆴 "
+	IconView      = "󰈈 "
+	IconStrike    = "󱐌 "
+	IconIssues    = "󰋽 "
+	IconChangelog = "󰠠 "
 )
 
 // Design System Constants
@@ -73,14 +75,17 @@ type Styles struct {
 	RowFocused  lipgloss.Style
 
 	// Badges & Status
-	Badge            lipgloss.Style
-	BadgeGood        lipgloss.Style
-	BadgeWarn        lipgloss.Style
-	BadgeBad         lipgloss.Style
-	BadgeMuted       lipgloss.Style
-	BadgeOutlineGood lipgloss.Style
-	BadgeOutlineWarn lipgloss.Style
-	BadgeOutlineBad  lipgloss.Style
+	Badge             lipgloss.Style
+	BadgeGood         lipgloss.Style
+	BadgeWarn         lipgloss.Style
+	BadgeBad          lipgloss.Style
+	BadgeMuted        lipgloss.Style
+	BadgeDelete       lipgloss.Style
+	BadgeQuit         lipgloss.Style
+	BadgeOutlineGood  lipgloss.Style
+	BadgeOutlineWarn  lipgloss.Style
+	BadgeOutlineBad   lipgloss.Style
+	BadgeOutlineMuted lipgloss.Style
 
 	// Detail & Form
 	DetailKey   lipgloss.Style
@@ -121,6 +126,12 @@ func New(t theme.Theme) Styles {
 		Foreground(t.Bg).
 		Background(t.Accent).
 		Bold(true)
+
+	// Contrast color for badge text
+	contrast := lipgloss.Color("#FFFFFF")
+	if t.IsLight {
+		contrast = t.Bg // Use theme background (usually light) for text on colored badges in light themes
+	}
 
 	return Styles{
 		Theme: t,
@@ -173,6 +184,52 @@ func New(t theme.Theme) Styles {
 		BadgeMuted: lipgloss.NewStyle().
 			Foreground(t.Muted).
 			Background(t.Bg),
+		BadgeDelete: lipgloss.NewStyle().
+			Foreground(contrast).
+			Background(t.Bad).
+			Bold(true).
+			Padding(0, 1),
+		BadgeQuit: lipgloss.NewStyle().
+			Foreground(contrast).
+			Background(t.Warn).
+			Bold(true).
+			Padding(0, 1),
+		BadgeOutlineGood: lipgloss.NewStyle().
+			Foreground(contrast).
+			Background(t.Good).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(t.Good).
+			BorderTop(false).
+			BorderBottom(false).
+			Bold(true).
+			Padding(0, 1),
+		BadgeOutlineWarn: lipgloss.NewStyle().
+			Foreground(contrast).
+			Background(t.Warn).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(t.Warn).
+			BorderTop(false).
+			BorderBottom(false).
+			Bold(true).
+			Padding(0, 1),
+		BadgeOutlineBad: lipgloss.NewStyle().
+			Foreground(contrast).
+			Background(t.Bad).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(t.Bad).
+			BorderTop(false).
+			BorderBottom(false).
+			Bold(true).
+			Padding(0, 1),
+		BadgeOutlineMuted: lipgloss.NewStyle().
+			Foreground(contrast).
+			Background(t.Muted).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(t.Muted).
+			BorderTop(false).
+			BorderBottom(false).
+			Bold(true).
+			Padding(0, 1),
 
 		// Detail & Form
 		DetailKey: mutedStyle.
@@ -238,14 +295,14 @@ func (s Styles) StatusBadge(st core.Status) string {
 func (s Styles) PriorityBadge(p core.Priority) string {
 	switch p.Clamp() {
 	case core.P0:
-		return s.BadgeMuted.Render(IconPriority0 + "P0")
+		return s.BadgeOutlineMuted.Render(IconPriority0 + "P0")
 	case core.P1:
-		return s.Badge.Render(IconPriority1 + "P1")
+		return s.BadgeOutlineMuted.Render(IconPriority1 + "P1")
 	case core.P2:
-		return s.BadgeWarn.Render(IconPriority2 + "P2")
+		return s.BadgeOutlineWarn.Render(IconPriority2 + "P2")
 	case core.P3:
-		return s.BadgeBad.Render(IconPriority3 + "P3")
+		return s.BadgeOutlineBad.Render(IconPriority3 + "P3")
 	default:
-		return s.BadgeMuted.Render(fmt.Sprintf("P%d", int(p)))
+		return s.BadgeOutlineMuted.Render(fmt.Sprintf("P%d", int(p)))
 	}
 }

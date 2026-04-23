@@ -85,6 +85,7 @@ const (
 	ModeThemeMenu
 	ModePluginMenu
 	ModeTagFilter
+	ModeConfirmQuit
 )
 
 type Model struct {
@@ -485,13 +486,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if m.mode == ModeConfirmQuit {
+			switch km.String() {
+			case "y", "enter":
+				return m, tea.Quit
+			case "n", "esc":
+				m.mode = ModeList
+				return m, nil
+			}
+		}
+
 		if m.mode == ModeTagFilter {
 			// Handle critical global keys even in input mode
 			if keymapMatch(m.km.Quit, km) {
-				// Allow quit to work from tag filter input
+				// Ask for confirmation even from tag filter
 				m.tagFilterInput.Blur()
-				m.tagFilterInput.SetValue("")
-				return m, tea.Quit
+				m.mode = ModeConfirmQuit
+				return m, nil
 			}
 
 			switch km.String() {
@@ -527,7 +538,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// while typing in menus or editors.
 		if !m.isInputFocused() {
 			if keymapMatch(m.km.Quit, km) {
-				return m, tea.Quit
+				m.mode = ModeConfirmQuit
+				return m, nil
 			}
 			if keymapMatch(m.km.Palette, km) {
 				m.palTasksOnly = false
@@ -896,17 +908,19 @@ func (m *Model) renderFooter() string {
 	left := ""
 	switch m.mode {
 	case ModeConfirmDelete:
-		left = m.s.BadgeBad.Render(" DELETE? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
+		left = m.s.BadgeDelete.Render(" DELETE? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
+	case ModeConfirmQuit:
+		left = m.s.BadgeQuit.Render(" QUIT? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
 	case ModeTagFilter:
 		left = " " + m.s.Muted.Render("enter apply • esc cancel • ctrl+u clear")
 	case ModeDetail:
 		left = " " + m.s.Muted.Render(
-			fk(m.km.Back)+" back • "+
-				fk(m.km.EditTask)+" edit • "+
-				fk(m.km.Palette)+" palette • "+
-				fk(m.km.Help)+" help • "+
-				fk(m.km.Issues)+" issues • "+
-				fk(m.km.Changelog)+" changelog",
+			fk(m.km.Back)+" 󰌍back • "+
+				fk(m.km.EditTask)+" 󰏫edit • "+
+				fk(m.km.Palette)+" "+styles.IconPalette+"palette • "+
+				fk(m.km.Help)+" "+styles.IconHelp+"help • "+
+				fk(m.km.Issues)+" "+styles.IconIssues+"issues • "+
+				fk(m.km.Changelog)+" "+styles.IconChangelog+"changelog",
 		)
 	case ModeEditor:
 		left = " " + m.s.Muted.Render("ctrl+s "+styles.IconDone+"save • esc "+styles.IconError+"cancel • tab navigate")
@@ -920,14 +934,15 @@ func (m *Model) renderFooter() string {
 		left = " " + m.s.Muted.Render("enter detail • u uninstall • o open folder • r reload • p/"+fk(m.km.ManagePlugins)+" close • ↑/↓ navigate")
 	default:
 		left = " " + m.s.Muted.Render(
-			fk(m.km.Palette)+" "+styles.IconPalette+" • "+
-				fk(m.km.NewTask)+" "+styles.IconNew+" • "+
-				fk(m.km.ToggleStrike)+" "+styles.IconStrike+" • "+
-				fk(m.km.DeleteTask)+" "+styles.IconDelete+" • "+
-				fk(m.km.Help)+" "+styles.IconHelp+" • "+
-				fk(m.km.Issues)+" issues • "+
-				fk(m.km.Changelog)+" changelog • "+
-				"1-9 "+styles.IconView+" ",
+			fk(m.km.Palette)+" "+styles.IconPalette+"palette • "+
+				fk(m.km.NewTask)+" "+styles.IconNew+"new • "+
+				"f "+styles.IconTag+"tag • "+
+				fk(m.km.ToggleStrike)+" "+styles.IconStrike+"strike • "+
+				fk(m.km.DeleteTask)+" "+styles.IconDelete+"delete • "+
+				fk(m.km.Help)+" "+styles.IconHelp+"help • "+
+				fk(m.km.Issues)+" "+styles.IconIssues+"issues • "+
+				fk(m.km.Changelog)+" "+styles.IconChangelog+"changelog • "+
+				"1-9 "+styles.IconView+"view",
 		)
 	}
 
