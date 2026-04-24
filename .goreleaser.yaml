@@ -68,7 +68,8 @@ changelog:
       - '^chore:'
       - '^README'
       - '^Merge'
-
+      - '^Brew'
+      
 release:
   draft: false
   prerelease: auto
