@@ -355,7 +355,9 @@ UI Re-render → Instant User Feedback
 ## 🌴 Project Structure
 
 ```
-.
+kairo/
+├── Casks
+│   └── kairo.rb
 ├── CHANGELOG.md
 ├── cmd
 │   └── kairo
@@ -452,7 +454,7 @@ UI Re-render → Instant User Feedback
 │   └── task-logger.lua
 ├── README.md
 ├── screenshots
-│   └── thumbnail.png
+│   └── demo.gif
 ├── scripts
 │   ├── install.ps1
 │   └── install.sh
