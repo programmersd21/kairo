@@ -57,6 +57,7 @@ data/
 
 # Local config (user-specific)
 config.toml
+local/
 
 # tasks metdata
 tasks.json
