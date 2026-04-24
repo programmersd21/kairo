@@ -36,6 +36,12 @@ const (
 	IconStrike    = "󱐌 "
 	IconIssues    = "󰋽 "
 	IconChangelog = "󰠠 "
+	IconBack      = "󰌍 "
+	IconEdit      = "󰏫 "
+	IconClose     = "󰅖 "
+	IconUp        = "󰜝 "
+	IconDown      = "󰜲 "
+	IconEnter     = "󰌑 "
 )
 
 // Design System Constants

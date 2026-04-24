@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1]
+
+### Fixed
+
+* **Footer Rendering**: Fixed an issue where the footer would disappear during theme changes or in specific application modes (Palette, Help, Theme Menu).
+* **Footer Layout**: Optimized footer keybinding hints to be more compact, preventing layout wrapping and ensuring visibility on standard terminal widths.
+* **UI Consistency**: Added missing icons to the footer across all modes for a more unified and polished user experience.
+* **Component Sizing**: Fixed a layout bug where certain overlay modes (Palette, Help, Theme Menu) incorrectly occupied the full terminal height, obscuring the header and footer.
+
 ## [1.2.0]
 
 ### Added

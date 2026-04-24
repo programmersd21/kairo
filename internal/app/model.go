@@ -791,18 +791,7 @@ func (m *Model) View() string {
 		return ""
 	}
 
-	var content string
-
-	switch m.mode {
-	case ModePalette:
-		content = m.pal.View()
-	case ModeHelp:
-		content = m.hlp.View()
-	case ModeThemeMenu:
-		content = m.tm.View()
-	default:
-		content = m.renderMainUI()
-	}
+	content := m.renderMainUI()
 
 	// Final rendering pipeline: FillViewport guarantees that every cell in
 	// the width×height viewport has the background color applied.
@@ -823,6 +812,17 @@ func (m *Model) renderMainUI() string {
 		availableHeight = 0
 	}
 
+	// Update sizes dynamically
+	m.list.SetSize(m.width, availableHeight)
+	m.det.SetSize(m.width, availableHeight)
+	m.pal.SetSize(m.width, availableHeight)
+	m.pm.SetSize(m.width, availableHeight)
+	m.hlp.SetSize(m.width, availableHeight)
+	m.tm.SetSize(m.width, availableHeight)
+	if m.edit != nil {
+		m.edit.SetSize(m.width, availableHeight)
+	}
+
 	// Sync animation state to tasklist
 	if m.animatingTaskID != "" {
 		m.list.SetAnimation(m.animatingTaskID, m.animationStarted, m.animationDuration, m.animationReverse)
@@ -834,6 +834,12 @@ func (m *Model) renderMainUI() string {
 		body = m.list.View()
 	case ModeDetail:
 		body = m.det.View()
+	case ModePalette:
+		body = m.pal.View()
+	case ModeHelp:
+		body = m.hlp.View()
+	case ModeThemeMenu:
+		body = m.tm.View()
 	case ModePluginMenu:
 		body = m.pm.View()
 	case ModeTagFilter:
@@ -860,26 +866,7 @@ func (m *Model) renderMainUI() string {
 }
 
 func (m *Model) rebuildComponentSizes() {
-	// Calculate header height dynamically
-	head := m.renderHeader()
-	foot := m.renderFooter()
-	hHeight := lipgloss.Height(head)
-	fHeight := lipgloss.Height(foot)
-
-	avail := m.height - hHeight - fHeight
-	if avail < 0 {
-		avail = 0
-	}
-
-	m.list.SetSize(m.width, avail)
-	m.det.SetSize(m.width, avail)
-	m.pal.SetSize(m.width, m.height)
-	m.pm.SetSize(m.width, m.height)
-	m.hlp.SetSize(m.width, m.height)
-	m.tm.SetSize(m.width, m.height)
-	if m.edit != nil {
-		m.edit.SetSize(m.width, avail)
-	}
+	// Component sizing is now handled dynamically in renderMainUI
 }
 
 // Add to Model struct:
@@ -962,41 +949,40 @@ func (m *Model) renderFooter() string {
 	left := ""
 	switch m.mode {
 	case ModeConfirmDelete:
-		left = m.s.BadgeDelete.Render(" DELETE? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
+		left = m.s.BadgeDelete.Render(" DELETE? ") + " " + m.s.Muted.Render("y/enter "+styles.IconDone+"confirm • n/esc "+styles.IconClose+"cancel")
 	case ModeConfirmQuit:
-		left = m.s.BadgeQuit.Render(" QUIT? ") + " " + m.s.Muted.Render("y/enter confirm • n/esc cancel")
+		left = m.s.BadgeQuit.Render(" QUIT? ") + " " + m.s.Muted.Render("y/enter "+styles.IconDone+"confirm • n/esc "+styles.IconClose+"cancel")
 	case ModeTagFilter:
-		left = " " + m.s.Muted.Render("enter apply • esc cancel • ctrl+u clear")
+		left = " " + m.s.Muted.Render("enter "+styles.IconDone+"apply • esc "+styles.IconClose+"cancel • ctrl+u clear")
 	case ModeDetail:
 		left = " " + m.s.Muted.Render(
-			fk(m.km.Back)+" 󰌍back • "+
-				fk(m.km.EditTask)+" 󰏫edit • "+
-				fk(m.km.Palette)+" "+styles.IconPalette+"palette • "+
+			fk(m.km.Back)+" "+styles.IconBack+"back • "+
+				fk(m.km.EditTask)+" "+styles.IconEdit+"edit • "+
+				fk(m.km.Palette)+" "+styles.IconPalette+"pal • "+
 				fk(m.km.Help)+" "+styles.IconHelp+"help • "+
-				fk(m.km.Issues)+" "+styles.IconIssues+"issues • "+
-				fk(m.km.Changelog)+" "+styles.IconChangelog+"changelog",
+				fk(m.km.Issues)+" "+styles.IconIssues+"iss • "+
+				fk(m.km.Changelog)+" "+styles.IconChangelog+"log",
 		)
 	case ModeEditor:
-		left = " " + m.s.Muted.Render("ctrl+s "+styles.IconDone+"save • esc "+styles.IconError+"cancel • tab navigate")
+		left = " " + m.s.Muted.Render("ctrl+s "+styles.IconDone+"save • esc "+styles.IconClose+"cls • tab nav")
 	case ModePalette:
-		left = " " + m.s.Muted.Render("enter select • esc/p close • ↑/↓ navigate")
+		left = " " + m.s.Muted.Render("enter "+styles.IconEnter+"sel • esc/p "+styles.IconClose+"cls • "+styles.IconUp+styles.IconDown+" nav")
 	case ModeHelp:
-		left = " " + m.s.Muted.Render("esc/q/"+fk(m.km.Help)+" close")
+		left = " " + m.s.Muted.Render("esc/q/"+fk(m.km.Help)+" "+styles.IconClose+"cls")
 	case ModeThemeMenu:
-		left = " " + m.s.Muted.Render("enter select • esc/q/"+fk(m.km.CycleTheme)+" close • ↑/↓ navigate")
+		left = " " + m.s.Muted.Render("enter "+styles.IconDone+"sel • esc/q/"+fk(m.km.CycleTheme)+" "+styles.IconClose+"cls • "+styles.IconUp+styles.IconDown+" nav")
 	case ModePluginMenu:
-		left = " " + m.s.Muted.Render("enter detail • u uninstall • o open folder • r reload • p/"+fk(m.km.ManagePlugins)+" close • ↑/↓ navigate")
+		left = " " + m.s.Muted.Render("enter det • u uninst • o open • r reload • p/"+fk(m.km.ManagePlugins)+" "+styles.IconClose+"cls • "+styles.IconUp+styles.IconDown+" nav")
 	default:
 		left = " " + m.s.Muted.Render(
-			fk(m.km.Palette)+" "+styles.IconPalette+"palette • "+
+			fk(m.km.Palette)+" "+styles.IconPalette+"pal • "+
 				fk(m.km.NewTask)+" "+styles.IconNew+"new • "+
 				"f "+styles.IconTag+"tag • "+
-				fk(m.km.ToggleStrike)+" "+styles.IconStrike+"strike • "+
-				fk(m.km.DeleteTask)+" "+styles.IconDelete+"delete • "+
+				fk(m.km.ToggleStrike)+" "+styles.IconStrike+"done • "+
+				fk(m.km.DeleteTask)+" "+styles.IconDelete+"del • "+
 				fk(m.km.Help)+" "+styles.IconHelp+"help • "+
-				fk(m.km.Issues)+" "+styles.IconIssues+"issues • "+
-				fk(m.km.Changelog)+" "+styles.IconChangelog+"changelog • "+
-				"1-9 "+styles.IconView+"view",
+				fk(m.km.Issues)+" "+styles.IconIssues+"iss • "+
+				fk(m.km.Changelog)+" "+styles.IconChangelog+"log",
 		)
 	}
 
