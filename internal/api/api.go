@@ -46,6 +46,8 @@ func (api *TaskAPI) Execute(ctx context.Context, req Request) Response {
 		return api.handleUpdate(ctx, req.Payload)
 	case "delete":
 		return api.handleDelete(ctx, req.Payload)
+	case "delete_all":
+		return api.handleDeleteAll(ctx)
 	case "list":
 		return api.handleList(ctx, req.Payload)
 	case "list_tags":
@@ -285,6 +287,21 @@ func (api *TaskAPI) handleDelete(ctx context.Context, payload json.RawMessage) R
 		Data: map[string]string{
 			"id": p.ID,
 		},
+	}
+}
+
+// handleDeleteAll processes a delete_all request
+func (api *TaskAPI) handleDeleteAll(ctx context.Context) Response {
+	if err := api.service.DeleteAll(ctx); err != nil {
+		return Response{
+			Success: false,
+			Error:   err.Error(),
+		}
+	}
+
+	return Response{
+		Success: true,
+		Data:    "all tasks deleted successfully",
 	}
 }
 

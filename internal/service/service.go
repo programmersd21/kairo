@@ -32,6 +32,9 @@ type TaskService interface {
 	// Delete soft-deletes a task.
 	Delete(ctx context.Context, id string) error
 
+	// DeleteAll soft-deletes all active tasks.
+	DeleteAll(ctx context.Context) error
+
 	// List retrieves tasks filtered by the given options.
 	List(ctx context.Context, filter core.Filter) ([]core.Task, error)
 
@@ -134,6 +137,18 @@ func (s *taskService) Delete(ctx context.Context, id string) error {
 
 	// Emit event
 	s.hooks.TaskDeleted(id)
+
+	return nil
+}
+
+// DeleteAll soft-deletes all tasks.
+func (s *taskService) DeleteAll(ctx context.Context) error {
+	if err := s.repo.DeleteAllTasks(ctx); err != nil {
+		return fmt.Errorf("failed to delete all tasks: %w", err)
+	}
+
+	// Emit event
+	s.hooks.TaskDeleteAll()
 
 	return nil
 }

@@ -174,6 +174,12 @@ func runAPI(ctx context.Context, svc service.TaskService, args []string) error {
 	taskAPI := api.New(svc)
 	action := args[0]
 
+	// Handle "delete all" special case
+	if action == "delete" && len(args) > 1 && args[1] == "all" {
+		action = "delete_all"
+		args = args[1:] // shift args so loop works if needed, though delete_all ignores payload
+	}
+
 	var req api.Request
 	if action == "--json" {
 		if len(args) < 2 {
@@ -335,7 +341,7 @@ func runHelp(args []string) {
 		fmt.Println("\nUsage:")
 		fmt.Println("  kairo api [action] [flags]")
 		fmt.Println("\nActions:")
-		fmt.Println("  create, list, update, delete, get, list-tags, cleanup")
+		fmt.Println("  create, list, update, delete, delete all, get, list-tags, cleanup")
 	case "completion":
 		fmt.Println("Generate shell completion scripts.")
 		fmt.Println("\nUsage:")

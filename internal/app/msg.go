@@ -27,4 +27,20 @@ type updateAvailableMsg struct {
 type rainbowTickMsg struct{}
 type cleanupTickMsg struct{}
 
-type strikeAnimationTickMsg struct{ TaskID string }
+// Animation tick messages carry a Gen (generation) counter so that stale
+// ticks from a previous animation cycle are silently dropped in Update().
+type strikeAnimationTickMsg struct {
+	TaskID string
+	Gen    int
+}
+type bloomAnimationTickMsg struct {
+	TaskID string
+	Gen    int
+}
+type deleteAnimationTickMsg struct {
+	TaskID string
+	Gen    int
+}
+type viewTransitionTickMsg struct {
+	Gen int
+}

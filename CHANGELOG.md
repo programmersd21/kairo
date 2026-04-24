@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2]
+
+### Added
+
+* **Cinematic TUI Motion System**: A comprehensive motion engine for liquid glass interactions, elastic physics, and fluid boba clustering.
+* **Cinematic View Shutter**: Smooth 600ms vertical split transition when switching tabs or closing menus, accompanied by a cascading task reveal.
+* **Bulk Deletion API**: Added `kairo api delete all` to safely soft-delete all active tasks in one command.
+* **Task Lifecycle Animations**: 
+    * **Bloom**: New tasks expand into existence with an 800ms `EaseOutQuad` deliberate typing sequence.
+    * **Glitch Deletion**: Bombastic 600ms glitch-vaporization effect where the task scrambles into particles and shrinks into nothingness.
+    * **Liquid Fade**: Completed tasks "melt" into the background using progressive eased strikethrough.
+* **Bento Layout System**: Redesigned header and empty states with modular, asymmetric blocks and soft, rounded borders for a premium aesthetic.
+
+### Fixed
+
+* **Isolated Tab Animations**: View transition bubbles in the header now *only* trigger when genuinely switching tabs, preventing layout flicker.
+* **Context Isolation**: `Esc` now gracefully closes the Tag Filter, and selecting a plugin with `Enter` smoothly animates the view transition instead of instantly snapping.
+* **Animation Glitches**: Resolved rendering artifacts (black blocks) during view transitions by ensuring background color persistence.
+* **Layout Stability**: Fixed alignment of the empty state Bento card and footer keybindings.
+* **Footer Legibility**: Fixed keybinding labels in the footer for better clarity.
+
 ## [1.2.1]
 
 ### Fixed

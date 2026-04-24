@@ -4,14 +4,12 @@
 
 ### 🌿 Minimal, powerful task management for the modern terminal.
 
+![Demo](screenshots/demo.gif)
+
 [![Release](https://img.shields.io/github/v/release/programmersd21/kairo?sort=semver&style=for-the-badge&logo=github&color=7c3aed)](https://github.com/programmersd21/kairo/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/programmersd21/kairo/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&color=2563eb)](https://github.com/programmersd21/kairo/actions)
 [![Go Report Card](https://img.shields.io/badge/go%20report-A%2B-brightgreen?style=for-the-badge&logo=go&logoColor=white&color=10b981)](https://goreportcard.com/report/github.com/programmersd21/kairo)
 [![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge&logo=open-source-initiative&logoColor=white)](https://opensource.org/licenses/MIT)
-
----
-
-![Demo](screenshots/demo.gif)
 
 **⌛ Time, executed well.**
 
@@ -27,8 +25,8 @@ built for developers and power users.
 It combines the simplicity of a **command-line tool**  
 with the sophistication of a *modern, premium design system*.
 
-🎯 **Instant Responsiveness** — Sub-millisecond task searching and navigation  
-🎨 **Premium UI Design** — Modern color palette with accessibility at its core  
+🎯 **BubbleTea Motion System** — Liquid glass interactions with elastic physics  
+🎨 **Premium UI Design** — Modern Bento-style layout with soft, rounded aesthetics  
 ⌨️ **Keyboard-First** — Complete control without ever touching a mouse  
 🖥️ **Seamless Rendering** — Pixel-perfect background fills the entire viewport, no terminal bleed-through  
 🔐 **Offline-First** — Your data lives locally in SQLite, always under your control  
@@ -36,6 +34,7 @@ with the sophistication of a *modern, premium design system*.
 🧩 **Extensible** — Unified Lua plugin system and CLI automation API  
 📱 **Responsive Layout** — Gracefully adapts to any terminal size  
 🤖 **Automation-Friendly** — Headless API for external scripts and CI/CD  
+🌊 **Boba Liquid Feel** — UI elements behave with soft inertia and fluid clustering  
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framework), [Lip Gloss](https://github.com/charmbracelet/lipgloss) (terminal styling), and SQLite (local storage).
 
@@ -51,7 +50,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framewo
 | **Event Hooks** | React to task creation, updates, and app lifecycle events |
 | **Smart Filtering** | Multiple views: Inbox, Today, Upcoming, Completed, by Tag, by Priority |
 | **Fuzzy Search** | Lightning-fast command palette with ranked results |
-| **Strike Animation** | Visual feedback when completing tasks with 'z' |
+| **Cinematic Animations** | Smooth vertical shutter, cascading row reveals, and glitch/vaporize deletions |
 | **Offline Storage** | SQLite with WAL for reliability and concurrent access |
 | **Git Sync** | Optional repository-backed sync with per-task JSON files |
 | **Import/Export** | JSON and Markdown support for data portability |
@@ -113,7 +112,7 @@ Downloads the latest GitHub Release for your OS/arch, verifies it against `check
 On Windows, Kairo will automatically close to apply the update; simply re-run `kairo` once the terminal returns.
 
 **Startup Notifications:**
-Kairo automatically checks for updates on startup. If a newer version is available, a notification will appear in the footer (e.g., `Update: v1.1.7 → v1.1.8`) directing you to run the update command.
+Kairo automatically checks for updates on startup. If a newer version is available, a notification will appear in the footer (e.g., `Update: v1.2.1 → v1.2.2`) directing you to run the update command.
 
 ---
 
@@ -132,6 +131,9 @@ kairo api create --title "Finish report" --priority 1
 
 # Update a task
 kairo api update --id <task-id> --status done
+
+# Delete all tasks (soft-delete)
+kairo api delete all
 
 # Advanced JSON interface
 kairo api --json '{"action": "create", "payload": {"title": "API Task", "tags": ["bot"]}}'
@@ -325,6 +327,20 @@ kairo sync
 
 ---
 
+## 📅 Natural Language Deadlines
+
+Kairo's smart parser understands natural language, making it effortless to set deadlines without worrying about specific date formats.
+
+When creating or editing a task, you can input deadlines like:
+- **Relative days:** `today`, `tomorrow`, `day after tomorrow`
+- **Specific days:** `monday`, `next friday`, `this sunday`
+- **Time-based:** `in 2 hours`, `at 5pm`, `tomorrow at 10am`
+- **Dates:** `august 24`, `24th of april`
+
+Powered by the [when](https://github.com/olebedev/when) library, Kairo ensures your deadlines are always parsed intuitively.
+
+---
+
 ## 🏗 Architecture
 
 Kairo is built with a modular architecture designed for performance, extensibility, and data sovereignty.
@@ -356,109 +372,115 @@ UI Re-render → Instant User Feedback
 
 ```
 kairo/
-├── Casks
-│   └── kairo.rb
-├── CHANGELOG.md
-├── cmd
-│   └── kairo
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   └── feature_request.md
+│   ├── workflows/
+│   │   ├── ci.yml
+│   │   └── release.yml
+│   └── PULL_REQUEST_TEMPLATE.md
+├── cmd/
+│   └── kairo/
 │       └── main.go
-├── CODE_OF_CONDUCT.md
-├── configs
-│   └── kairo.example.toml
-├── CONTRIBUTING.md
-├── go.mod
-├── go.sum
-├── internal
-│   ├── api
+├── internal/
+│   ├── api/
 │   │   └── api.go
-│   ├── app
+│   ├── app/
 │   │   ├── model.go
 │   │   └── msg.go
-│   ├── buildinfo
+│   ├── buildinfo/
 │   │   └── buildinfo.go
-│   ├── completion
+│   ├── completion/
 │   │   └── completion.go
-│   ├── config
+│   ├── config/
 │   │   ├── config.go
 │   │   └── config_test.go
-│   ├── core
-│   │   ├── codec
+│   ├── core/
+│   │   ├── codec/
 │   │   │   ├── json.go
 │   │   │   └── markdown.go
+│   │   ├── nlp/
+│   │   │   └── deadline.go
 │   │   ├── core_test.go
 │   │   ├── ids.go
-│   │   ├── nlp
-│   │   │   └── deadline.go
 │   │   ├── task.go
 │   │   └── view.go
-│   ├── hooks
+│   ├── hooks/
 │   │   └── hooks.go
-│   ├── lua
+│   ├── lua/
 │   │   └── engine.go
-│   ├── plugins
+│   ├── plugins/
 │   │   └── host.go
-│   ├── search
+│   ├── search/
 │   │   ├── fuzzy.go
 │   │   ├── fuzzy_test.go
 │   │   └── index.go
-│   ├── service
+│   ├── service/
 │   │   └── service.go
-│   ├── storage
+│   ├── storage/
 │   │   ├── migrations.go
 │   │   ├── repo.go
 │   │   └── repo_test.go
-│   ├── sync
+│   ├── sync/
 │   │   └── engine.go
-│   ├── ui
-│   │   ├── detail
+│   ├── ui/
+│   │   ├── detail/
 │   │   │   └── model.go
-│   │   ├── editor
+│   │   ├── editor/
 │   │   │   └── model.go
-│   │   ├── help
+│   │   ├── help/
 │   │   │   └── model.go
-│   │   ├── keymap
+│   │   ├── keymap/
 │   │   │   ├── keymap.go
 │   │   │   ├── keymap_test.go
 │   │   │   ├── normalize.go
 │   │   │   └── normalize_test.go
-│   │   ├── palette
+│   │   ├── palette/
 │   │   │   └── model.go
-│   │   ├── plugin_menu
+│   │   ├── plugin_menu/
 │   │   │   └── model.go
-│   │   ├── render
+│   │   ├── render/
+│   │   │   ├── easing.go
 │   │   │   └── render.go
-│   │   ├── styles
+│   │   ├── styles/
 │   │   │   └── styles.go
-│   │   ├── tasklist
+│   │   ├── tasklist/
 │   │   │   └── model.go
-│   │   ├── theme
+│   │   ├── theme/
 │   │   │   └── theme.go
-│   │   └── theme_menu
+│   │   └── theme_menu/
 │   │       └── model.go
-│   ├── updater
+│   ├── updater/
 │   │   ├── checksums.go
 │   │   ├── download.go
 │   │   ├── extract.go
 │   │   ├── github.go
 │   │   ├── updater.go
 │   │   └── windows_helper.go
-│   └── util
+│   └── util/
 │       ├── paths.go
 │       └── util_test.go
-├── LICENSE
-├── Makefile
-├── plugins
+├── plugins/
 │   ├── auto-cleanup.lua
 │   ├── auto-tagger.lua
 │   ├── sample.lua
 │   └── task-logger.lua
-├── README.md
-├── screenshots
+├── screenshots/
 │   └── demo.gif
-├── scripts
+├── scripts/
 │   ├── install.ps1
 │   └── install.sh
-├── SECURITY.md
+├── local/
+│   └── demo_preset.json
+├── .gitignore
+├── .goreleaser.yaml
+├── CHANGELOG.md
+├── go.mod
+├── go.sum
+├── LICENSE
+├── Makefile
+├── README.md
 └── VERSION.txt
 ```
 

@@ -9,6 +9,7 @@ import (
 )
 
 type CloseMsg struct{}
+type TransitionMsg struct{}
 type UninstallMsg struct{ ID string }
 type OpenFolderMsg struct{}
 type ReloadMsg struct{}
@@ -61,6 +62,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			switch x.String() {
 			case "esc", "q", "enter":
 				m.detail = nil
+				return m, func() tea.Msg { return TransitionMsg{} }
 			}
 			return m, nil
 		}
@@ -80,6 +82,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if m.sel >= 0 && m.sel < len(m.plugins) {
 				p := m.plugins[m.sel]
 				m.detail = &p
+				return m, func() tea.Msg { return TransitionMsg{} }
 			}
 		case "o":
 			return m, func() tea.Msg { return OpenFolderMsg{} }

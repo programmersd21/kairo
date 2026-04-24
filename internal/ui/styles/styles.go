@@ -28,20 +28,20 @@ const (
 	IconHelp      = "󰋗 "
 	IconTask      = "󰈈 "
 	IconPlugin    = "󰡀 "
-	// UI Affordances
-	IconPalette   = "󰳟 "
-	IconNew       = "󰐕 "
-	IconDelete    = "󰆴 "
-	IconView      = "󰈈 "
-	IconStrike    = "󱐌 "
-	IconIssues    = "󰋽 "
-	IconChangelog = "󰠠 "
-	IconBack      = "󰌍 "
-	IconEdit      = "󰏫 "
-	IconClose     = "󰅖 "
-	IconUp        = "󰜝 "
-	IconDown      = "󰜲 "
-	IconEnter     = "󰌑 "
+	// UI Affordances (Safe Unicode for cross-platform terminal compatibility)
+	IconPalette   = "⌘ "
+	IconNew       = "+ "
+	IconDelete    = "× "
+	IconView      = "◎ "
+	IconStrike    = "✓ "
+	IconIssues    = "! "
+	IconChangelog = "≡ "
+	IconBack      = "« "
+	IconEdit      = "✎ "
+	IconClose     = "× "
+	IconUp        = "↑ "
+	IconDown      = "↓ "
+	IconEnter     = "↵ "
 )
 
 // Design System Constants
@@ -259,7 +259,7 @@ func New(t theme.Theme) Styles {
 		// Components
 		Card: lipgloss.NewStyle().
 			Background(t.Bg).
-			BorderStyle(lipgloss.NormalBorder()).
+			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(t.Border).
 			Padding(0, 1),
 		CardHeader:  accentStyle.Bold(true),
@@ -267,25 +267,25 @@ func New(t theme.Theme) Styles {
 		CardFooter:  mutedStyle,
 		Overlay: lipgloss.NewStyle().
 			Background(t.Bg).
-			BorderStyle(lipgloss.NormalBorder()).
+			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(t.Accent).
 			Padding(0, 1),
 		Input: lipgloss.NewStyle().
 			Background(t.Overlay).
-			BorderStyle(lipgloss.NormalBorder()).
+			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(t.Border),
 		InputFocused: lipgloss.NewStyle().
 			Background(t.Overlay).
-			BorderStyle(lipgloss.NormalBorder()).
+			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(t.Accent),
 		InputPlaceholder: mutedStyle,
 		Button:           lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted),
 		ButtonPrimary:    lipgloss.NewStyle().Padding(0, 1).Foreground(t.Accent).Bold(true),
 		ButtonSecondary:  lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted),
 		ButtonActive:     lipgloss.NewStyle().Padding(0, 1).Foreground(t.Accent).Bold(true),
-		Divider:          mutedStyle.SetString(strings.Repeat("─", 80)),
-		Border:           lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(t.Border),
-		SoftBorder:       lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(t.Border),
+		Divider:          mutedStyle.SetString(strings.Repeat("\u2500", 80)),
+		Border:           lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(t.Border),
+		SoftBorder:       lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(t.Muted),
 
 		// States
 		Empty:   mutedStyle.Italic(true),

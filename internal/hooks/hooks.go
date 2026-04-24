@@ -11,11 +11,12 @@ import (
 type EventType string
 
 const (
-	EventTaskCreate EventType = "task_create"
-	EventTaskUpdate EventType = "task_update"
-	EventTaskDelete EventType = "task_delete"
-	EventAppStart   EventType = "app_start"
-	EventAppStop    EventType = "app_stop"
+	EventTaskCreate    EventType = "task_create"
+	EventTaskUpdate    EventType = "task_update"
+	EventTaskDelete    EventType = "task_delete"
+	EventTaskDeleteAll EventType = "task_delete_all"
+	EventAppStart      EventType = "app_start"
+	EventAppStop       EventType = "app_stop"
 )
 
 // Event represents an application event that plugins can subscribe to
@@ -103,6 +104,13 @@ func (m *Manager) TaskDeleted(taskID string) {
 		Payload: map[string]interface{}{
 			"task_id": taskID,
 		},
+	})
+}
+
+// TaskDeleteAll emits a bulk task deletion event
+func (m *Manager) TaskDeleteAll() {
+	m.Emit(Event{
+		Type: EventTaskDeleteAll,
 	})
 }
 

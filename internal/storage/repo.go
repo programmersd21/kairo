@@ -145,6 +145,14 @@ func (r *Repository) DeleteTask(ctx context.Context, id string) error {
 	})
 }
 
+func (r *Repository) DeleteAllTasks(ctx context.Context) error {
+	return withTx(ctx, r.db, func(tx *sql.Tx) error {
+		now := time.Now().UTC().UnixMilli()
+		_, err := tx.ExecContext(ctx, `UPDATE tasks SET deleted_at_ms=?, updated_at_ms=? WHERE deleted_at_ms IS NULL`, now, now)
+		return err
+	})
+}
+
 type Tombstone struct {
 	ID        string
 	DeletedAt time.Time
