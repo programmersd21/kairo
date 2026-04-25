@@ -69,15 +69,18 @@ changelog:
       - '^README'
       - '^Merge'
       - '^Brew'
-      
+
 release:
   draft: false
   prerelease: auto
 
-homebrew_casks:
-  - repository:
+brews:
+  - name: kairo
+
+    repository:
       owner: programmersd21
       name: kairo_tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
 
     directory: Casks
 

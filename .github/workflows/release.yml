@@ -12,6 +12,7 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,38 +22,39 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'   # ← reads from go.mod, no manual updates needed
+          go-version-file: 'go.mod'
 
       - name: Read version
-        id: get_version
         run: echo "VERSION=$(cat VERSION.txt)" >> $GITHUB_ENV
 
       - name: Create tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "${{ env.VERSION }}" >/dev/null 2>&1; then
-            TAGGED_COMMIT=$(git rev-list -n 1 "${{ env.VERSION }}")
+
+          if git rev-parse "${VERSION}" >/dev/null 2>&1; then
+            TAGGED_COMMIT=$(git rev-list -n 1 "${VERSION}")
             CURRENT_COMMIT=$(git rev-parse HEAD)
+
             if [ "$TAGGED_COMMIT" != "$CURRENT_COMMIT" ]; then
               echo "Tag exists but points to wrong commit. Force-updating..."
-              git tag -f ${{ env.VERSION }}
-              git push origin ${{ env.VERSION }} --force
+              git tag -f "${VERSION}"
+              git push origin "${VERSION}" --force
             else
-              echo "Tag ${{ env.VERSION }} already points to HEAD, skipping."
+              echo "Tag already correct. Skipping."
             fi
           else
-            git tag ${{ env.VERSION }}
-            git push origin ${{ env.VERSION }}
+            git tag "${VERSION}"
+            git push origin "${VERSION}"
           fi
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7   # ← was v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: latest
           args: release --clean
         env:
-          # A Personal Access Token (PAT) is required to push to the external tap repo
-          GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
           
