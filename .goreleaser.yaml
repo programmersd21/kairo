@@ -74,7 +74,7 @@ release:
   draft: false
   prerelease: auto
 
-brews:
+homebrew_casks:
   - name: kairo
 
     repository:
@@ -89,4 +89,7 @@ brews:
     homepage: "https://github.com/programmersd21/kairo"
     description: "Minimal, powerful task management"
     license: "MIT"
-    
+
+    ids:
+      - kairo
+      
