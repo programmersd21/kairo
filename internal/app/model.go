@@ -16,6 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/programmersd21/kairo/internal/buildinfo"
 	"github.com/programmersd21/kairo/internal/config"
 	"github.com/programmersd21/kairo/internal/core"
@@ -30,6 +31,7 @@ import (
 	"github.com/programmersd21/kairo/internal/ui/palette"
 	"github.com/programmersd21/kairo/internal/ui/plugin_menu"
 	"github.com/programmersd21/kairo/internal/ui/render"
+	"github.com/programmersd21/kairo/internal/ui/settings"
 	"github.com/programmersd21/kairo/internal/ui/styles"
 	"github.com/programmersd21/kairo/internal/ui/tasklist"
 	"github.com/programmersd21/kairo/internal/ui/theme"
@@ -86,16 +88,18 @@ const (
 	ModePluginMenu
 	ModeTagFilter
 	ModeConfirmQuit
+	ModeSettings
 )
 
 type Model struct {
 	ctx context.Context
 
-	cfg   config.Config
-	svc   service.TaskService
-	km    keymap.Keymap
-	theme theme.Theme
-	s     styles.Styles
+	cfg       config.Config
+	svc       service.TaskService
+	km        keymap.Keymap
+	thBuiltin theme.Theme
+	theme     theme.Theme
+	s         styles.Styles
 
 	width  int
 	height int
@@ -115,6 +119,7 @@ type Model struct {
 	hlp  help.Model
 	tm   theme_menu.Model
 	pm   plugin_menu.Model
+	set  settings.Model
 
 	tagFilterInput textinput.Model // Input field for direct tag filtering in Tag View
 
@@ -135,8 +140,10 @@ type Model struct {
 
 	plugHost *plugins.Host
 	plugCh   chan struct{}
+	configCh chan config.Config
 
 	RainbowAnimationOffset int
+	rainbowAnimating       bool
 	animatingTaskID        string
 	animationStarted       time.Time
 	animationDuration      time.Duration
@@ -173,7 +180,8 @@ func (m *Model) cleanupTickCmd() tea.Cmd {
 }
 
 func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.Model, error) {
-	th := applyThemeOverride(theme.ByName(cfg.App.Theme), cfg.Theme)
+	thBuiltin := theme.FindBuiltin(cfg.App.Theme)
+	th := applyThemeOverride(thBuiltin, cfg.Theme)
 	s := styles.New(th)
 	km := keymap.FromConfig(cfg.Keymap)
 
@@ -189,6 +197,7 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 		cfg:                    cfg,
 		svc:                    svc,
 		km:                     km,
+		thBuiltin:              thBuiltin,
 		theme:                  th,
 		s:                      s,
 		mode:                   ModeList,
@@ -201,6 +210,41 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 	m.hlp = help.New(m.s, m.km)
 	m.tm = theme_menu.New(m.s)
 	m.pm = plugin_menu.New(m.s)
+	m.set = settings.New(m.s, cfg)
+
+	// Config watcher.
+	m.configCh = make(chan config.Config, 8)
+	cPath, err := config.ConfigPath()
+	if err == nil {
+		watcher, err := fsnotify.NewWatcher()
+		if err == nil {
+			_ = watcher.Add(filepath.Dir(cPath))
+			go func() {
+				for {
+					select {
+					case event, ok := <-watcher.Events:
+						if !ok {
+							return
+						}
+						// Watch for writes or renames (some editors save via rename) to the config file
+						if (event.Has(fsnotify.Write) || event.Has(fsnotify.Create) || event.Has(fsnotify.Rename)) && filepath.Base(event.Name) == "config.toml" {
+							time.Sleep(100 * time.Millisecond) // Wait for write to stabilize
+							newCfg, err := config.Load()
+							if err == nil {
+								select {
+								case m.configCh <- newCfg:
+								default:
+								}
+							}
+						}
+					case <-ctx.Done():
+						_ = watcher.Close()
+						return
+					}
+				}
+			}()
+		}
+	}
 
 	// Sync.
 	if cfg.Sync.Enabled && strings.TrimSpace(cfg.Sync.RepoPath) != "" {
@@ -262,10 +306,14 @@ func applyThemeOverride(t theme.Theme, o config.ThemeConfig) theme.Theme {
 func (m *Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.checkUpdateCmd(), m.cleanupTickCmd()}
 	if m.cfg.App.Rainbow {
+		m.rainbowAnimating = true
 		cmds = append(cmds, m.rainbowTickCmd())
 	}
 	if m.plugCh != nil {
 		cmds = append(cmds, m.listenPluginsCmd())
+	}
+	if m.configCh != nil {
+		cmds = append(cmds, m.listenConfigCmd())
 	}
 	return tea.Batch(cmds...)
 }
@@ -315,6 +363,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case allTasksLoadedMsg:
 		m.all = x.Tasks
+		m.list.SetAllTasks(m.all)
 		m.rebuildPaletteIndex()
 		return m, nil
 
@@ -344,6 +393,43 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.viewTransitionTickCmd()
 		}
 		return m, nil
+
+	case settings.CloseMsg:
+		if m.mode == ModeSettings {
+			m.mode = ModeList
+			m.transitioning = true
+			m.transitionStarted = time.Now()
+			return m, m.viewTransitionTickCmd()
+		}
+		return m, nil
+
+	case settings.ConfigChangedMsg:
+		m.cfg = x.Config
+		m.km = keymap.FromConfig(m.cfg.Keymap)
+		m.thBuiltin = theme.FindBuiltin(m.cfg.App.Theme)
+		m.theme = applyThemeOverride(m.thBuiltin, m.cfg.Theme)
+		m.refreshStyles()
+		m.set.SetConfig(m.cfg)
+
+		m.rebuildViews()
+		m.rebuildPaletteIndex()
+
+		// If config changed externally or internally, we might need to restart/update components
+		if m.cfg.Sync.Enabled && m.syncEngine == nil {
+			m.syncEngine = ksync.New(m.svc.Repo(), m.cfg.Sync.RepoPath, m.cfg.Sync.Remote, m.cfg.Sync.Branch, ksync.Strategy(m.cfg.Sync.Strategy), m.cfg.Sync.AutoPush)
+		} else if !m.cfg.Sync.Enabled {
+			m.syncEngine = nil
+		}
+
+		cmds := []tea.Cmd{m.listenConfigCmd()}
+		// Restart rainbow ticker if it was just enabled and isn't already running
+		if m.cfg.App.Rainbow && !m.rainbowAnimating {
+			m.rainbowAnimating = true
+			cmds = append(cmds, m.rainbowTickCmd())
+		}
+
+		// Continue listening for more config changes
+		return m, tea.Batch(cmds...)
 
 	case theme_menu.SelectMsg:
 		m.theme = x.Theme
@@ -474,6 +560,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
 
 	case rainbowTickMsg:
+		if !m.cfg.App.Rainbow {
+			m.rainbowAnimating = false
+			return m, nil
+		}
+		m.rainbowAnimating = true
 		// Linear rainbow animation: increment offset each tick
 		m.RainbowAnimationOffset = (m.RainbowAnimationOffset + 1) % 7 // 7 colors in rainbow
 		return m, m.rainbowTickCmd()
@@ -757,6 +848,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if keymapMatch(m.km.Changelog, km) {
 				return m, openURLCmd("https://github.com/programmersd21/kairo/blob/main/CHANGELOG.md")
 			}
+			if keymapMatch(m.km.Settings, km) {
+				m.mode = ModeSettings
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				return m, m.viewTransitionTickCmd()
+			}
 
 			// Plugin reload - single character keybinding only valid in ModeList
 			if km.String() == "g" && m.mode == ModeList {
@@ -930,9 +1027,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.pm, cmd = m.pm.Update(msg)
 		return m, cmd
-	default:
-		return m, nil
+	case ModeSettings:
+		var cmd tea.Cmd
+		m.set, cmd = m.set.Update(msg)
+		return m, cmd
 	}
+	return m, nil
 }
 
 func (m *Model) View() string {
@@ -977,6 +1077,7 @@ func (m *Model) renderMainUI() string {
 	m.det.SetSize(m.width, availableHeight)
 	m.pal.SetSize(m.width, availableHeight)
 	m.pm.SetSize(m.width, availableHeight)
+	m.set.SetSize(m.width, availableHeight)
 	m.hlp.SetSize(m.width, availableHeight)
 	m.tm.SetSize(m.width, availableHeight)
 	if m.edit != nil {
@@ -1005,6 +1106,8 @@ func (m *Model) renderMainUI() string {
 		body = m.tm.View()
 	case ModePluginMenu:
 		body = m.pm.View()
+	case ModeSettings:
+		body = m.set.View()
 	case ModeTagFilter:
 		body = m.renderTagFilterOverlay(availableHeight)
 	case ModeEditor:
@@ -1080,51 +1183,102 @@ func (m *Model) renderHeader() string {
 		logo = lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Bold(true).Render(logoText)
 	}
 
+	// Header has Padding(0, 1), so inner width is m.width - 2
+	innerW := m.width - 2
+	if innerW < 0 {
+		innerW = 0
+	}
+
 	// Tabs
 	tabs := []string{}
 	tabWidths := make([]int, len(m.views))
 	tabOffsets := make([]int, len(m.views))
 	currentOffset := 0
 
+	// Dynamic truncation to ensure tabs fit in the terminal width
+	fixedTabW := 4 // 2 caps + 2 padding
+	totalNaturalWidth := 0
+	for _, v := range m.views {
+		totalNaturalWidth += lipgloss.Width(v.Title) + fixedTabW
+	}
+
+	maxTitleW := 999
+	if totalNaturalWidth > innerW && len(m.views) > 0 {
+		availTextW := innerW - (len(m.views) * fixedTabW)
+		if availTextW < 0 {
+			availTextW = 0
+		}
+		maxTitleW = availTextW / len(m.views)
+	}
+
 	for i, v := range m.views {
 		style := m.s.TabInactive
+		isActive := false
 		// During transition, we treat them all as inactive to show them "behind" the bubble
 		if i == m.activeIdx && (!m.transitioning || m.prevActiveIdx == m.activeIdx) {
 			style = m.s.TabActive
+			isActive = true
 		}
-		rendered := style.Render(v.Title)
+
+		title := utilTruncate(v.Title, maxTitleW)
+
+		var rendered string
+		if isActive {
+			l := lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Background(m.s.Theme.Bg).Render("")
+			r := lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Background(m.s.Theme.Bg).Render("")
+			rendered = l + style.Render(title) + r
+		} else {
+			// Use background colored pill ends so the spacing matches the active tab
+			l := lipgloss.NewStyle().Foreground(m.s.Theme.Bg).Background(m.s.Theme.Bg).Render("")
+			r := lipgloss.NewStyle().Foreground(m.s.Theme.Bg).Background(m.s.Theme.Bg).Render("")
+			rendered = l + style.Render(title) + r
+		}
+
 		tabs = append(tabs, rendered)
 		tabWidths[i] = lipgloss.Width(rendered)
 		tabOffsets[i] = currentOffset
 		currentOffset += tabWidths[i]
 	}
 	inactiveTabRow := lipgloss.JoinHorizontal(lipgloss.Left, tabs...)
-	tabRow := inactiveTabRow
+	tabRow := lipgloss.PlaceHorizontal(innerW, lipgloss.Center, inactiveTabRow)
 
 	// Animated Indicator (Bubble effect)
 	if m.transitioning && m.prevActiveIdx != m.activeIdx {
+		// ... (keep the existing logic, just ensure tabRow is constructed correctly)
 		pIdx := m.prevActiveIdx
 		aIdx := m.activeIdx
 		if pIdx >= 0 && pIdx < len(tabOffsets) && aIdx >= 0 && aIdx < len(tabOffsets) {
 			currentPos := int(float64(tabOffsets[pIdx]) + float64(tabOffsets[aIdx]-tabOffsets[pIdx])*m.transitionProgress)
 			currentWidth := int(float64(tabWidths[pIdx]) + float64(tabWidths[aIdx]-tabWidths[pIdx])*m.transitionProgress)
 
-			// TabActive has Padding(0,1) which adds 2 to the width.
-			// We must truncate the text to currentWidth - 2 so it fits without wrapping.
-			textW := currentWidth - 2
-			if textW < 0 {
-				textW = 0
+			// Calculate center offset for the bubble
+			totalTabWidth := currentOffset
+			startOffset := (innerW - totalTabWidth) / 2
+			if startOffset < 0 {
+				startOffset = 0
 			}
 
-			indicator := m.s.TabActive.
-				Width(currentWidth).
+			indicatorTextW := currentWidth - 2
+			if indicatorTextW < 0 {
+				indicatorTextW = 0
+			}
+
+			l := lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Background(m.s.Theme.Bg).Render("")
+			r := lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Background(m.s.Theme.Bg).Render("")
+
+			indicatorCenter := m.s.TabActive.
+				Width(indicatorTextW).
 				MaxHeight(1).
 				Align(lipgloss.Center).
-				Render(utilTruncate(m.views[aIdx].Title, textW))
+				Render(utilTruncate(m.views[aIdx].Title, indicatorTextW))
 
-			// "Ghosting" effect: Use a spacer to push the indicator to the right position
-			// and join it horizontally to overlay conceptually.
-			spacer := strings.Repeat(" ", currentPos)
+			indicator := l + indicatorCenter + r
+
+			repeatCount := startOffset + currentPos
+			if repeatCount < 0 {
+				repeatCount = 0
+			}
+			spacer := strings.Repeat(" ", repeatCount)
 			tabRow = spacer + indicator
 
 			// To prevent flickering, we ensure the tabRow always has the same total width
@@ -1134,38 +1288,26 @@ func (m *Model) renderHeader() string {
 				tabRow += strings.Repeat(" ", remaining)
 			}
 		}
+	} else {
+		// If not transitioning, ensure tabRow is centered
+		tabRow = lipgloss.PlaceHorizontal(innerW, lipgloss.Center, tabRow)
 	}
 
-	sep := lipgloss.NewStyle().Background(m.s.Theme.Bg).Render("  ")
-	topBarLeft := lipgloss.JoinHorizontal(lipgloss.Left, logo, sep, tabRow)
+	// 3. Task Count Pill (Bottom Row)
+	pillStyle := lipgloss.NewStyle().
+		Foreground(m.s.Theme.Bg).
+		Background(m.s.Theme.Accent).
+		Bold(true).
+		Padding(0, 1)
+	leftCap := lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Background(m.s.Theme.Bg).Render("")
+	rightCap := lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Background(m.s.Theme.Bg).Render("")
 
 	count := fmt.Sprintf("%d tasks", len(m.tasks))
-	topBarRight := m.s.Muted.Render(count)
+	taskCountPill := leftCap + pillStyle.Render(count) + rightCap
+	countRow := lipgloss.PlaceHorizontal(innerW, lipgloss.Center, taskCountPill)
 
-	topBar := render.BarLine(topBarLeft, topBarRight, m.width, m.s.Theme.Bg)
-
-	// Detail line (tag/priority info) - Grouped in a Bento block
-	detailLine := ""
-	v := m.views[m.activeIdx]
-	if v.ID == core.ViewTag && m.tagFilter.IsActive() && m.tagFilter.Value() != "" {
-		detailLine = "  " + m.s.Muted.Render(styles.IconTag) + m.s.Title.Render(m.tagFilter.Value()) + "  " + m.s.Muted.Render("[press f to edit]")
-	} else if v.ID == core.ViewPriority && m.priParam != nil {
-		detailLine = "  " + m.s.Muted.Render("Priority: ") + m.s.PriorityBadge(*m.priParam)
-	}
-
-	header := topBar
-	if detailLine != "" {
-		detailLine = render.BarLine(detailLine, "", m.width, m.s.Theme.Bg)
-		header = lipgloss.JoinVertical(lipgloss.Left, topBar, detailLine)
-	}
-
-	return m.s.SoftBorder.
-		Width(m.width).
-		BorderTop(false).
-		BorderLeft(false).
-		BorderRight(false).
-		BorderBottom(true).
-		Render(header)
+	headerContent := lipgloss.JoinVertical(lipgloss.Center, "", logo, "", tabRow, "", countRow)
+	return m.s.Header.Width(m.width).Render(headerContent)
 }
 
 // firstKey returns the first configured key for a binding, or "?" if unset.
@@ -1179,46 +1321,75 @@ func firstKey(b key.Binding) string {
 
 func (m *Model) renderFooter() string {
 	fk := firstKey
+
+	// Style for the pill container (accent background, theme background text)
+	pillStyle := lipgloss.NewStyle().
+		Foreground(m.s.Theme.Bg).
+		Background(m.s.Theme.Accent).
+		Bold(true).
+		Padding(0, 1)
+
+	// Unicode pill ends for circular appearance
+	leftCap := lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Background(m.s.Theme.Bg).Render("")
+	rightCap := lipgloss.NewStyle().Foreground(m.s.Theme.Accent).Background(m.s.Theme.Bg).Render("")
+
+	// Separator between pills
+	sep := lipgloss.NewStyle().
+		Background(m.s.Theme.Bg).
+		Render(" ")
+
+	makePill := func(text string) string {
+		return leftCap + pillStyle.Render(text) + rightCap
+	}
+
 	left := ""
 	switch m.mode {
 	case ModeConfirmDelete:
-		left = m.s.BadgeDelete.Render(" DELETE? ") + " " + m.s.Muted.Render("y/enter "+styles.IconDone+"confirm • n/esc "+styles.IconClose+"cancel")
+		delLeft := lipgloss.NewStyle().Foreground(m.s.Theme.Bad).Background(m.s.Theme.Bg).Render("")
+		delRight := lipgloss.NewStyle().Foreground(m.s.Theme.Bad).Background(m.s.Theme.Bg).Render("")
+		delPill := delLeft + m.s.BadgeDelete.Render("DELETE?") + delRight
+		left = " " + delPill + " " + makePill("y/enter confirm") + sep + makePill("n/esc cancel")
 	case ModeConfirmQuit:
-		left = m.s.BadgeQuit.Render(" QUIT? ") + " " + m.s.Muted.Render("y/enter "+styles.IconDone+"confirm • n/esc "+styles.IconClose+"cancel")
+		quitLeft := lipgloss.NewStyle().Foreground(m.s.Theme.Warn).Background(m.s.Theme.Bg).Render("")
+		quitRight := lipgloss.NewStyle().Foreground(m.s.Theme.Warn).Background(m.s.Theme.Bg).Render("")
+		quitPill := quitLeft + m.s.BadgeQuit.Render("QUIT?") + quitRight
+		left = " " + quitPill + " " + makePill("y/enter confirm") + sep + makePill("n/esc cancel")
 	case ModeTagFilter:
-		left = " " + m.s.Muted.Render("enter "+styles.IconDone+"apply • esc "+styles.IconClose+"cancel • ctrl+u clear")
+		left = " " + makePill("enter apply") + sep + makePill("esc cancel") + sep + makePill("ctrl+u clear")
 	case ModeDetail:
-		left = " " + m.s.Accent.Background(m.s.Theme.Bg).Render(
-			fk(m.km.Back)+" "+styles.IconBack+"back • "+
-				fk(m.km.EditTask)+" "+styles.IconEdit+"edit • "+
-				fk(m.km.Palette)+" "+styles.IconPalette+"palette • "+
-				fk(m.km.Help)+" "+styles.IconHelp+"help • "+
-				fk(m.km.Issues)+" "+styles.IconIssues+"issues • "+
-				fk(m.km.Discussions)+" "+styles.IconDiscuss+"discussions • "+
-				fk(m.km.Changelog)+" "+styles.IconChangelog+"changelog",
-		)
+		items := []string{
+			makePill(fk(m.km.Back) + " " + styles.IconBack + "back"),
+			makePill(fk(m.km.EditTask) + " " + styles.IconEdit + "edit"),
+			makePill(fk(m.km.Palette) + " " + styles.IconPalette + "palette"),
+			makePill(fk(m.km.Help) + " " + styles.IconHelp + "help"),
+			makePill(fk(m.km.Issues) + " " + styles.IconIssues + "issues"),
+			makePill(fk(m.km.Discussions) + " " + styles.IconDiscuss + "discussions"),
+			makePill(fk(m.km.Changelog) + " " + styles.IconChangelog + "changelog"),
+		}
+		left = " " + strings.Join(items, sep)
 	case ModeEditor:
-		left = " " + m.s.Muted.Render("ctrl+s "+styles.IconDone+"save • esc "+styles.IconClose+"cancel • tab nav")
+		left = " " + makePill("ctrl+s save") + sep + makePill("esc cancel") + sep + makePill("tab nav")
 	case ModePalette:
-		left = " " + m.s.Muted.Render("enter "+styles.IconEnter+"select • esc/p "+styles.IconClose+"cancel • "+styles.IconUp+styles.IconDown+" nav")
+		left = " " + makePill("enter select") + sep + makePill("esc/p cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
 	case ModeHelp:
-		left = " " + m.s.Muted.Render("esc/q/"+fk(m.km.Help)+" "+styles.IconClose+"cancel")
+		left = " " + makePill("esc/q/"+fk(m.km.Help)+" cancel")
 	case ModeThemeMenu:
-		left = " " + m.s.Muted.Render("enter "+styles.IconDone+"select • esc/q/"+fk(m.km.CycleTheme)+" "+styles.IconClose+"cancel • "+styles.IconUp+styles.IconDown+" nav")
+		left = " " + makePill("enter select") + sep + makePill("esc/q/"+fk(m.km.CycleTheme)+" cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
+	case ModeSettings:
+		left = " " + makePill("esc/ctrl+s close") + sep + makePill("enter toggle") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
 	case ModePluginMenu:
-		left = " " + m.s.Muted.Render("enter detail • u uninstall • o open • r reload • p/"+fk(m.km.ManagePlugins)+" "+styles.IconClose+"cancel • "+styles.IconUp+styles.IconDown+" nav")
+		left = " " + makePill("enter detail") + sep + makePill("u uninstall") + sep + makePill("o open") + sep + makePill("r reload") + sep + makePill("p/"+fk(m.km.ManagePlugins)+" cancel")
 	default:
-		left = " " + m.s.Accent.Background(m.s.Theme.Bg).Render(
-			fk(m.km.Palette)+" "+styles.IconPalette+"palette • "+
-				fk(m.km.NewTask)+" "+styles.IconNew+"new • "+
-				"f "+styles.IconTag+"tag • "+
-				fk(m.km.ToggleStrike)+" "+styles.IconStrike+"done • "+
-				fk(m.km.DeleteTask)+" "+styles.IconDelete+"delete • "+
-				fk(m.km.Help)+" "+styles.IconHelp+"help • "+
-				fk(m.km.Issues)+" "+styles.IconIssues+"issues • "+
-				fk(m.km.Discussions)+" "+styles.IconDiscuss+"discussions • "+
-				fk(m.km.Changelog)+" "+styles.IconChangelog+"changelog",
-		)
+		items := []string{
+			makePill(fk(m.km.Palette) + " " + styles.IconPalette + "palette"),
+			makePill(fk(m.km.NewTask) + " " + styles.IconNew + "new"),
+			makePill("f " + styles.IconTag + "tag"),
+			makePill(fk(m.km.ToggleStrike) + " " + styles.IconStrike + "done"),
+			makePill(fk(m.km.DeleteTask) + " " + styles.IconDelete + "delete"),
+			makePill(fk(m.km.Settings) + " settings"),
+			makePill(fk(m.km.Help) + " " + styles.IconHelp + "help"),
+		}
+		left = " " + strings.Join(items, sep)
 	}
 
 	right := ""
@@ -1226,10 +1397,8 @@ func (m *Model) renderFooter() string {
 		icon := styles.IconInfo
 		if m.isErr {
 			icon = styles.IconError
-			right = m.s.Accent.Background(m.s.Theme.Bg).Render(icon + " " + m.statusText + " ")
-		} else {
-			right = m.s.Accent.Background(m.s.Theme.Bg).Render(icon + " " + m.statusText + " ")
 		}
+		right = makePill(icon+" "+m.statusText) + " "
 	} else {
 		syncLogo := ""
 		if m.syncEngine != nil && m.syncEngine.Enabled() {
@@ -1248,17 +1417,10 @@ func (m *Model) renderFooter() string {
 			}
 			versionText = fmt.Sprintf("Update: %s → %s", cur, lat)
 		}
-		right = m.s.Accent.Background(m.s.Theme.Bg).Render(syncLogo + versionText + " ")
+		right = makePill(syncLogo+versionText) + " "
 	}
 
-	line := render.BarLine(left, right, m.width, m.s.Theme.Bg)
-	return m.s.SoftBorder.
-		Width(m.width).
-		BorderBottom(false).
-		BorderLeft(false).
-		BorderRight(false).
-		BorderTop(true).
-		Render(line)
+	return render.BarLine(left, right, m.width, m.s.Theme.Bg)
 }
 
 // renderTagFilterOverlay renders the tag filter input modal
@@ -1465,6 +1627,7 @@ func (m *Model) refreshStyles() {
 	m.s = styles.New(m.theme)
 	m.list = tasklist.New(m.s, m.cfg.App.VimMode, m.km)
 	m.list.SetTasks(m.tasks)
+	m.list.SetAllTasks(m.all)
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
@@ -1631,6 +1794,13 @@ func (m *Model) listenPluginsCmd() tea.Cmd {
 	return func() tea.Msg {
 		<-m.plugCh
 		return pluginChangedMsg{}
+	}
+}
+
+func (m *Model) listenConfigCmd() tea.Cmd {
+	return func() tea.Msg {
+		cfg := <-m.configCh
+		return settings.ConfigChangedMsg{Config: cfg}
 	}
 }
 

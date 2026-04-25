@@ -494,3 +494,7 @@ func ByName(name string) Theme {
 	}
 	return Catppuccin
 }
+
+func FindBuiltin(name string) Theme {
+	return ByName(name)
+}

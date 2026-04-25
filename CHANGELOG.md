@@ -9,9 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* **Theme Previews**: The Theme Menu now displays intuitive mini-swatches for every theme, accurately rendering the background, foreground, accent, and success colors side-by-side for flawless visual previewing on any terminal background.
+* **Header Breathing Room**: Added a subtle top margin to the header, pushing the "KAIRO" logo and tabs down slightly for a more balanced, uncrowded layout.
 * **GitHub Discussions (`u`)**: Added dedicated shortcut to open the project's GitHub Discussions page.
-* **Empty State Redesign**: Removed the box border in the empty state and introduced an attractive, centered layout with a minimalist rocket icon and inspiring prompt.
+* **Footer UI Update**: Redesigned the footer with individual, circular pill containers (using powerline-style caps) for each keybinding to maximize readability and aesthetic appeal. Keybindings are left-aligned while version and sync status remain anchored to the right.
+* **Settings Menu**: Added an interactive settings menu (accessible via `ctrl+s`) to live-configure application settings, with support for live config file watching, reloading, and a shortcut (`g`) to directly open `config.toml` for advanced configuration.
+* **Empty State Dashboard**: Transformed the empty home screen into a personal productivity dashboard with compressed, elegant greetings, a minimalist rocket icon, and real-time task completion statistics.
 * **Theme Improvements**: Updated the `Nord` theme's muted color to a more prominent tone for improved legibility.
+
+### Fixed
+
+* **Responsive Auto-Resize Engine**: Fully implemented dynamic width constraints across the application. 
+    * The Header Tabs now dynamically shrink and truncate titles (`Upc…`) to guarantee they never overflow the window horizontally.
+    * The overall Header block and task count pill perfectly anchor to the exact center (`Align(lipgloss.Center)`), surviving aggressive terminal resizing without drifting.
+    * The Footer (`render.BarLine`) correctly clips to the terminal width without shattering the layout grid.
+* **Tab Switch Panics**: Fixed a crash (`strings: negative Repeat count`) that triggered when switching tabs rapidly during narrow terminal conditions.
+* **Menu Box Centering**: Resolved an issue where the Help and Theme menu overlays would drift to the left; they now properly inherit the viewport dimensions and float perfectly dead-center.
+* **Help Menu Alignment**: Corrected the text alignment inside the Help box to render cleanly on the left instead of forcing awkward center-justification.
+* **Cohesive Pill Caps**: Extended the premium powerline pill styling (`` / ``) to the Header Tabs (including smooth animated bubble transitions), the `DELETE?` / `QUIT?` footer badges, and all Task Priority labels (P0-P3).
+* **Linear Rainbow Animation Fix**: Resolved a race condition where toggling the rainbow logo multiple times (or changing other settings) would spawn multiple ticker loops, causing the animation to accelerate. It now maintains a consistent, buttery-smooth frame rate.
+
+### Changed
+
+* **Homebrew Repository Modularity**: Migrated the Homebrew Cask publishing from the primary application repository to a dedicated, independent tap repository (`programmersd21/kairo_tap`) to maintain cleaner git history, modularity, and separation of distribution concerns.
 
 ## [1.2.2]
 

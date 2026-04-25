@@ -22,8 +22,9 @@ type Model struct {
 	width  int
 	height int
 
-	tasks []core.Task
-	sel   int
+	tasks    []core.Task
+	allTasks []core.Task // All tasks for stats calculation
+	sel      int
 
 	// Animation state — set by the app model, read-only during render.
 	animatingTaskID  string
@@ -65,6 +66,10 @@ func (m *Model) SetTasks(ts []core.Task) {
 	if m.sel < 0 {
 		m.sel = 0
 	}
+}
+
+func (m *Model) SetAllTasks(ts []core.Task) {
+	m.allTasks = append([]core.Task(nil), ts...)
 }
 
 func (m *Model) SetAnimation(taskID string, start time.Time, duration time.Duration, reverse bool) {
@@ -172,24 +177,42 @@ func (m Model) View() string {
 }
 
 func (m Model) renderEmpty() string {
-	boxWidth := min(60, m.width-4)
-
-	// Gradient accent
+	boxWidth := min(64, m.width-4)
 	accent := m.styles.Theme.Accent
 
+	// 1. Dynamic Greeting
+	hour := time.Now().Hour()
+	var greeting string
+	if hour < 12 {
+		greeting = "Good morning"
+	} else if hour < 18 {
+		greeting = "Good afternoon"
+	} else {
+		greeting = "Good evening"
+	}
+
+	header := lipgloss.NewStyle().
+		Foreground(accent).
+		Background(m.styles.Theme.Bg).
+		Bold(true).
+		Width(boxWidth).
+		Align(lipgloss.Center).
+		Render(greeting)
+
+	// 2. Central Icon & Motivation
 	icon := lipgloss.NewStyle().
 		Foreground(accent).
 		Background(m.styles.Theme.Bg).
 		Bold(true).
 		Width(boxWidth).
 		Align(lipgloss.Center).
-		Render("󰇍")
+		MarginBottom(1).
+		Render("")
 
 	title := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Fg).
 		Background(m.styles.Theme.Bg).
 		Bold(true).
-		Margin(1, 0, 0, 0).
 		Width(boxWidth).
 		Align(lipgloss.Center).
 		Render("Nothing on the horizon")
@@ -197,11 +220,31 @@ func (m Model) renderEmpty() string {
 	subtitle := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Muted).
 		Background(m.styles.Theme.Bg).
-		Margin(1, 0, 0, 0).
 		Width(boxWidth).
 		Align(lipgloss.Center).
-		Render("Press 'n' to plant the seed for a new task")
+		Render("Your schedule is perfectly clear.")
 
+	// 3. Quick Stats (if applicable)
+	completedCount := 0
+	for _, t := range m.allTasks {
+		if t.Status == core.StatusDone {
+			completedCount++
+		}
+	}
+
+	stats := ""
+	if completedCount > 0 {
+		statsText := fmt.Sprintf("You've conquered %d tasks so far. Ready for more?", completedCount)
+		stats = lipgloss.NewStyle().
+			Foreground(m.styles.Theme.Good).
+			Background(m.styles.Theme.Bg).
+			Margin(1, 0, 0, 0).
+			Width(boxWidth).
+			Align(lipgloss.Center).
+			Render("󰄬 " + statsText)
+	}
+
+	// 4. Action Hint
 	paletteKeys := strings.Join(m.km.Palette.Keys(), ", ")
 	hint := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Muted).
@@ -210,16 +253,24 @@ func (m Model) renderEmpty() string {
 		Margin(2, 0, 0, 0).
 		Width(boxWidth).
 		Align(lipgloss.Center).
-		Render(fmt.Sprintf("Tip: Use the command palette (%s) to access all features", paletteKeys))
+		Render(fmt.Sprintf("Tip: Press 'n' for a new task or %s for the palette", paletteKeys))
 
-	// Center in view
+	// Composite
+	dashboard := lipgloss.JoinVertical(lipgloss.Center,
+		icon,
+		header,
+		title,
+		subtitle,
+		stats,
+		hint,
+	)
+
 	return lipgloss.NewStyle().
 		Width(m.width).
 		Height(m.height).
 		Align(lipgloss.Center, lipgloss.Center).
-		Render(lipgloss.JoinVertical(lipgloss.Center, icon, title, subtitle, hint))
+		Render(dashboard)
 }
-
 func (m Model) renderRow(t core.Task, selected bool) string {
 	// Compute animation progress for strike (completion toggle).
 	// Progress is always clamped to [0, 1] — no overshoot.

@@ -49,7 +49,10 @@ func (m Model) View() string {
 		cardW = w - 2
 	}
 
-	header := m.styles.Title.Render(" Help & Keybindings ")
+	header := lipgloss.NewStyle().
+		Align(lipgloss.Center).
+		Width(cardW - 2). // Match card inner width
+		Render(m.styles.Title.Render(" Help & Keybindings "))
 
 	// Helper to extract keys from binding
 	getK := func(b key.Binding) string {
@@ -89,6 +92,7 @@ func (m Model) View() string {
 				{getK(m.km.CycleTheme), "󰏘 " + "Theme menu"},
 				{getK(m.km.OpenPluginDir), "󰝰 " + "Open plugins folder"},
 				{getK(m.km.ManagePlugins), styles.IconPlugin + "Manage plugins"},
+				{getK(m.km.Settings), "󰒓 " + "Settings menu"},
 				{getK(m.km.Help), styles.IconHelp + "Show help"},
 				{getK(m.km.Issues), styles.IconIssues + "Open GitHub issues"},
 				{getK(m.km.Discussions), styles.IconDiscuss + "Open GitHub discussions"},
@@ -99,14 +103,20 @@ func (m Model) View() string {
 	}
 
 	var content []string
-	content = append(content, lipgloss.NewStyle().Padding(0, 1).Render(header), "")
+	content = append(content, header, "")
 
 	for _, s := range sections {
-		content = append(content, lipgloss.NewStyle().Bold(true).Foreground(m.styles.Theme.Accent).Padding(0, 1).Render(s.title))
+		// Align section titles to left
+		title := lipgloss.NewStyle().Bold(true).Foreground(m.styles.Theme.Accent).Padding(0, 1).Align(lipgloss.Left).Render(s.title)
+		content = append(content, title)
+
 		for _, k := range s.keys {
-			keyStr := lipgloss.NewStyle().Foreground(m.styles.Theme.Good).Width(15).Render(k.key)
+			keyStr := lipgloss.NewStyle().Foreground(m.styles.Theme.Good).Width(15).Align(lipgloss.Right).Render(k.key)
 			descStr := m.styles.Muted.Render(k.desc)
-			content = append(content, lipgloss.NewStyle().Padding(0, 2).Render(keyStr+" "+descStr))
+			// Join key and description with a small space
+			row := lipgloss.JoinHorizontal(lipgloss.Left, keyStr, " ", descStr)
+			// Left align the whole row
+			content = append(content, lipgloss.NewStyle().Padding(0, 2).Align(lipgloss.Left).Render(row))
 		}
 		content = append(content, "")
 	}
@@ -119,7 +129,8 @@ func (m Model) View() string {
 		Padding(1, 1).
 		Render(strings.Join(content, "\n"))
 
-	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center, card,
+	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center,
+		card,
 		lipgloss.WithWhitespaceChars(" "),
 		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
 	)

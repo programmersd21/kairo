@@ -310,16 +310,35 @@ func (s Styles) StatusBadge(st core.Status) string {
 }
 
 func (s Styles) PriorityBadge(p core.Priority) string {
+	var style lipgloss.Style
+	var text string
+	var bg lipgloss.Color
+
 	switch p.Clamp() {
 	case core.P0:
-		return s.BadgeOutlineMuted.Render(IconPriority0 + "P0")
+		style = s.BadgeOutlineMuted
+		text = IconPriority0 + "P0"
+		bg = s.Theme.Muted
 	case core.P1:
-		return s.BadgeOutlineMuted.Render(IconPriority1 + "P1")
+		style = s.BadgeOutlineMuted
+		text = IconPriority1 + "P1"
+		bg = s.Theme.Muted
 	case core.P2:
-		return s.BadgeOutlineWarn.Render(IconPriority2 + "P2")
+		style = s.BadgeOutlineWarn
+		text = IconPriority2 + "P2"
+		bg = s.Theme.Warn
 	case core.P3:
-		return s.BadgeOutlineBad.Render(IconPriority3 + "P3")
+		style = s.BadgeOutlineBad
+		text = IconPriority3 + "P3"
+		bg = s.Theme.Bad
 	default:
-		return s.BadgeOutlineMuted.Render(fmt.Sprintf("P%d", int(p)))
+		style = s.BadgeOutlineMuted
+		text = fmt.Sprintf("P%d", int(p))
+		bg = s.Theme.Muted
 	}
+
+	style = style.BorderStyle(lipgloss.HiddenBorder())
+	leftCap := lipgloss.NewStyle().Foreground(bg).Background(s.Theme.Bg).Render("")
+	rightCap := lipgloss.NewStyle().Foreground(bg).Background(s.Theme.Bg).Render("")
+	return leftCap + style.Render(text) + rightCap
 }

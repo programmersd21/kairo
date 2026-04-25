@@ -33,6 +33,7 @@ type Keymap struct {
 	Issues        key.Binding
 	Discussions   key.Binding
 	Changelog     key.Binding
+	Settings      key.Binding
 }
 
 func FromConfig(c config.KeymapConfig) Keymap {
@@ -61,6 +62,7 @@ func FromConfig(c config.KeymapConfig) Keymap {
 		Issues:        bind(c.Issues, "issues", "open github issues"),
 		Discussions:   bind(c.Discussions, "discussions", "open github discussions"),
 		Changelog:     bind(c.Changelog, "changelog", "open changelog"),
+		Settings:      bind(c.Settings, "settings", "open settings"),
 	}
 }
 func bind(keys, helpKey, helpDesc string) key.Binding {

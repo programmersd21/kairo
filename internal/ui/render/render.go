@@ -106,5 +106,6 @@ func BarLine(left, right string, width int, bg lipgloss.Color) string {
 		gap = 0
 	}
 	spacer := lipgloss.NewStyle().Background(bg).Render(strings.Repeat(" ", gap))
-	return left + spacer + right
+	line := left + spacer + right
+	return lipgloss.NewStyle().MaxWidth(width).MaxHeight(1).Render(line)
 }

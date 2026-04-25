@@ -82,6 +82,7 @@ type KeymapConfig struct {
 	Issues        string `toml:"issues"`
 	Discussions   string `toml:"discussions"`
 	Changelog     string `toml:"changelog"`
+	Settings      string `toml:"settings"`
 }
 
 func Default() Config {
@@ -141,12 +142,13 @@ func Default() Config {
 			Issues:        "i",
 			Discussions:   "u",
 			Changelog:     "c",
+			Settings:      "ctrl+s",
 		},
 	}
 }
 
 func (c Config) Save() error {
-	path, err := configPath()
+	path, err := ConfigPath()
 	if err != nil {
 		return err
 	}
@@ -160,7 +162,7 @@ func (c Config) Save() error {
 func Load() (Config, error) {
 	cfg := Default()
 
-	path, err := configPath()
+	path, err := ConfigPath()
 	if err != nil {
 		return cfg, err
 	}
@@ -273,6 +275,9 @@ func Load() (Config, error) {
 	if cfg.Keymap.Changelog == "" {
 		cfg.Keymap.Changelog = defaults.Keymap.Changelog
 	}
+	if cfg.Keymap.Settings == "" {
+		cfg.Keymap.Settings = defaults.Keymap.Settings
+	}
 
 	appDir, _ := util.AppDataDir(appName)
 
@@ -315,7 +320,7 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
-func configPath() (string, error) {
+func ConfigPath() (string, error) {
 	d, err := util.AppDataDir(appName)
 	if err != nil {
 		return "", err

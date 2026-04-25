@@ -70,7 +70,13 @@ func (m Model) View() string {
 	}
 	cardW := min(40, w-4)
 
+	header := lipgloss.NewStyle().
+		Align(lipgloss.Center).
+		Width(cardW).
+		Render(m.styles.Title.Render(" Select Theme "))
+
 	var lines []string
+	lines = append(lines, header, "")
 	for i, t := range m.themes {
 		style := m.styles.RowNormal
 		prefix := "  "
@@ -78,7 +84,23 @@ func (m Model) View() string {
 			style = m.styles.RowSelected
 			prefix = "> "
 		}
-		lines = append(lines, style.Render(prefix+t.Name))
+
+		// Create a mini-swatch using the theme's actual background
+		swatchBg := lipgloss.NewStyle().Background(t.Bg)
+		cFg := swatchBg.Foreground(t.Fg).Render("●")
+		cAc := swatchBg.Foreground(t.Accent).Render("●")
+		cGo := swatchBg.Foreground(t.Good).Render("●")
+
+		// The swatch block
+		colors := swatchBg.Render(" ") + cFg + swatchBg.Render(" ") + cAc + swatchBg.Render(" ") + cGo + swatchBg.Render(" ")
+
+		// Pad name for alignment
+		name := t.Name
+		for len(name) < 20 {
+			name += " "
+		}
+
+		lines = append(lines, style.Render(prefix+name+" "+colors))
 	}
 
 	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center,

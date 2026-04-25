@@ -51,6 +51,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framewo
 | **Smart Filtering** | Multiple views: Inbox, Today, Upcoming, Completed, by Tag, by Priority |
 | **Fuzzy Search** | Lightning-fast command palette with ranked results |
 | **Cinematic Animations** | Smooth vertical shutter, cascading row reveals, and glitch/vaporize deletions |
+| **Responsive Auto-Resize**| Strict grid enforcement with dynamic title truncation preventing layout drifts |
 | **Offline Storage** | SQLite with WAL for reliability and concurrent access |
 | **Git Sync** | Optional repository-backed sync with per-task JSON files |
 | **Import/Export** | JSON and Markdown support for data portability |
@@ -74,8 +75,8 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framewo
 ### macOS (Homebrew)
 
 ```bash
-brew tap programmersd21/kairo https://github.com/programmersd21/kairo
-brew install --cask programmersd21/kairo/kairo
+brew tap programmersd21/kairo_tap
+brew install --cask kairo
 ```
 
 ### Linux / macOS (curl)
@@ -112,7 +113,7 @@ Downloads the latest GitHub Release for your OS/arch, verifies it against `check
 On Windows, Kairo will automatically close to apply the update; simply re-run `kairo` once the terminal returns.
 
 **Startup Notifications:**
-Kairo automatically checks for updates on startup. If a newer version is available, a notification will appear in the footer (e.g., `Update: v1.2.1 → v1.2.2`) directing you to run the update command.
+Kairo automatically checks for updates on startup. If a newer version is available, a notification will appear in the footer (e.g., `Update: v1.2.2 → v1.2.3`) directing you to run the update command.
 
 ---
 
@@ -250,6 +251,7 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 | `enter` | 👁️ View task details |
 | `d` | 🗑️ Delete task |
 | `t` | 🎨 Cycle themes |
+| `ctrl+s` | ⚙️ Open Settings Menu |
 | `i` | 📢 Open GitHub issues |
 | `c` | 📝 Show changelog |
 | `?` | ❓ Show help menu |
@@ -283,6 +285,25 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 
 ---
 
+## ⌨️ Vim Mode
+
+For users who live in the terminal, Kairo offers a built-in **Vim Mode** for seamless navigation without leaving the home row.
+
+### Enabling Vim Mode
+You can toggle Vim Mode in two ways:
+1. **Settings Menu**: Press `ctrl+s` and toggle "Vim Mode" to `true`.
+2. **Configuration File**: Set `vim_mode = true` in your `config.toml`.
+
+### Vim Shortcuts
+When enabled, the following classic Vim keys are activated for list navigation:
+- `j`: Move selection down
+- `k`: Move selection up
+- `G`: Jump to the bottom of the list
+
+*Note: Standard arrow keys, `pgup`/`pgdown`, and `home`/`end` remain functional regardless of this setting.*
+
+---
+
 ## ⚙️ Configuration
 
 ### Config Location
@@ -299,7 +320,7 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 cp configs/kairo.example.toml ~/.config/kairo/config.toml
 ```
 
-Then edit to customize:
+Then edit the file or use the built-in Settings menu (`ctrl+s` in Kairo) to customize:
 - **Theme selection** — Choose from 32 built-in themes:
     - **Premium Dark:** `catppuccin` (Default), `midnight`, `aurora`, `cyberpunk`, `dracula`, `nord`, `obsidian_bloom`, `neon_reef`, `carbon_sunset`, `vanta_aurora`, `plasma_grape`, `midnight_jade`, `synthwave_minimal`, `graphite_matcha`
     - **Premium Light:** `vanilla`, `solarized`, `rose`, `matcha`, `cloud`, `sepia`, `cloud_dancer`, `sakura_sand`, `olive_mist`, `terracotta_air`, `vanilla_sky`, `peach_fuzz_neo`, `coastal_drift`, `matcha_latte`
@@ -307,6 +328,7 @@ Then edit to customize:
 - **Keybindings** — Rebind any keyboard shortcut
 - **View ordering** — Customize your task view tabs
 - **Sync settings** — Configure Git repository sync
+- **Plugins** — Toggle and manage your Lua plugins
 
 ---
 
@@ -372,115 +394,110 @@ UI Re-render → Instant User Feedback
 
 ```
 kairo/
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug_report.md
-│   │   └── feature_request.md
-│   ├── workflows/
-│   │   ├── ci.yml
-│   │   └── release.yml
-│   └── PULL_REQUEST_TEMPLATE.md
-├── cmd/
-│   └── kairo/
+├── CHANGELOG.md
+├── cmd
+│   └── kairo
 │       └── main.go
-├── internal/
-│   ├── api/
+├── CODE_OF_CONDUCT.md
+├── configs
+│   └── kairo.example.toml
+├── CONTRIBUTING.md
+├── go.mod
+├── go.sum
+├── internal
+│   ├── api
 │   │   └── api.go
-│   ├── app/
+│   ├── app
 │   │   ├── model.go
 │   │   └── msg.go
-│   ├── buildinfo/
+│   ├── buildinfo
 │   │   └── buildinfo.go
-│   ├── completion/
+│   ├── completion
 │   │   └── completion.go
-│   ├── config/
+│   ├── config
 │   │   ├── config.go
 │   │   └── config_test.go
-│   ├── core/
-│   │   ├── codec/
+│   ├── core
+│   │   ├── codec
 │   │   │   ├── json.go
 │   │   │   └── markdown.go
-│   │   ├── nlp/
-│   │   │   └── deadline.go
 │   │   ├── core_test.go
 │   │   ├── ids.go
+│   │   ├── nlp
+│   │   │   └── deadline.go
 │   │   ├── task.go
 │   │   └── view.go
-│   ├── hooks/
+│   ├── hooks
 │   │   └── hooks.go
-│   ├── lua/
+│   ├── lua
 │   │   └── engine.go
-│   ├── plugins/
+│   ├── plugins
 │   │   └── host.go
-│   ├── search/
+│   ├── search
 │   │   ├── fuzzy.go
 │   │   ├── fuzzy_test.go
 │   │   └── index.go
-│   ├── service/
+│   ├── service
 │   │   └── service.go
-│   ├── storage/
+│   ├── storage
 │   │   ├── migrations.go
 │   │   ├── repo.go
 │   │   └── repo_test.go
-│   ├── sync/
+│   ├── sync
 │   │   └── engine.go
-│   ├── ui/
-│   │   ├── detail/
+│   ├── ui
+│   │   ├── detail
 │   │   │   └── model.go
-│   │   ├── editor/
+│   │   ├── editor
 │   │   │   └── model.go
-│   │   ├── help/
+│   │   ├── help
 │   │   │   └── model.go
-│   │   ├── keymap/
+│   │   ├── keymap
 │   │   │   ├── keymap.go
 │   │   │   ├── keymap_test.go
 │   │   │   ├── normalize.go
 │   │   │   └── normalize_test.go
-│   │   ├── palette/
+│   │   ├── palette
 │   │   │   └── model.go
-│   │   ├── plugin_menu/
+│   │   ├── plugin_menu
 │   │   │   └── model.go
-│   │   ├── render/
+│   │   ├── render
 │   │   │   ├── easing.go
 │   │   │   └── render.go
-│   │   ├── styles/
-│   │   │   └── styles.go
-│   │   ├── tasklist/
+│   │   ├── settings
 │   │   │   └── model.go
-│   │   ├── theme/
+│   │   ├── styles
+│   │   │   └── styles.go
+│   │   ├── tasklist
+│   │   │   └── model.go
+│   │   ├── theme
 │   │   │   └── theme.go
-│   │   └── theme_menu/
+│   │   └── theme_menu
 │   │       └── model.go
-│   ├── updater/
+│   ├── updater
 │   │   ├── checksums.go
 │   │   ├── download.go
 │   │   ├── extract.go
 │   │   ├── github.go
 │   │   ├── updater.go
 │   │   └── windows_helper.go
-│   └── util/
+│   └── util
 │       ├── paths.go
 │       └── util_test.go
-├── plugins/
+├── LICENSE
+├── Makefile
+├── plugins
 │   ├── auto-cleanup.lua
 │   ├── auto-tagger.lua
 │   ├── sample.lua
 │   └── task-logger.lua
-├── screenshots/
+├── README.md
+├── screenshots
 │   └── demo.gif
-├── scripts/
+├── scripts
 │   ├── install.ps1
 │   └── install.sh
-├── local/
-│   └── demo_preset.json
-├── .gitignore
-├── .goreleaser.yaml
-├── CHANGELOG.md
-├── go.mod
-├── go.sum
-├── LICENSE
-├── Makefile
-├── README.md
+├── SECURITY.md
 └── VERSION.txt
 ```
 

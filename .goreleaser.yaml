@@ -77,7 +77,7 @@ release:
 homebrew_casks:
   - repository:
       owner: programmersd21
-      name: kairo
+      name: kairo_tap
 
     directory: Casks
 
