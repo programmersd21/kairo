@@ -751,6 +751,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if keymapMatch(m.km.Issues, km) {
 				return m, openURLCmd("https://github.com/programmersd21/kairo/issues")
 			}
+			if keymapMatch(m.km.Discussions, km) {
+				return m, openURLCmd("https://github.com/programmersd21/kairo/discussions")
+			}
 			if keymapMatch(m.km.Changelog, km) {
 				return m, openURLCmd("https://github.com/programmersd21/kairo/blob/main/CHANGELOG.md")
 			}
@@ -1185,34 +1188,36 @@ func (m *Model) renderFooter() string {
 	case ModeTagFilter:
 		left = " " + m.s.Muted.Render("enter "+styles.IconDone+"apply • esc "+styles.IconClose+"cancel • ctrl+u clear")
 	case ModeDetail:
-		left = " " + m.s.Muted.Render(
+		left = " " + m.s.Accent.Background(m.s.Theme.Bg).Render(
 			fk(m.km.Back)+" "+styles.IconBack+"back • "+
 				fk(m.km.EditTask)+" "+styles.IconEdit+"edit • "+
-				fk(m.km.Palette)+" "+styles.IconPalette+"pal • "+
+				fk(m.km.Palette)+" "+styles.IconPalette+"palette • "+
 				fk(m.km.Help)+" "+styles.IconHelp+"help • "+
-				fk(m.km.Issues)+" "+styles.IconIssues+"iss • "+
-				fk(m.km.Changelog)+" "+styles.IconChangelog+"log",
+				fk(m.km.Issues)+" "+styles.IconIssues+"issues • "+
+				fk(m.km.Discussions)+" "+styles.IconDiscuss+"discussions • "+
+				fk(m.km.Changelog)+" "+styles.IconChangelog+"changelog",
 		)
 	case ModeEditor:
-		left = " " + m.s.Muted.Render("ctrl+s "+styles.IconDone+"save • esc "+styles.IconClose+"cls • tab nav")
+		left = " " + m.s.Muted.Render("ctrl+s "+styles.IconDone+"save • esc "+styles.IconClose+"cancel • tab nav")
 	case ModePalette:
-		left = " " + m.s.Muted.Render("enter "+styles.IconEnter+"sel • esc/p "+styles.IconClose+"cls • "+styles.IconUp+styles.IconDown+" nav")
+		left = " " + m.s.Muted.Render("enter "+styles.IconEnter+"select • esc/p "+styles.IconClose+"cancel • "+styles.IconUp+styles.IconDown+" nav")
 	case ModeHelp:
-		left = " " + m.s.Muted.Render("esc/q/"+fk(m.km.Help)+" "+styles.IconClose+"cls")
+		left = " " + m.s.Muted.Render("esc/q/"+fk(m.km.Help)+" "+styles.IconClose+"cancel")
 	case ModeThemeMenu:
-		left = " " + m.s.Muted.Render("enter "+styles.IconDone+"sel • esc/q/"+fk(m.km.CycleTheme)+" "+styles.IconClose+"cls • "+styles.IconUp+styles.IconDown+" nav")
+		left = " " + m.s.Muted.Render("enter "+styles.IconDone+"select • esc/q/"+fk(m.km.CycleTheme)+" "+styles.IconClose+"cancel • "+styles.IconUp+styles.IconDown+" nav")
 	case ModePluginMenu:
-		left = " " + m.s.Muted.Render("enter det • u uninst • o open • r reload • p/"+fk(m.km.ManagePlugins)+" "+styles.IconClose+"cls • "+styles.IconUp+styles.IconDown+" nav")
+		left = " " + m.s.Muted.Render("enter detail • u uninstall • o open • r reload • p/"+fk(m.km.ManagePlugins)+" "+styles.IconClose+"cancel • "+styles.IconUp+styles.IconDown+" nav")
 	default:
-		left = " " + m.s.Muted.Render(
-			fk(m.km.Palette)+" "+styles.IconPalette+"pal • "+
+		left = " " + m.s.Accent.Background(m.s.Theme.Bg).Render(
+			fk(m.km.Palette)+" "+styles.IconPalette+"palette • "+
 				fk(m.km.NewTask)+" "+styles.IconNew+"new • "+
 				"f "+styles.IconTag+"tag • "+
 				fk(m.km.ToggleStrike)+" "+styles.IconStrike+"done • "+
-				fk(m.km.DeleteTask)+" "+styles.IconDelete+"del • "+
+				fk(m.km.DeleteTask)+" "+styles.IconDelete+"delete • "+
 				fk(m.km.Help)+" "+styles.IconHelp+"help • "+
-				fk(m.km.Issues)+" "+styles.IconIssues+"iss • "+
-				fk(m.km.Changelog)+" "+styles.IconChangelog+"log",
+				fk(m.km.Issues)+" "+styles.IconIssues+"issues • "+
+				fk(m.km.Discussions)+" "+styles.IconDiscuss+"discussions • "+
+				fk(m.km.Changelog)+" "+styles.IconChangelog+"changelog",
 		)
 	}
 
@@ -1221,14 +1226,14 @@ func (m *Model) renderFooter() string {
 		icon := styles.IconInfo
 		if m.isErr {
 			icon = styles.IconError
-			right = m.s.Muted.Foreground(m.s.Theme.Bad).Bold(true).Render(icon+" ") + m.s.Muted.Render(m.statusText+" ")
+			right = m.s.Accent.Background(m.s.Theme.Bg).Render(icon + " " + m.statusText + " ")
 		} else {
-			right = m.s.Muted.Foreground(m.s.Theme.Good).Bold(true).Render(icon+" ") + m.s.Muted.Render(m.statusText+" ")
+			right = m.s.Accent.Background(m.s.Theme.Bg).Render(icon + " " + m.statusText + " ")
 		}
 	} else {
-		syncStatus := ""
+		syncLogo := ""
 		if m.syncEngine != nil && m.syncEngine.Enabled() {
-			syncStatus = styles.IconSync + " "
+			syncLogo = styles.IconSync + " "
 		}
 
 		versionText := buildinfo.VersionTag()
@@ -1241,11 +1246,9 @@ func (m *Model) renderFooter() string {
 			if !strings.HasPrefix(lat, "v") {
 				lat = "v" + lat
 			}
-			versionText = fmt.Sprintf("Update: %s → %s (run `kairo update`)", cur, lat)
-			right = m.s.Muted.Foreground(m.s.Theme.Accent).Bold(true).Render(syncStatus + versionText + " ")
-		} else {
-			right = m.s.Muted.Render(syncStatus + versionText + " ")
+			versionText = fmt.Sprintf("Update: %s → %s", cur, lat)
 		}
+		right = m.s.Accent.Background(m.s.Theme.Bg).Render(syncLogo + versionText + " ")
 	}
 
 	line := render.BarLine(left, right, m.width, m.s.Theme.Bg)

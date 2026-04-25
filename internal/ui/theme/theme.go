@@ -67,7 +67,7 @@ var Nord = Theme{
 	IsLight: false,
 	Bg:      lipgloss.Color("#2E3440"),
 	Fg:      lipgloss.Color("#D8DEE9"),
-	Muted:   lipgloss.Color("#4C566A"),
+	Muted:   lipgloss.Color("#81A1C1"),
 	Border:  lipgloss.Color("#3B4252"),
 	Accent:  lipgloss.Color("#88C0D0"),
 	Good:    lipgloss.Color("#A3BE8C"),

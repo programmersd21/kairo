@@ -80,6 +80,7 @@ type KeymapConfig struct {
 	ToggleStrike  string `toml:"toggle_strike"`
 	Help          string `toml:"help"`
 	Issues        string `toml:"issues"`
+	Discussions   string `toml:"discussions"`
 	Changelog     string `toml:"changelog"`
 }
 
@@ -138,6 +139,7 @@ func Default() Config {
 			ToggleStrike:  "z",
 			Help:          "?",
 			Issues:        "i",
+			Discussions:   "u",
 			Changelog:     "c",
 		},
 	}
@@ -264,6 +266,9 @@ func Load() (Config, error) {
 	}
 	if cfg.Keymap.Issues == "" {
 		cfg.Keymap.Issues = defaults.Keymap.Issues
+	}
+	if cfg.Keymap.Discussions == "" {
+		cfg.Keymap.Discussions = defaults.Keymap.Discussions
 	}
 	if cfg.Keymap.Changelog == "" {
 		cfg.Keymap.Changelog = defaults.Keymap.Changelog

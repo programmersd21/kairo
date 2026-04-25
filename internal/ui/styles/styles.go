@@ -42,6 +42,7 @@ const (
 	IconUp        = "↑ "
 	IconDown      = "↓ "
 	IconEnter     = "↵ "
+	IconDiscuss   = "󰭹 "
 )
 
 // Design System Constants

@@ -174,13 +174,16 @@ func (m Model) View() string {
 func (m Model) renderEmpty() string {
 	boxWidth := min(60, m.width-4)
 
+	// Gradient accent
+	accent := m.styles.Theme.Accent
+
 	icon := lipgloss.NewStyle().
-		Foreground(m.styles.Theme.Accent).
+		Foreground(accent).
 		Background(m.styles.Theme.Bg).
 		Bold(true).
 		Width(boxWidth).
 		Align(lipgloss.Center).
-		Render("\u2728 " + styles.IconTask)
+		Render("󰇍")
 
 	title := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Fg).
@@ -189,7 +192,7 @@ func (m Model) renderEmpty() string {
 		Margin(1, 0, 0, 0).
 		Width(boxWidth).
 		Align(lipgloss.Center).
-		Render("No tasks here yet")
+		Render("Nothing on the horizon")
 
 	subtitle := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Muted).
@@ -197,7 +200,7 @@ func (m Model) renderEmpty() string {
 		Margin(1, 0, 0, 0).
 		Width(boxWidth).
 		Align(lipgloss.Center).
-		Render("Press 'n' to create a new task and start your journey")
+		Render("Press 'n' to plant the seed for a new task")
 
 	paletteKeys := strings.Join(m.km.Palette.Keys(), ", ")
 	hint := lipgloss.NewStyle().
@@ -209,23 +212,12 @@ func (m Model) renderEmpty() string {
 		Align(lipgloss.Center).
 		Render(fmt.Sprintf("Tip: Use the command palette (%s) to access all features", paletteKeys))
 
-	content := lipgloss.JoinVertical(lipgloss.Left,
-		icon,
-		title,
-		subtitle,
-		hint,
-	)
-
-	card := m.styles.Card.
-		Width(boxWidth).
-		Padding(2, 0). // Horizontal padding removed to respect explicit line widths
-		Render(content)
-
-	// Place centered; FillViewport at the top level will handle ANSI fixup.
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card,
-		lipgloss.WithWhitespaceChars(" "),
-		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
-	)
+	// Center in view
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(lipgloss.JoinVertical(lipgloss.Center, icon, title, subtitle, hint))
 }
 
 func (m Model) renderRow(t core.Task, selected bool) string {
