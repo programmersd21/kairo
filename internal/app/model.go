@@ -855,18 +855,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.viewTransitionTickCmd()
 			}
 
-			// Plugin reload - single character keybinding only valid in ModeList
-			if km.String() == "g" && m.mode == ModeList {
-				if m.plugHost != nil {
-					_ = m.plugHost.LoadAll()
-					m.rebuildViews()
-					m.rebuildPaletteIndex()
-					m.statusText = "Plugins reloaded"
-					m.isErr = false
-					return m, m.loadTasksCmd()
-				}
-			}
-
 			if m.mode == ModeList {
 				// Dynamic view switching (1-9)
 				if len(km.String()) == 1 && km.String() >= "1" && km.String() <= "9" {
@@ -1343,6 +1331,7 @@ func (m *Model) renderFooter() string {
 	}
 
 	left := ""
+	// Critical prompts are always shown regardless of ShowHelp setting
 	switch m.mode {
 	case ModeConfirmDelete:
 		delLeft := lipgloss.NewStyle().Foreground(m.s.Theme.Bad).Background(m.s.Theme.Bg).Render("")
@@ -1356,40 +1345,46 @@ func (m *Model) renderFooter() string {
 		left = " " + quitPill + " " + makePill("y/enter confirm") + sep + makePill("n/esc cancel")
 	case ModeTagFilter:
 		left = " " + makePill("enter apply") + sep + makePill("esc cancel") + sep + makePill("ctrl+u clear")
-	case ModeDetail:
-		items := []string{
-			makePill(fk(m.km.Back) + " " + styles.IconBack + "back"),
-			makePill(fk(m.km.EditTask) + " " + styles.IconEdit + "edit"),
-			makePill(fk(m.km.Palette) + " " + styles.IconPalette + "palette"),
-			makePill(fk(m.km.Help) + " " + styles.IconHelp + "help"),
-			makePill(fk(m.km.Issues) + " " + styles.IconIssues + "issues"),
-			makePill(fk(m.km.Discussions) + " " + styles.IconDiscuss + "discussions"),
-			makePill(fk(m.km.Changelog) + " " + styles.IconChangelog + "changelog"),
-		}
-		left = " " + strings.Join(items, sep)
-	case ModeEditor:
-		left = " " + makePill("ctrl+s save") + sep + makePill("esc cancel") + sep + makePill("tab nav")
-	case ModePalette:
-		left = " " + makePill("enter select") + sep + makePill("esc/p cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
-	case ModeHelp:
-		left = " " + makePill("esc/q/"+fk(m.km.Help)+" cancel")
-	case ModeThemeMenu:
-		left = " " + makePill("enter select") + sep + makePill("esc/q/"+fk(m.km.CycleTheme)+" cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
-	case ModeSettings:
-		left = " " + makePill("esc/ctrl+s close") + sep + makePill("enter toggle") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
-	case ModePluginMenu:
-		left = " " + makePill("enter detail") + sep + makePill("u uninstall") + sep + makePill("o open") + sep + makePill("r reload") + sep + makePill("p/"+fk(m.km.ManagePlugins)+" cancel")
 	default:
-		items := []string{
-			makePill(fk(m.km.Palette) + " " + styles.IconPalette + "palette"),
-			makePill(fk(m.km.NewTask) + " " + styles.IconNew + "new"),
-			makePill("f " + styles.IconTag + "tag"),
-			makePill(fk(m.km.ToggleStrike) + " " + styles.IconStrike + "done"),
-			makePill(fk(m.km.DeleteTask) + " " + styles.IconDelete + "delete"),
-			makePill(fk(m.km.Settings) + " settings"),
-			makePill(fk(m.km.Help) + " " + styles.IconHelp + "help"),
+		// Only show help pills if ShowHelp is enabled in config
+		if m.cfg.App.ShowHelp {
+			switch m.mode {
+			case ModeDetail:
+				items := []string{
+					makePill(fk(m.km.Back) + " " + styles.IconBack + "back"),
+					makePill(fk(m.km.EditTask) + " " + styles.IconEdit + "edit"),
+					makePill(fk(m.km.Palette) + " " + styles.IconPalette + "palette"),
+					makePill(fk(m.km.Help) + " " + styles.IconHelp + "help"),
+					makePill(fk(m.km.Issues) + " " + styles.IconIssues + "issues"),
+					makePill(fk(m.km.Discussions) + " " + styles.IconDiscuss + "discussions"),
+					makePill(fk(m.km.Changelog) + " " + styles.IconChangelog + "changelog"),
+				}
+				left = " " + strings.Join(items, sep)
+			case ModeEditor:
+				left = " " + makePill("ctrl+s save") + sep + makePill("esc cancel") + sep + makePill("tab nav")
+			case ModePalette:
+				left = " " + makePill("enter select") + sep + makePill("esc/p cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
+			case ModeHelp:
+				left = " " + makePill("esc/q/"+fk(m.km.Help)+" cancel")
+			case ModeThemeMenu:
+				left = " " + makePill("enter select") + sep + makePill("esc/q/"+fk(m.km.CycleTheme)+" cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
+			case ModeSettings:
+				left = " " + makePill("esc/ctrl+s close") + sep + makePill("enter toggle") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
+			case ModePluginMenu:
+				left = " " + makePill("enter detail") + sep + makePill("u uninstall") + sep + makePill("o open") + sep + makePill("r reload") + sep + makePill("p/"+fk(m.km.ManagePlugins)+" cancel")
+			default:
+				items := []string{
+					makePill(fk(m.km.Palette) + " " + styles.IconPalette + "palette"),
+					makePill(fk(m.km.NewTask) + " " + styles.IconNew + "new"),
+					makePill("f " + styles.IconTag + "tag"),
+					makePill(fk(m.km.ToggleStrike) + " " + styles.IconStrike + "done"),
+					makePill(fk(m.km.DeleteTask) + " " + styles.IconDelete + "delete"),
+					makePill(fk(m.km.Settings) + " settings"),
+					makePill(fk(m.km.Help) + " " + styles.IconHelp + "help"),
+				}
+				left = " " + strings.Join(items, sep)
+			}
 		}
-		left = " " + strings.Join(items, sep)
 	}
 
 	right := ""

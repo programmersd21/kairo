@@ -41,6 +41,8 @@ type Model struct {
 
 	DeletingTaskID string
 	DeleteProgress float64
+
+	lastKey string // For tracking key sequences like 'gg'
 }
 
 func New(s styles.Styles, vimMode bool, km keymap.Keymap) Model {
@@ -90,6 +92,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch x.String() {
 		case "up", "k":
+			m.lastKey = ""
 			if x.String() == "k" && !m.vimMode {
 				break
 			}
@@ -97,6 +100,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.sel--
 			}
 		case "down", "j":
+			m.lastKey = ""
 			if x.String() == "j" && !m.vimMode {
 				break
 			}
@@ -104,24 +108,41 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.sel++
 			}
 		case "pgup":
+			m.lastKey = ""
 			m.sel -= max(1, m.height-4)
 			if m.sel < 0 {
 				m.sel = 0
 			}
 		case "pgdown":
+			m.lastKey = ""
 			m.sel += max(1, m.height-4)
 			if m.sel > len(m.tasks)-1 {
 				m.sel = len(m.tasks) - 1
 			}
 		case "home":
+			m.lastKey = ""
 			m.sel = 0
 		case "end", "G":
+			m.lastKey = ""
 			if x.String() == "G" && !m.vimMode {
 				break
 			}
 			if len(m.tasks) > 0 {
 				m.sel = len(m.tasks) - 1
 			}
+		case "g":
+			if !m.vimMode {
+				break
+			}
+			if m.lastKey == "g" {
+				m.sel = 0
+				m.lastKey = ""
+			} else {
+				m.lastKey = "g"
+				return m, nil // Don't reset lastKey yet
+			}
+		default:
+			m.lastKey = ""
 		}
 	}
 	return m, nil

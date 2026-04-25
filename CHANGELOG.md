@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4]
+
+### Added
+
+* **Vim Navigation**: Added support for `gg` in Vim Mode to instantly jump to the top of the task list, complementing the existing `G` shortcut for bottom navigation.
+
+### Fixed
+
+* **Help Footer Bug**: Resolved a bug where the "Show Help Footer" setting (in both `config.toml` and the settings menu) was being ignored. The footer now correctly hides help keybinding pills when disabled, providing more vertical space for task lists while still retaining critical action prompts (like delete/quit confirmation) for improved usability.
+
+### Changed
+
+* **Keybinding Refinement**: Removed the legacy hardcoded `g` shortcut for plugin reloading in the main list view, as it conflicted with Vim mode navigation. Plugin management remains accessible via the dedicated plugin menu and command palette.
+
 ## [1.2.3]
 
 ### Added

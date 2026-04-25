@@ -299,6 +299,7 @@ When enabled, the following classic Vim keys are activated for list navigation:
 - `j`: Move selection down
 - `k`: Move selection up
 - `G`: Jump to the bottom of the list
+- `gg`: Jump to the top of the list
 
 *Note: Standard arrow keys, `pgup`/`pgdown`, and `home`/`end` remain functional regardless of this setting.*
 
