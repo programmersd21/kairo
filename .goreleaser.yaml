@@ -37,7 +37,7 @@ builds:
 
 archives:
   - id: kairo
-    builds:
+    ids:
       - kairo
 
     formats:
