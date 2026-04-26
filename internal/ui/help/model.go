@@ -93,6 +93,7 @@ func (m Model) View() string {
 				{getK(m.km.OpenPluginDir), "󰝰 " + "Open plugins folder"},
 				{getK(m.km.ManagePlugins), styles.IconPlugin + "Manage plugins"},
 				{getK(m.km.Settings), "󰒓 " + "Settings menu"},
+				{getK(m.km.ImportExport), "󰛖 " + "Import / Export menu"},
 				{getK(m.km.AIPanelToggle), "🤖 " + "AI Assistant panel"},
 				{getK(m.km.Help), styles.IconHelp + "Show help"},
 				{getK(m.km.Issues), styles.IconIssues + "Open GitHub issues"},

@@ -369,6 +369,9 @@ func (m *Model) isInputFocused() bool {
 	case ModeTagFilter:
 		// Tag filter input field is active when filtering by tag
 		return true
+	case ModeImportExport:
+		// Import/Export menu has a file path input field
+		return true
 	default:
 		// All other modes don't have active text input fields, so keybindings can safely fire
 		return false

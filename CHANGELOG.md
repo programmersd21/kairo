@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1]
+
+### Added
+
+* **AI Total App Control**: Updated the AI Assistant's system prompt and tool definitions to enable seamless control over UI themes and Lua plugins.
+* **Help Menu Clarity**: Added dedicated keybinding information for the Import/Export menu to the global help screen.
+
+### Fixed
+
+* **Focus Management**: Resolved a bug where typing in the Import/Export file path box would inadvertently trigger global app keybindings.
+
 ## [1.3.0]
 
 ### Added
