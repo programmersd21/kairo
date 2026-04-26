@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0]
+
+### Added
+
+* **Import/Export Menu**: Introduced a dedicated menu (accessible via `x`) to easily import and export tasks in multiple formats directly from the TUI.
+* **CSV and Text Support**: Added support for `.csv` and `.txt` formats to both the TUI and the CLI API, expanding data portability beyond JSON and Markdown.
+* **API-Bound Transitions**: The new menu binds directly to the Kairo API, ensuring consistent data handling and validation between the TUI and headless automation.
+* **Dynamic File Path Input**: Users can now specify custom file paths for both imports and exports with real-time feedback and default filename suggestions.
+* **Bulk Deletion UI**: Added a quick 'Delete All' action (`a`) to the delete confirmation dialog for rapid workspace clearing.
+* **Lua Plugin Themes**: The Lua plugin system now supports curating custom themes. Plugins can return a `themes` table with full control over colors and appearance, which persist across sessions.
+* **AI Assistant Panel**: Integrated Gemini (3.1 Flash Lite, 2.5 Flash, 2.0 Flash) (`ctrl+a`) for natural language task management. Create, list, and update tasks using conversational prompts with total tool-calling app control.
+* **Live UI Syncing**: AI operations via the assistant panel now trigger live asynchronous UI refreshes (zero restart needed).
+* **AI Model Selection**: Users can seamlessly switch between Gemini models live via the Settings TUI (using `left`/`right` arrow keys) or in `config.toml`.
+* **Google Search Agent**: Running Kairo with `gemini-2.5-flash-lite` automatically unlocks native Google Search grounding capabilities for web-aware automation.
+* **Integrated MCP Server**: Built-in Model Context Protocol server (`kairo mcp`) that exposes your entire task database (including deep metadata like `deadline`, `status`, `tags`, and `priority`) to other AI agents.
+* **Settings Reset**: Quickly reset all app configurations back to default inside the settings menu by pressing `r`.
+* **API & MCP Theme Control**: Change the entire TUI theme via the headless API (`kairo api set_theme`) or MCP tools (`kairo_set_theme`).
+* **API & MCP Plugin Control**: Full management of Lua plugins (list, get, write, delete) through the CLI API and MCP server, enabling AI agents to extend Kairo's functionality.
+* **Status Indicators**: The footer now displays a real-time "MCP" pill when the built-in server is active.
+
+### Changed
+
+* **CLI Enhancements**: Updated `kairo import` and `kairo export` commands to support the new `--format [csv|txt]` options.
+* **Command Palette**: Added "Import/Export" to the global command palette for quick access.
+
+
 ## [1.2.4]
 
 ### Added

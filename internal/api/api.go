@@ -6,8 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
+	"github.com/programmersd21/kairo/internal/config"
 	"github.com/programmersd21/kairo/internal/core"
+	"github.com/programmersd21/kairo/internal/core/codec"
 	"github.com/programmersd21/kairo/internal/service"
 )
 
@@ -52,8 +56,24 @@ func (api *TaskAPI) Execute(ctx context.Context, req Request) Response {
 		return api.handleList(ctx, req.Payload)
 	case "list_tags":
 		return api.handleListTags(ctx)
+	case "export":
+		return api.handleExport(ctx, req.Payload)
+	case "import":
+		return api.handleImport(ctx, req.Payload)
 	case "cleanup":
 		return api.cleanup(ctx)
+	case "configure-ai":
+		return api.handleConfigureAI(ctx, req.Payload)
+	case "set_theme":
+		return api.handleSetTheme(ctx, req.Payload)
+	case "plugin_list":
+		return api.handlePluginList(ctx)
+	case "plugin_get":
+		return api.handlePluginGet(ctx, req.Payload)
+	case "plugin_write":
+		return api.handlePluginWrite(ctx, req.Payload)
+	case "plugin_delete":
+		return api.handlePluginDelete(ctx, req.Payload)
 	default:
 		return Response{
 			Success: false,
@@ -115,6 +135,7 @@ func (api *TaskAPI) handleCreate(ctx context.Context, payload json.RawMessage) R
 		Tags        []string `json:"tags,omitempty"`
 		Priority    *int     `json:"priority,omitempty"`
 		Status      string   `json:"status,omitempty"`
+		Deadline    *string  `json:"deadline,omitempty"`
 	}
 
 	var p CreatePayload
@@ -144,6 +165,12 @@ func (api *TaskAPI) handleCreate(ctx context.Context, payload json.RawMessage) R
 	}
 	if p.Priority != nil {
 		task.Priority = core.Priority(*p.Priority)
+	}
+	if p.Deadline != nil {
+		t, err := time.Parse(time.RFC3339, *p.Deadline)
+		if err == nil {
+			task.Deadline = &t
+		}
 	}
 
 	created, err := api.service.Create(ctx, task)
@@ -204,6 +231,7 @@ func (api *TaskAPI) handleUpdate(ctx context.Context, payload json.RawMessage) R
 		Tags        []string `json:"tags,omitempty"`
 		Priority    *int     `json:"priority,omitempty"`
 		Status      *string  `json:"status,omitempty"`
+		Deadline    *string  `json:"deadline,omitempty"`
 	}
 
 	var p UpdatePayload
@@ -238,6 +266,19 @@ func (api *TaskAPI) handleUpdate(ctx context.Context, payload json.RawMessage) R
 	if p.Status != nil {
 		s := core.Status(*p.Status)
 		patch.Status = &s
+	}
+
+	if p.Deadline != nil {
+		if *p.Deadline == "" {
+			var nilTime *time.Time
+			patch.Deadline = &nilTime
+		} else {
+			t, err := time.Parse(time.RFC3339, *p.Deadline)
+			if err == nil {
+				timePtr := &t
+				patch.Deadline = &timePtr
+			}
+		}
 	}
 
 	updated, err := api.service.Update(ctx, p.ID, patch)
@@ -368,4 +409,147 @@ func (api *TaskAPI) handleListTags(ctx context.Context) Response {
 		Success: true,
 		Data:    tags,
 	}
+}
+
+// handleExport processes an export request
+func (api *TaskAPI) handleExport(ctx context.Context, payload json.RawMessage) Response {
+	type ExportPayload struct {
+		Format string `json:"format"`
+	}
+
+	var p ExportPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		p.Format = "json"
+	}
+
+	tasks, err := api.service.ListAll(ctx)
+	if err != nil {
+		return Response{Success: false, Error: err.Error()}
+	}
+
+	var data string
+	var b []byte
+	switch strings.ToLower(p.Format) {
+	case "csv":
+		b, err = codec.MarshalCSV(tasks)
+		data = string(b)
+	case "txt", "text":
+		b = codec.MarshalText(tasks)
+		data = string(b)
+	case "md", "markdown":
+		b = codec.MarshalMarkdown(tasks)
+		data = string(b)
+	case "json":
+		b, err = codec.MarshalJSON(tasks)
+		data = string(b)
+	default:
+		return Response{Success: false, Error: fmt.Sprintf("unsupported format: %s", p.Format)}
+	}
+
+	if err != nil {
+		return Response{Success: false, Error: err.Error()}
+	}
+
+	return Response{
+		Success: true,
+		Data:    data,
+	}
+}
+
+// handleImport processes an import request
+func (api *TaskAPI) handleImport(ctx context.Context, payload json.RawMessage) Response {
+	type ImportPayload struct {
+		Format string `json:"format"`
+		Data   string `json:"data"`
+	}
+
+	var p ImportPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return Response{Success: false, Error: "invalid payload"}
+	}
+
+	var tasks []core.Task
+	var err error
+	b := []byte(p.Data)
+
+	switch strings.ToLower(p.Format) {
+	case "csv":
+		tasks, err = codec.UnmarshalCSV(b)
+	case "txt", "text":
+		tasks, err = codec.UnmarshalText(b)
+	case "md", "markdown":
+		tasks, err = codec.UnmarshalMarkdown(b)
+	case "json":
+		tasks, err = codec.UnmarshalJSON(b)
+	default:
+		return Response{Success: false, Error: fmt.Sprintf("unsupported format: %s", p.Format)}
+	}
+
+	if err != nil {
+		return Response{Success: false, Error: err.Error()}
+	}
+
+	for _, t := range tasks {
+		if err := api.service.UpsertTask(ctx, t); err != nil {
+			return Response{Success: false, Error: err.Error()}
+		}
+	}
+
+	return Response{
+		Success: true,
+		Data:    fmt.Sprintf("successfully imported %d tasks", len(tasks)),
+	}
+}
+func (api *TaskAPI) handleConfigureAI(ctx context.Context, payload json.RawMessage) Response {
+	type ConfigPayload struct {
+		Key   string `json:"key"`
+		Reset bool   `json:"reset"`
+	}
+	var p ConfigPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return Response{Success: false, Error: "invalid payload"}
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return Response{Success: false, Error: err.Error()}
+	}
+
+	if p.Reset {
+		cfg.App.GeminiAPIKey = ""
+	} else {
+		cfg.App.GeminiAPIKey = p.Key
+	}
+
+	if err := cfg.Save(); err != nil {
+		return Response{Success: false, Error: err.Error()}
+	}
+
+	return Response{Success: true, Data: "AI configuration updated"}
+}
+
+func (api *TaskAPI) handleSetTheme(ctx context.Context, payload json.RawMessage) Response {
+	type ThemePayload struct {
+		Theme string `json:"theme"`
+	}
+	var p ThemePayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return Response{Success: false, Error: "invalid payload"}
+	}
+	if p.Theme == "" {
+		return Response{Success: false, Error: "theme cannot be empty"}
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return Response{Success: false, Error: err.Error()}
+	}
+
+	cfg.App.Theme = p.Theme
+
+	if err := cfg.Save(); err != nil {
+		return Response{Success: false, Error: err.Error()}
+	}
+
+	return Response{Success: true, Data: fmt.Sprintf("Theme successfully updated to '%s'", p.Theme)}
 }

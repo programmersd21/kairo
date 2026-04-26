@@ -24,6 +24,7 @@ const (
 	IconTag       = "󰓹 "
 	IconSync      = "󰑓 "
 	IconError     = "󰅚 "
+	IconSuccess   = "󰄲 "
 	IconInfo      = "󰋽 "
 	IconHelp      = "󰋗 "
 	IconTask      = "󰈈 "

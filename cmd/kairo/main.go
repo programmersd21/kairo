@@ -13,6 +13,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	mcpserver "github.com/mark3labs/mcp-go/server"
 	"github.com/programmersd21/kairo/internal/api"
 	"github.com/programmersd21/kairo/internal/app"
 	"github.com/programmersd21/kairo/internal/buildinfo"
@@ -21,6 +22,7 @@ import (
 	"github.com/programmersd21/kairo/internal/core"
 	"github.com/programmersd21/kairo/internal/core/codec"
 	"github.com/programmersd21/kairo/internal/hooks"
+	"github.com/programmersd21/kairo/internal/mcp"
 	"github.com/programmersd21/kairo/internal/service"
 	"github.com/programmersd21/kairo/internal/storage"
 	ksync "github.com/programmersd21/kairo/internal/sync"
@@ -140,6 +142,12 @@ func main() {
 				os.Exit(2)
 			}
 			return
+		case "mcp":
+			if err := runMCP(ctx, svc); err != nil {
+				fmt.Fprintln(os.Stderr, "kairo mcp:", err)
+				os.Exit(2)
+			}
+			return
 		}
 	}
 
@@ -177,7 +185,24 @@ func runAPI(ctx context.Context, svc service.TaskService, args []string) error {
 	// Handle "delete all" special case
 	if action == "delete" && len(args) > 1 && args[1] == "all" {
 		action = "delete_all"
-		args = args[1:] // shift args so loop works if needed, though delete_all ignores payload
+		args = args[1:]
+	}
+
+	// Handle "configure-ai" set/reset
+	if action == "configure-ai" {
+		payload := make(map[string]interface{})
+		if len(args) > 1 {
+			if args[1] == "set" && len(args) > 2 {
+				payload["key"] = args[2]
+			} else if args[1] == "reset" {
+				payload["reset"] = true
+			}
+		}
+		b, _ := json.Marshal(payload)
+		resp := taskAPI.Execute(ctx, api.Request{Action: action, Payload: b})
+		out, _ := json.MarshalIndent(resp, "", "  ")
+		fmt.Println(string(out))
+		return nil
 	}
 
 	var req api.Request
@@ -236,12 +261,16 @@ func runExport(ctx context.Context, repo *storage.Repository, args []string) err
 
 	var b []byte
 	switch format {
-	case "json":
-		b, err = codec.MarshalJSON(tasks)
+	case "csv":
+		b, err = codec.MarshalCSV(tasks)
+	case "txt", "text":
+		b = codec.MarshalText(tasks)
 	case "md", "markdown":
 		b = codec.MarshalMarkdown(tasks)
+	case "json":
+		b, err = codec.MarshalJSON(tasks)
 	default:
-		return fmt.Errorf("unknown format %q", format)
+		return fmt.Errorf("unknown format %q (supported: json, md, csv, txt)", format)
 	}
 	if err != nil {
 		return err
@@ -286,12 +315,16 @@ func runImport(ctx context.Context, repo *storage.Repository, args []string) err
 	}
 	var tasks []core.Task
 	switch format {
-	case "json":
-		tasks, err = codec.UnmarshalJSON(b)
+	case "csv":
+		tasks, err = codec.UnmarshalCSV(b)
+	case "txt", "text":
+		tasks, err = codec.UnmarshalText(b)
 	case "md", "markdown":
 		tasks, err = codec.UnmarshalMarkdown(b)
+	case "json":
+		tasks, err = codec.UnmarshalJSON(b)
 	default:
-		return fmt.Errorf("unknown format %q", format)
+		return fmt.Errorf("unknown format %q (supported: json, md, csv, txt)", format)
 	}
 	if err != nil {
 		return err
@@ -350,13 +383,13 @@ func runHelp(args []string) {
 		fmt.Println("\nExample:")
 		fmt.Println("  kairo completion zsh install")
 	case "export":
-		fmt.Println("Export tasks to JSON or Markdown.")
+		fmt.Println("Export tasks to JSON, Markdown, CSV or Text.")
 		fmt.Println("\nUsage:")
-		fmt.Println("  kairo export --format [json|md] --out [file]")
+		fmt.Println("  kairo export --format [json|md|csv|txt] --out [file]")
 	case "import":
-		fmt.Println("Import tasks from JSON or Markdown.")
+		fmt.Println("Import tasks from JSON, Markdown, CSV or Text.")
 		fmt.Println("\nUsage:")
-		fmt.Println("  kairo import --format [json|md] --in [file]")
+		fmt.Println("  kairo import --format [json|md|csv|txt] --in [file]")
 	case "sync":
 		fmt.Println("Sync tasks with Git repository.")
 		fmt.Println("\nUsage:")
@@ -364,4 +397,9 @@ func runHelp(args []string) {
 	default:
 		fmt.Printf("Unknown help topic %q\n", args[0])
 	}
+}
+func runMCP(ctx context.Context, svc service.TaskService) error {
+	s := mcp.NewServer(svc)
+	server := mcpserver.NewStdioServer(s)
+	return server.Listen(ctx, os.Stdin, os.Stdout)
 }

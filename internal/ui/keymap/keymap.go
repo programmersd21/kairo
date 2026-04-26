@@ -34,6 +34,8 @@ type Keymap struct {
 	Discussions   key.Binding
 	Changelog     key.Binding
 	Settings      key.Binding
+	ImportExport  key.Binding
+	AIPanelToggle key.Binding
 }
 
 func FromConfig(c config.KeymapConfig) Keymap {
@@ -63,6 +65,8 @@ func FromConfig(c config.KeymapConfig) Keymap {
 		Discussions:   bind(c.Discussions, "discussions", "open github discussions"),
 		Changelog:     bind(c.Changelog, "changelog", "open changelog"),
 		Settings:      bind(c.Settings, "settings", "open settings"),
+		ImportExport:  bind(c.ImportExport, "import-export", "import or export tasks"),
+		AIPanelToggle: bind(c.AIPanelToggle, "ai", "toggle AI assistant"),
 	}
 }
 func bind(keys, helpKey, helpDesc string) key.Binding {

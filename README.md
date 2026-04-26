@@ -54,7 +54,10 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI framewo
 | **Responsive Auto-Resize**| Strict grid enforcement with dynamic title truncation preventing layout drifts |
 | **Offline Storage** | SQLite with WAL for reliability and concurrent access |
 | **Git Sync** | Optional repository-backed sync with per-task JSON files |
-| **Import/Export** | JSON and Markdown support for data portability |
+| **Import/Export** | JSON, Markdown, CSV, and Text support for data portability |
+| **AI Assistant** | Integrated Gemini (3.1/2.5/2.0) with total app control, Google Search, & live UI refreshes |
+| **MCP Server**   | Built-in Model Context Protocol server exposing entire task schema, themes, and plugins |
+| **Custom Themes**| Curate and share custom themes via Lua plugins or API |
 
 ---
 
@@ -138,6 +141,18 @@ kairo api delete all
 
 # Advanced JSON interface
 kairo api --json '{"action": "create", "payload": {"title": "API Task", "tags": ["bot"]}}'
+
+# AI Configuration
+kairo api configure-ai set "YOUR_GEMINI_API_KEY"
+kairo api configure-ai reset
+
+# Set TUI Theme
+kairo api set_theme --theme catppuccin
+
+# Plugin Management (list, get, write, delete)
+kairo api plugin_list
+kairo api plugin_get --name auto-cleanup.lua
+kairo api plugin_delete --name sample.lua
 ```
 
 ### Other CLI Commands
@@ -150,7 +165,8 @@ kairo version
 kairo update
 
 # Export tasks
-kairo export --format json --out tasks.json
+kairo export --format csv --out tasks.csv
+kairo export --format txt --out tasks.txt
 kairo export --format markdown --out tasks.md
 
 # Import tasks
@@ -171,6 +187,9 @@ kairo help export
 
 # Sync with Git (if configured)
 kairo sync
+
+# Start MCP Server (stdio)
+kairo mcp
 ```
 
 ---
@@ -198,6 +217,24 @@ end)
 -- Register custom commands
 plugin.commands = {
     { id = "hello", title = "Say Hello", run = function() kairo.notify("Hello!") end }
+}
+
+
+-- Register custom themes
+plugin.themes = {
+    {
+        name = "midnight_neon",
+        is_light = false,
+        bg = "#000000",
+        fg = "#ffffff",
+        muted = "#444444",
+        border = "#222222",
+        accent = "#00ff00",
+        good = "#00ff00",
+        warn = "#ffff00",
+        bad = "#ff0000",
+        overlay = "#111111",
+    }
 }
 
 return plugin
@@ -256,6 +293,15 @@ Kairo features a **minimalist design system** optimized for clarity and focus.
 | `c` | 📝 Show changelog |
 | `?` | ❓ Show help menu |
 | `q` | ❌ Quit |
+
+### AI Assistant Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `ctrl+a` | 🤖 Toggle AI Assistant Panel |
+| `ctrl+l` | 🧹 Clear AI Chat History |
+| `enter`  | ↵ Submit Prompt |
+| `esc`    | ❌ Close AI Panel |
 
 ### Plugin Menu Shortcuts
 
@@ -326,10 +372,12 @@ Then edit the file or use the built-in Settings menu (`ctrl+s` in Kairo) to cust
     - **Premium Dark:** `catppuccin` (Default), `midnight`, `aurora`, `cyberpunk`, `dracula`, `nord`, `obsidian_bloom`, `neon_reef`, `carbon_sunset`, `vanta_aurora`, `plasma_grape`, `midnight_jade`, `synthwave_minimal`, `graphite_matcha`
     - **Premium Light:** `vanilla`, `solarized`, `rose`, `matcha`, `cloud`, `sepia`, `cloud_dancer`, `sakura_sand`, `olive_mist`, `terracotta_air`, `vanilla_sky`, `peach_fuzz_neo`, `coastal_drift`, `matcha_latte`
     - **Hybrid/Specialized:** `digital_lavender`, `neo_mint_system`, `sunset_gradient_pro`, `forest_sanctuary`
+- **AI Model Selection** — Switch between `gemini-3.1-flash-lite-preview`, `gemini-2.5-flash-lite`, and `gemini-2.0-flash-lite` live using ←/→ arrows
 - **Keybindings** — Rebind any keyboard shortcut
 - **View ordering** — Customize your task view tabs
 - **Sync settings** — Configure Git repository sync
 - **Plugins** — Toggle and manage your Lua plugins
+- **Reset to Defaults** — Press `r` inside the Settings menu to restore all factory settings
 
 ---
 
@@ -395,111 +443,30 @@ UI Re-render → Instant User Feedback
 
 ```
 kairo/
-├── CHANGELOG.md
-├── cmd
-│   └── kairo
-│       └── main.go
-├── CODE_OF_CONDUCT.md
-├── configs
-│   └── kairo.example.toml
-├── CONTRIBUTING.md
-├── go.mod
-├── go.sum
-├── internal
-│   ├── api
-│   │   └── api.go
-│   ├── app
-│   │   ├── model.go
-│   │   └── msg.go
-│   ├── buildinfo
-│   │   └── buildinfo.go
-│   ├── completion
-│   │   └── completion.go
-│   ├── config
-│   │   ├── config.go
-│   │   └── config_test.go
-│   ├── core
-│   │   ├── codec
-│   │   │   ├── json.go
-│   │   │   └── markdown.go
-│   │   ├── core_test.go
-│   │   ├── ids.go
-│   │   ├── nlp
-│   │   │   └── deadline.go
-│   │   ├── task.go
-│   │   └── view.go
-│   ├── hooks
-│   │   └── hooks.go
-│   ├── lua
-│   │   └── engine.go
-│   ├── plugins
-│   │   └── host.go
-│   ├── search
-│   │   ├── fuzzy.go
-│   │   ├── fuzzy_test.go
-│   │   └── index.go
-│   ├── service
-│   │   └── service.go
-│   ├── storage
-│   │   ├── migrations.go
-│   │   ├── repo.go
-│   │   └── repo_test.go
-│   ├── sync
-│   │   └── engine.go
-│   ├── ui
-│   │   ├── detail
-│   │   │   └── model.go
-│   │   ├── editor
-│   │   │   └── model.go
-│   │   ├── help
-│   │   │   └── model.go
-│   │   ├── keymap
-│   │   │   ├── keymap.go
-│   │   │   ├── keymap_test.go
-│   │   │   ├── normalize.go
-│   │   │   └── normalize_test.go
-│   │   ├── palette
-│   │   │   └── model.go
-│   │   ├── plugin_menu
-│   │   │   └── model.go
-│   │   ├── render
-│   │   │   ├── easing.go
-│   │   │   └── render.go
-│   │   ├── settings
-│   │   │   └── model.go
-│   │   ├── styles
-│   │   │   └── styles.go
-│   │   ├── tasklist
-│   │   │   └── model.go
-│   │   ├── theme
-│   │   │   └── theme.go
-│   │   └── theme_menu
-│   │       └── model.go
-│   ├── updater
-│   │   ├── checksums.go
-│   │   ├── download.go
-│   │   ├── extract.go
-│   │   ├── github.go
-│   │   ├── updater.go
-│   │   └── windows_helper.go
-│   └── util
-│       ├── paths.go
-│       └── util_test.go
-├── LICENSE
-├── Makefile
-├── plugins
-│   ├── auto-cleanup.lua
-│   ├── auto-tagger.lua
-│   ├── sample.lua
-│   └── task-logger.lua
-├── README.md
-├── screenshots
-│   └── demo.gif
-├── scripts
-│   ├── install.ps1
-│   └── install.sh
-├── SECURITY.md
-└── VERSION.txt
+├── cmd/
+│   └── kairo/
+│       └── main.go            # Entry point for TUI & CLI
+├── configs/
+│   └── kairo.example.toml     # Template configuration
+├── internal/
+│   ├── ai/                    # Gemini API & Tool-calling engine
+│   ├── api/                   # Headless JSON API & Plugin control
+│   ├── app/                   # Root TUI state & message bus
+│   ├── core/                  # Task models & NLP logic
+│   │   └── codec/             # CSV, JSON, Markdown, Text support
+│   ├── mcp/                   # Model Context Protocol server
+│   ├── plugins/               # Lua plugin host (host.go)
+│   ├── storage/               # SQLite & Migration engine
+│   ├── sync/                  # Optional Git-backed sync logic
+│   ├── ui/                    # Componentized TUI (Bubble Tea)
+│   │   ├── ai_panel/          # Integrated AI assistant
+│   │   ├── import_export_menu/# Format-aware I/O interface
+│   │   ├── settings/          # Live configuration & model switching
+│   │   └── ...
+│   └── util/                  # Cross-platform path helpers
+├── plugins/                   # User-extensible Lua scripts
+├── screenshots/               # Demo assets
+└── scripts/                   # Platform-specific installers
 ```
 
 ---

@@ -22,10 +22,13 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Theme    string `toml:"theme"`
-	VimMode  bool   `toml:"vim_mode"`
-	ShowHelp bool   `toml:"show_help"`
-	Rainbow  bool   `toml:"rainbow"`
+	Theme        string `toml:"theme"`
+	VimMode      bool   `toml:"vim_mode"`
+	ShowHelp     bool   `toml:"show_help"`
+	Rainbow      bool   `toml:"rainbow"`
+	GeminiAPIKey string `toml:"gemini_api_key"`
+	AIModel      string `toml:"ai_model"`
+	MCPEnabled   bool   `toml:"mcp_enabled"`
 }
 
 type StorageConfig struct {
@@ -83,6 +86,8 @@ type KeymapConfig struct {
 	Discussions   string `toml:"discussions"`
 	Changelog     string `toml:"changelog"`
 	Settings      string `toml:"settings"`
+	ImportExport  string `toml:"import_export"`
+	AIPanelToggle string `toml:"ai_panel_toggle"`
 }
 
 func Default() Config {
@@ -92,6 +97,7 @@ func Default() Config {
 			VimMode:  false,
 			ShowHelp: true,
 			Rainbow:  false,
+			AIModel:  "gemini-3.1-flash-lite-preview",
 		},
 		Theme: ThemeConfig{
 			Bg:      "", // Use theme default
@@ -143,6 +149,8 @@ func Default() Config {
 			Discussions:   "u",
 			Changelog:     "c",
 			Settings:      "ctrl+s",
+			ImportExport:  "x",
+			AIPanelToggle: "ctrl+a",
 		},
 	}
 }
@@ -277,6 +285,9 @@ func Load() (Config, error) {
 	}
 	if cfg.Keymap.Settings == "" {
 		cfg.Keymap.Settings = defaults.Keymap.Settings
+	}
+	if cfg.Keymap.ImportExport == "" {
+		cfg.Keymap.ImportExport = defaults.Keymap.ImportExport
 	}
 
 	appDir, _ := util.AppDataDir(appName)

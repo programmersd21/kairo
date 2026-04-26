@@ -22,8 +22,8 @@ type Model struct {
 	sel    int
 }
 
-func New(s styles.Styles) Model {
-	th := theme.Builtins()
+func New(s styles.Styles, extra []theme.Theme) Model {
+	th := append(theme.Builtins(), extra...)
 	sel := 0
 	for i, t := range th {
 		if t.Name == s.Theme.Name {

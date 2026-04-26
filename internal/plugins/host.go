@@ -11,12 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fsnotify/fsnotify"
 	lua "github.com/yuin/gopher-lua"
 
 	"github.com/programmersd21/kairo/internal/core"
 	klua "github.com/programmersd21/kairo/internal/lua"
 	"github.com/programmersd21/kairo/internal/service"
+	"github.com/programmersd21/kairo/internal/ui/theme"
 )
 
 type PluginInfo struct {
@@ -55,6 +57,7 @@ type Host struct {
 	plugins  []PluginInfo
 	cmds     []CommandInfo
 	views    []ViewInfo
+	themes   []theme.Theme
 	handlers map[string]handlerRef // fullID -> handler reference
 	lastErr  error
 
@@ -102,6 +105,11 @@ func (h *Host) Views() []ViewInfo {
 	defer h.mu.RUnlock()
 	return append([]ViewInfo(nil), h.views...)
 }
+func (h *Host) Themes() []theme.Theme {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return append([]theme.Theme(nil), h.themes...)
+}
 
 func (h *Host) LoadAll() error {
 	if !h.Enabled() {
@@ -119,6 +127,7 @@ func (h *Host) LoadAll() error {
 	var plugins []PluginInfo
 	var cmds []CommandInfo
 	var views []ViewInfo
+	var themes []theme.Theme
 	handlers := map[string]handlerRef{}
 
 	for _, ent := range ents {
@@ -126,7 +135,7 @@ func (h *Host) LoadAll() error {
 			continue
 		}
 		path := filepath.Join(h.dir, ent.Name())
-		info, pc, pv, ph, err := h.loadOne(path)
+		info, pc, pv, pt, ph, err := h.loadOne(path)
 		if err != nil {
 			h.setErr(err)
 			continue
@@ -134,6 +143,7 @@ func (h *Host) LoadAll() error {
 		plugins = append(plugins, info)
 		cmds = append(cmds, pc...)
 		views = append(views, pv...)
+		themes = append(themes, pt...)
 		for k, v := range ph {
 			handlers[k] = v
 		}
@@ -143,6 +153,7 @@ func (h *Host) LoadAll() error {
 	h.plugins = plugins
 	h.cmds = cmds
 	h.views = views
+	h.themes = themes
 	h.handlers = handlers
 	h.lastErr = nil
 	h.mu.Unlock()
@@ -276,7 +287,7 @@ func (h *Host) Watch(ctx context.Context, onChange func()) error {
 	return nil
 }
 
-func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, map[string]handlerRef, error) {
+func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, []theme.Theme, map[string]handlerRef, error) {
 	L := lua.NewState()
 	defer L.Close()
 
@@ -284,12 +295,12 @@ func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, map[
 	eng.SetupKairoAPI(L)
 
 	if err := L.DoFile(path); err != nil {
-		return PluginInfo{}, nil, nil, nil, fmt.Errorf("plugin %s: %w", filepath.Base(path), err)
+		return PluginInfo{}, nil, nil, nil, nil, fmt.Errorf("plugin %s: %w", filepath.Base(path), err)
 	}
 	ret := L.Get(-1)
 	tbl, ok := ret.(*lua.LTable)
 	if !ok {
-		return PluginInfo{}, nil, nil, nil, fmt.Errorf("plugin %s: must return a table", filepath.Base(path))
+		return PluginInfo{}, nil, nil, nil, nil, fmt.Errorf("plugin %s: must return a table", filepath.Base(path))
 	}
 
 	pluginID := luaToString(tbl.RawGetString("id"))
@@ -311,6 +322,7 @@ func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, map[
 
 	var cmds []CommandInfo
 	var views []ViewInfo
+	var themes []theme.Theme
 	handlers := map[string]handlerRef{}
 
 	if ctbl, ok := tbl.RawGetString("commands").(*lua.LTable); ok {
@@ -377,7 +389,36 @@ func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, map[
 		})
 	}
 
-	return info, cmds, views, handlers, nil
+	if ttbl, ok := tbl.RawGetString("themes").(*lua.LTable); ok {
+		ttbl.ForEach(func(_ lua.LValue, v lua.LValue) {
+			t, ok := v.(*lua.LTable)
+			if !ok {
+				return
+			}
+			name := luaToString(t.RawGetString("name"))
+			if name == "" {
+				return
+			}
+			getColor := func(key string) lipgloss.Color {
+				return lipgloss.Color(luaToString(t.RawGetString(key)))
+			}
+			themes = append(themes, theme.Theme{
+				Name:    name,
+				IsLight: t.RawGetString("is_light").String() == "true",
+				Bg:      getColor("bg"),
+				Fg:      getColor("fg"),
+				Muted:   getColor("muted"),
+				Border:  getColor("border"),
+				Accent:  getColor("accent"),
+				Good:    getColor("good"),
+				Warn:    getColor("warn"),
+				Bad:     getColor("bad"),
+				Overlay: getColor("overlay"),
+			})
+		})
+	}
+
+	return info, cmds, views, themes, handlers, nil
 }
 
 func luaToString(v lua.LValue) string {

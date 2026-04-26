@@ -17,6 +17,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/programmersd21/kairo/internal/ai"
+	"github.com/programmersd21/kairo/internal/api"
 	"github.com/programmersd21/kairo/internal/buildinfo"
 	"github.com/programmersd21/kairo/internal/config"
 	"github.com/programmersd21/kairo/internal/core"
@@ -24,9 +26,11 @@ import (
 	"github.com/programmersd21/kairo/internal/search"
 	"github.com/programmersd21/kairo/internal/service"
 	ksync "github.com/programmersd21/kairo/internal/sync"
+	"github.com/programmersd21/kairo/internal/ui/ai_panel"
 	"github.com/programmersd21/kairo/internal/ui/detail"
 	"github.com/programmersd21/kairo/internal/ui/editor"
 	"github.com/programmersd21/kairo/internal/ui/help"
+	"github.com/programmersd21/kairo/internal/ui/import_export_menu"
 	"github.com/programmersd21/kairo/internal/ui/keymap"
 	"github.com/programmersd21/kairo/internal/ui/palette"
 	"github.com/programmersd21/kairo/internal/ui/plugin_menu"
@@ -89,6 +93,7 @@ const (
 	ModeTagFilter
 	ModeConfirmQuit
 	ModeSettings
+	ModeImportExport
 )
 
 type Model struct {
@@ -112,14 +117,21 @@ type Model struct {
 	tagFilter     FilterState // Replaced plain tagParam with proper state management
 	priParam      *core.Priority
 
-	list tasklist.Model
-	pal  palette.Model
-	det  detail.Model
-	edit *editor.Model
-	hlp  help.Model
-	tm   theme_menu.Model
-	pm   plugin_menu.Model
-	set  settings.Model
+	list       tasklist.Model
+	pal        palette.Model
+	det        detail.Model
+	edit       *editor.Model
+	hlp        help.Model
+	tm         theme_menu.Model
+	pm         plugin_menu.Model
+	set        settings.Model
+	iem        import_export_menu.Model
+	aiPanel    ai_panel.Model
+	aiClient   *ai.Client
+	aiKey      string
+	aiChan     chan ai_panel.AIChunkMsg
+	mcpCmd     *exec.Cmd
+	mcpRunning bool
 
 	tagFilterInput textinput.Model // Input field for direct tag filtering in Tag View
 
@@ -208,9 +220,17 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
-	m.tm = theme_menu.New(m.s)
+	m.tm = theme_menu.New(m.s, nil)
 	m.pm = plugin_menu.New(m.s)
 	m.set = settings.New(m.s, cfg)
+	m.iem = import_export_menu.New(m.s)
+	m.aiPanel = ai_panel.New(m.s)
+	m.aiChan = make(chan ai_panel.AIChunkMsg, 100)
+	m.aiKey = cfg.App.GeminiAPIKey
+	if m.aiKey != "" {
+		m.aiClient, _ = ai.NewClient(ctx, m.aiKey, cfg.App.AIModel)
+		ai.SetService(svc)
+	}
 
 	// Config watcher.
 	m.configCh = make(chan config.Config, 8)
@@ -268,6 +288,17 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 				m.isErr = isErr
 			})
 			_ = m.plugHost.LoadAll()
+
+			// If the configured theme is a plugin theme, apply it now that plugins are loaded
+			for _, pt := range m.plugHost.Themes() {
+				if pt.Name == m.cfg.App.Theme {
+					m.thBuiltin = pt
+					m.theme = applyThemeOverride(pt, m.cfg.Theme)
+					m.refreshStyles()
+					break
+				}
+			}
+
 			m.plugCh = make(chan struct{}, 8)
 			_ = m.plugHost.Watch(ctx, func() {
 				select {
@@ -315,6 +346,12 @@ func (m *Model) Init() tea.Cmd {
 	if m.configCh != nil {
 		cmds = append(cmds, m.listenConfigCmd())
 	}
+	if m.aiChan != nil {
+		cmds = append(cmds, m.listenAICmd())
+	}
+	if m.cfg.App.MCPEnabled {
+		cmds = append(cmds, m.startMCPCmd())
+	}
 	return tea.Batch(cmds...)
 }
 
@@ -342,6 +379,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch x := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = x.Width, x.Height
+		m.list.SetSize(x.Width, x.Height)
+		m.pal.SetSize(x.Width, x.Height)
+		m.det.SetSize(x.Width, x.Height)
+		m.tm.SetSize(x.Width, x.Height)
+		m.pm.SetSize(x.Width, x.Height)
+		m.set.SetSize(x.Width, x.Height)
+		m.iem.SetSize(x.Width, x.Height)
 		m.rebuildComponentSizes()
 		return m, nil
 
@@ -404,15 +448,29 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case settings.ConfigChangedMsg:
+		oldMCP := m.cfg.App.MCPEnabled
 		m.cfg = x.Config
+		m.aiKey = m.cfg.App.GeminiAPIKey
+		if m.aiKey != "" {
+			m.aiClient, _ = ai.NewClient(m.ctx, m.aiKey, m.cfg.App.AIModel)
+			ai.SetService(m.svc)
+		}
 		m.km = keymap.FromConfig(m.cfg.Keymap)
 		m.thBuiltin = theme.FindBuiltin(m.cfg.App.Theme)
 		m.theme = applyThemeOverride(m.thBuiltin, m.cfg.Theme)
 		m.refreshStyles()
 		m.set.SetConfig(m.cfg)
+		m.set.SetStyles(m.s)
 
 		m.rebuildViews()
 		m.rebuildPaletteIndex()
+
+		var mcpCmd tea.Cmd
+		if m.cfg.App.MCPEnabled && !oldMCP {
+			mcpCmd = m.startMCPCmd()
+		} else if !m.cfg.App.MCPEnabled && oldMCP {
+			mcpCmd = m.stopMCPCmd()
+		}
 
 		// If config changed externally or internally, we might need to restart/update components
 		if m.cfg.Sync.Enabled && m.syncEngine == nil {
@@ -422,6 +480,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		cmds := []tea.Cmd{m.listenConfigCmd()}
+		if mcpCmd != nil {
+			cmds = append(cmds, mcpCmd)
+		}
 		// Restart rainbow ticker if it was just enabled and isn't already running
 		if m.cfg.App.Rainbow && !m.rainbowAnimating {
 			m.rainbowAnimating = true
@@ -447,6 +508,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.transitioning = true
 			m.transitionStarted = time.Now()
 			return m, m.viewTransitionTickCmd()
+		}
+		return m, nil
+
+	case import_export_menu.CloseMsg:
+		if m.mode == ModeImportExport {
+			m.mode = ModeList
+			m.transitioning = true
+			m.transitionStarted = time.Now()
+			return m, m.viewTransitionTickCmd()
+		}
+		return m, nil
+
+	case import_export_menu.SelectMsg:
+		if m.mode == ModeImportExport {
+			m.mode = ModeList
+			m.transitioning = true
+			m.transitionStarted = time.Now()
+			return m, tea.Batch(
+				m.handleImportExportAction(x.Action, x.Path),
+				m.viewTransitionTickCmd(),
+			)
 		}
 		return m, nil
 
@@ -555,6 +637,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case taskUpdatedMsg:
 		return m, tea.Batch(m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
+
+	case string: // AI prompt from panel
+		return m, m.startAIStreamCmd(x)
+
+	case ai_panel.AIChunkMsg:
+		var cmds []tea.Cmd
+		var cmd tea.Cmd
+		m.aiPanel, cmd = m.aiPanel.Update(x)
+		cmds = append(cmds, cmd, m.listenAICmd())
+
+		if x.Chunk.Refresh {
+			cmds = append(cmds, m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
+		}
+		return m, tea.Batch(cmds...)
+
+	case mcpStatusMsg:
+		m.mcpRunning = x.Running
+		return m, nil
 
 	case taskDeletedMsg:
 		return m, tea.Batch(m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
@@ -673,6 +773,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if km, ok := msg.(tea.KeyMsg); ok {
+		// AI Panel priority
+		if m.aiPanel.Visible {
+			// AIPanelToggle still toggles
+			if keymapMatch(m.km.AIPanelToggle, km) {
+				m.aiPanel.Visible = false
+				return m, nil
+			}
+
+			var cmd tea.Cmd
+			m.aiPanel, cmd = m.aiPanel.Update(msg)
+			if cmd != nil {
+				return m, cmd
+			}
+			// AI panel intercepts all keys except ctrl+c
+			if km.String() != "ctrl+c" {
+				return m, nil
+			}
+		}
+
 		if m.mode == ModeConfirmDelete {
 			switch km.String() {
 			case "y", "enter":
@@ -684,6 +803,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.animationGen++
 					return m, m.deleteAnimationTickCmd(t.ID)
 				}
+			case "a":
+				m.mode = ModeList
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				m.animationGen++
+				return m, tea.Batch(m.deleteAllTasksCmd(), m.viewTransitionTickCmd())
 			case "n", "esc":
 				m.mode = ModeList
 				m.transitioning = true
@@ -778,30 +903,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = ModeConfirmQuit
 				return m, nil
 			}
-			if keymapMatch(m.km.Palette, km) {
-				m.palTasksOnly = false
-				m.applyPaletteIndex()
-				m.pal.SetPlaceholder("Search tasks, commands, tags…")
-				m.mode = ModePalette
-				m.transitioning = true
-				m.transitionStarted = time.Now()
-				return m, tea.Batch(m.pal.Open(), m.viewTransitionTickCmd())
+
+			if keymapMatch(m.km.AIPanelToggle, km) {
+				m.aiPanel.Toggle()
+				m.aiPanel.SetSize(m.width, m.height)
+				if m.aiPanel.Visible {
+					return m, m.aiPanel.Init()
+				}
+				return m, nil
 			}
-			if keymapMatch(m.km.TaskSearch, km) && (m.mode == ModeList || m.mode == ModeDetail) {
-				m.palTasksOnly = true
-				m.applyPaletteIndex()
-				m.pal.SetPlaceholder("Search tasks…")
-				m.mode = ModePalette
-				m.transitioning = true
-				m.transitionStarted = time.Now()
-				return m, tea.Batch(m.pal.Open(), m.viewTransitionTickCmd())
-			}
-			if keymapMatch(m.km.CycleTheme, km) {
-				m.mode = ModeThemeMenu
-				m.transitioning = true
-				m.transitionStarted = time.Now()
-				return m, m.viewTransitionTickCmd()
-			}
+
+			// Sub-menu specific toggles/actions that should work even in the menu themselves (to close them)
 			if keymapMatch(m.km.ManagePlugins, km) {
 				if m.mode == ModePluginMenu {
 					m.mode = ModeList
@@ -818,41 +930,75 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			if keymapMatch(m.km.OpenPluginDir, km) {
-				if m.plugHost != nil {
-					dir := m.cfg.Plugins.Dir
-					if dir == "" {
-						stateDir, err := util.AppStateDir("kairo")
-						if err == nil {
-							dir = filepath.Join(stateDir, "plugins")
+
+			// Primary mode utility keys
+			if m.mode == ModeList || m.mode == ModeDetail {
+				if keymapMatch(m.km.Palette, km) {
+					m.palTasksOnly = false
+					m.applyPaletteIndex()
+					m.pal.SetPlaceholder("Search tasks, commands, tags…")
+					m.mode = ModePalette
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					return m, tea.Batch(m.pal.Open(), m.viewTransitionTickCmd())
+				}
+				if keymapMatch(m.km.TaskSearch, km) {
+					m.palTasksOnly = true
+					m.applyPaletteIndex()
+					m.pal.SetPlaceholder("Search tasks…")
+					m.mode = ModePalette
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					return m, tea.Batch(m.pal.Open(), m.viewTransitionTickCmd())
+				}
+				if keymapMatch(m.km.CycleTheme, km) {
+					m.mode = ModeThemeMenu
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					return m, m.viewTransitionTickCmd()
+				}
+				if keymapMatch(m.km.ImportExport, km) {
+					m.mode = ModeImportExport
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					return m, m.viewTransitionTickCmd()
+				}
+				if keymapMatch(m.km.OpenPluginDir, km) {
+					if m.plugHost != nil {
+						dir := m.cfg.Plugins.Dir
+						if dir == "" {
+							stateDir, err := util.AppStateDir("kairo")
+							if err == nil {
+								dir = filepath.Join(stateDir, "plugins")
+							}
+						}
+						if dir != "" {
+							return m, openFolderCmd(dir)
 						}
 					}
-					if dir != "" {
-						return m, openFolderCmd(dir)
-					}
+					return m, nil
 				}
-				return m, nil
-			}
-			if keymapMatch(m.km.Help, km) {
-				m.mode = ModeHelp
-				m.transitioning = true
-				m.transitionStarted = time.Now()
-				return m, m.viewTransitionTickCmd()
-			}
-			if keymapMatch(m.km.Issues, km) {
-				return m, openURLCmd("https://github.com/programmersd21/kairo/issues")
-			}
-			if keymapMatch(m.km.Discussions, km) {
-				return m, openURLCmd("https://github.com/programmersd21/kairo/discussions")
-			}
-			if keymapMatch(m.km.Changelog, km) {
-				return m, openURLCmd("https://github.com/programmersd21/kairo/blob/main/CHANGELOG.md")
-			}
-			if keymapMatch(m.km.Settings, km) {
-				m.mode = ModeSettings
-				m.transitioning = true
-				m.transitionStarted = time.Now()
-				return m, m.viewTransitionTickCmd()
+				if keymapMatch(m.km.Help, km) {
+					m.mode = ModeHelp
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					return m, m.viewTransitionTickCmd()
+				}
+				if keymapMatch(m.km.Issues, km) {
+					return m, openURLCmd("https://github.com/programmersd21/kairo/issues")
+				}
+				if keymapMatch(m.km.Discussions, km) {
+					return m, openURLCmd("https://github.com/programmersd21/kairo/discussions")
+				}
+				if keymapMatch(m.km.Changelog, km) {
+					return m, openURLCmd("https://github.com/programmersd21/kairo/blob/main/CHANGELOG.md")
+				}
+				if keymapMatch(m.km.Settings, km) {
+					m.mode = ModeSettings
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					return m, m.viewTransitionTickCmd()
+				}
 			}
 
 			if m.mode == ModeList {
@@ -1019,7 +1165,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.set, cmd = m.set.Update(msg)
 		return m, cmd
+	case ModeImportExport:
+		var cmd tea.Cmd
+		m.iem, cmd = m.iem.Update(msg)
+		return m, cmd
 	}
+
 	return m, nil
 }
 
@@ -1050,8 +1201,24 @@ func (m *Model) View() string {
 }
 
 func (m *Model) renderMainUI() string {
-	head := m.renderHeader()
-	foot := m.renderFooter()
+	// Calculate the width budget: when AI panel is visible, the main UI
+	// shrinks to make room. Both halves must fit within m.width.
+	mainW := m.width
+	aiPanelW := 0
+	if m.aiPanel.Visible {
+		aiPanelW = int(float64(m.width) * 0.35)
+		if aiPanelW < 30 {
+			aiPanelW = 30
+		}
+		mainW = m.width - aiPanelW
+		if mainW < 40 {
+			mainW = 40
+			aiPanelW = m.width - mainW
+		}
+	}
+
+	head := m.renderHeaderWithWidth(mainW)
+	foot := m.renderFooterWithWidth(mainW)
 
 	hHeight := lipgloss.Height(head)
 	fHeight := lipgloss.Height(foot)
@@ -1060,16 +1227,20 @@ func (m *Model) renderMainUI() string {
 		availableHeight = 0
 	}
 
-	// Update sizes dynamically
-	m.list.SetSize(m.width, availableHeight)
-	m.det.SetSize(m.width, availableHeight)
-	m.pal.SetSize(m.width, availableHeight)
-	m.pm.SetSize(m.width, availableHeight)
-	m.set.SetSize(m.width, availableHeight)
-	m.hlp.SetSize(m.width, availableHeight)
-	m.tm.SetSize(m.width, availableHeight)
+	// Update sizes dynamically — use mainW so components don't overflow
+	m.list.SetSize(mainW, availableHeight)
+	m.det.SetSize(mainW, availableHeight)
+	m.pal.SetSize(mainW, availableHeight)
+	m.pm.SetSize(mainW, availableHeight)
+	m.set.SetSize(mainW, availableHeight)
+	m.hlp.SetSize(mainW, availableHeight)
+	m.tm.SetSize(mainW, availableHeight)
+	m.iem.SetSize(mainW, availableHeight)
 	if m.edit != nil {
-		m.edit.SetSize(m.width, availableHeight)
+		m.edit.SetSize(mainW, availableHeight)
+	}
+	if m.aiPanel.Visible {
+		m.aiPanel.SetSizeExact(aiPanelW, availableHeight)
 	}
 
 	// Sync animation state to tasklist
@@ -1104,31 +1275,29 @@ func (m *Model) renderMainUI() string {
 		} else {
 			body = m.list.View()
 		}
+	case ModeImportExport:
+		body = m.iem.View()
 	default:
 		body = m.list.View()
 	}
 
 	// Ensure body fills its allocated height.
-	// The outer FillViewport handles width filling and ANSI reset fixup.
 	body = lipgloss.NewStyle().
 		Height(availableHeight).
-		Width(m.width).
+		Width(mainW).
 		Background(m.s.Theme.Bg).
 		Render(body)
 
 	// Cinematic "vertical split" reveal (masking effect)
-	// Uses Linear easing over 250ms to expand the visible area from the center
-	// outwards at a constant speed, providing a premium, deliberate feel.
 	if m.transitioning && m.transitionProgress < 1.0 {
 		lines := strings.Split(body, "\n")
-		// We use availableHeight here to ensure the split mask respects the actual viewport
 		mid := availableHeight / 2
 		revealHalf := int(float64(mid) * m.transitionProgress)
 
 		emptyLine := lipgloss.NewStyle().
-			Width(m.width).
+			Width(mainW).
 			Background(m.s.Theme.Bg).
-			Render(strings.Repeat(" ", m.width))
+			Render(strings.Repeat(" ", mainW))
 
 		for i := 0; i < len(lines); i++ {
 			dist := i - mid
@@ -1142,7 +1311,90 @@ func (m *Model) renderMainUI() string {
 		body = strings.Join(lines, "\n")
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+	content := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+	if m.aiPanel.Visible {
+		return lipgloss.JoinHorizontal(lipgloss.Top, content, m.aiPanel.View())
+	}
+	return content
+}
+
+func (m *Model) startAIStreamCmd(prompt string) tea.Cmd {
+	return func() tea.Msg {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r // absorb panics from network/channel teardown
+			}
+		}()
+
+		if m.aiClient == nil {
+			if m.aiKey == "" {
+				return ai_panel.AIChunkMsg{Chunk: ai.StreamChunk{Err: fmt.Errorf("API key not set. Go to settings (ctrl+s) to add it")}}
+			}
+			var err error
+			m.aiClient, err = ai.NewClient(m.ctx, m.aiKey, m.cfg.App.AIModel)
+			if err != nil {
+				return ai_panel.AIChunkMsg{Chunk: ai.StreamChunk{Err: err}}
+			}
+		}
+
+		appCtx := ai.AppContext{
+			ViewName: m.views[m.activeIdx].Title,
+			Data:     fmt.Sprintf("Tasks: %d, Tags: %v", len(m.all), m.tags),
+		}
+
+		ch, err := m.aiClient.ChatStream(m.ctx, m.aiPanel.History, prompt, appCtx)
+		if err != nil {
+			return ai_panel.AIChunkMsg{Chunk: ai.StreamChunk{Err: err}}
+		}
+
+		for chunk := range ch {
+			select {
+			case <-m.ctx.Done():
+				return nil
+			case m.aiChan <- ai_panel.AIChunkMsg{Chunk: chunk}:
+			}
+		}
+		return nil
+	}
+}
+
+func (m *Model) listenAICmd() tea.Cmd {
+	return func() tea.Msg {
+		return <-m.aiChan
+	}
+}
+
+type mcpStatusMsg struct {
+	Running bool
+}
+
+func (m *Model) startMCPCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.mcpRunning {
+			return nil
+		}
+		exe, _ := os.Executable()
+		cmd := exec.Command(exe, "mcp")
+		if err := cmd.Start(); err != nil {
+			return mcpStatusMsg{Running: false}
+		}
+		m.mcpCmd = cmd
+		m.mcpRunning = true
+		return mcpStatusMsg{Running: true}
+	}
+}
+
+func (m *Model) stopMCPCmd() tea.Cmd {
+	return func() tea.Msg {
+		if !m.mcpRunning || m.mcpCmd == nil {
+			return nil
+		}
+		_ = m.mcpCmd.Process.Kill()
+		_ = m.mcpCmd.Wait()
+		m.mcpCmd = nil
+		m.mcpRunning = false
+		return mcpStatusMsg{Running: false}
+	}
 }
 
 func (m *Model) rebuildComponentSizes() {
@@ -1153,6 +1405,24 @@ func (m *Model) rebuildComponentSizes() {
 // RainbowAnimationOffset int
 // And inside New():
 // m.RainbowAnimationOffset = 0
+
+// renderHeaderWithWidth renders the header at a specific width.
+func (m *Model) renderHeaderWithWidth(w int) string {
+	saved := m.width
+	m.width = w
+	result := m.renderHeader()
+	m.width = saved
+	return result
+}
+
+// renderFooterWithWidth renders the footer at a specific width.
+func (m *Model) renderFooterWithWidth(w int) string {
+	saved := m.width
+	m.width = w
+	result := m.renderFooter()
+	m.width = saved
+	return result
+}
 
 // Updated RenderHeader:
 func (m *Model) renderHeader() string {
@@ -1337,7 +1607,7 @@ func (m *Model) renderFooter() string {
 		delLeft := lipgloss.NewStyle().Foreground(m.s.Theme.Bad).Background(m.s.Theme.Bg).Render("")
 		delRight := lipgloss.NewStyle().Foreground(m.s.Theme.Bad).Background(m.s.Theme.Bg).Render("")
 		delPill := delLeft + m.s.BadgeDelete.Render("DELETE?") + delRight
-		left = " " + delPill + " " + makePill("y/enter confirm") + sep + makePill("n/esc cancel")
+		left = " " + delPill + " " + makePill("y/enter confirm") + sep + makePill("a delete all") + sep + makePill("n/esc cancel")
 	case ModeConfirmQuit:
 		quitLeft := lipgloss.NewStyle().Foreground(m.s.Theme.Warn).Background(m.s.Theme.Bg).Render("")
 		quitRight := lipgloss.NewStyle().Foreground(m.s.Theme.Warn).Background(m.s.Theme.Bg).Render("")
@@ -1380,6 +1650,7 @@ func (m *Model) renderFooter() string {
 					makePill(fk(m.km.ToggleStrike) + " " + styles.IconStrike + "done"),
 					makePill(fk(m.km.DeleteTask) + " " + styles.IconDelete + "delete"),
 					makePill(fk(m.km.Settings) + " settings"),
+					makePill(fk(m.km.AIPanelToggle) + " assistant"),
 					makePill(fk(m.km.Help) + " " + styles.IconHelp + "help"),
 				}
 				left = " " + strings.Join(items, sep)
@@ -1412,7 +1683,11 @@ func (m *Model) renderFooter() string {
 			}
 			versionText = fmt.Sprintf("Update: %s → %s", cur, lat)
 		}
-		right = makePill(syncLogo+versionText) + " "
+		mcpStatus := ""
+		if m.mcpRunning {
+			mcpStatus = makePill("MCP "+styles.IconSuccess) + " "
+		}
+		right = mcpStatus + makePill(syncLogo+versionText) + " "
 	}
 
 	return render.BarLine(left, right, m.width, m.s.Theme.Bg)
@@ -1476,14 +1751,29 @@ func (m *Model) setActiveView(id core.ViewID) {
 
 func (m *Model) rebuildViews() {
 	base := core.DefaultViews(time.Now())
+	var pluginThemes []theme.Theme
 	if m.plugHost != nil {
 		for _, v := range m.plugHost.Views() {
 			base = append(base, core.View{ID: core.ViewID(v.ID), Title: v.Title, Filter: v.Filter})
 		}
+		pluginThemes = m.plugHost.Themes()
 	}
 	m.views = base
 	if m.activeIdx >= len(m.views) {
 		m.activeIdx = 0
+	}
+
+	// Re-initialize components that depend on plugin data
+	m.tm = theme_menu.New(m.s, pluginThemes)
+
+	// If current theme is a plugin theme, refresh it (in case it changed)
+	for _, pt := range pluginThemes {
+		if pt.Name == m.cfg.App.Theme {
+			m.thBuiltin = pt
+			m.theme = applyThemeOverride(pt, m.cfg.Theme)
+			m.refreshStyles()
+			break
+		}
 	}
 }
 
@@ -1570,6 +1860,15 @@ func (m *Model) deleteTaskCmd(id string) tea.Cmd {
 	}
 }
 
+func (m *Model) deleteAllTasksCmd() tea.Cmd {
+	return func() tea.Msg {
+		if err := m.svc.DeleteAll(m.ctx); err != nil {
+			return errMsg{Err: err}
+		}
+		return taskUpdatedMsg{} // Trigger reload
+	}
+}
+
 func (m *Model) strikeAnimationTickCmd(taskID string) tea.Cmd {
 	gen := m.animationGen
 	return tea.Tick(16*time.Millisecond, func(time.Time) tea.Msg {
@@ -1626,8 +1925,14 @@ func (m *Model) refreshStyles() {
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
-	m.tm = theme_menu.New(m.s)
+	var pluginThemes []theme.Theme
+	if m.plugHost != nil {
+		pluginThemes = m.plugHost.Themes()
+	}
+	m.tm = theme_menu.New(m.s, pluginThemes)
 	m.pm = plugin_menu.New(m.s)
+	m.iem = import_export_menu.New(m.s)
+	m.aiPanel.SetStyles(m.s)
 
 	// Reinitialize tag filter input with new styles
 	tagInput := textinput.New()
@@ -1654,6 +1959,7 @@ func (m *Model) rebuildPaletteIndex() {
 		search.Item{ID: "cmd:view:completed", Kind: search.KindCommand, Title: "View: Completed", Hint: "4"},
 		search.Item{ID: "cmd:view:tag", Kind: search.KindCommand, Title: "View: By Tag", Hint: "f"},
 		search.Item{ID: "cmd:view:priority", Kind: search.KindCommand, Title: "View: By Priority", Hint: "5"},
+		search.Item{ID: "cmd:import-export", Kind: search.KindCommand, Title: "Import/Export", Hint: "x"},
 	)
 
 	for _, t := range m.tags {
@@ -1755,6 +2061,9 @@ func (m *Model) runCommand(id string) tea.Cmd {
 		return m.loadTasksCmd()
 	case "cmd:sync":
 		return m.syncNowCmd()
+	case "cmd:import-export":
+		m.mode = ModeImportExport
+		return nil
 	}
 
 	if strings.HasPrefix(id, "cmd:view:plugin:") {
@@ -1885,4 +2194,54 @@ func keymapMatch(b interface{ Keys() []string }, k tea.KeyMsg) bool {
 		}
 	}
 	return false
+}
+func (m *Model) handleImportExportAction(action import_export_menu.Action, path string) tea.Cmd {
+	return func() tea.Msg {
+		taskAPI := api.New(m.svc)
+		var resp api.Response
+
+		if action.IsExport() {
+			req := api.Request{
+				Action:  "export",
+				Payload: []byte(fmt.Sprintf(`{"format":"%s"}`, action.Format())),
+			}
+			resp = taskAPI.Execute(m.ctx, req)
+			if resp.Success {
+				data, ok := resp.Data.(string)
+				if !ok {
+					return errMsg{Err: errors.New("invalid response from API")}
+				}
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil && filepath.Dir(path) != "." {
+					return errMsg{Err: err}
+				}
+				if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+					return errMsg{Err: err}
+				}
+				m.statusText = fmt.Sprintf("Exported to %s", path)
+				m.isErr = false
+				return nil
+			}
+		} else {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return errMsg{Err: err}
+			}
+			req := api.Request{
+				Action:  "import",
+				Payload: []byte(fmt.Sprintf(`{"format":"%s", "data":%q}`, action.Format(), string(data))),
+			}
+			resp = taskAPI.Execute(m.ctx, req)
+			if resp.Success {
+				msg, _ := resp.Data.(string)
+				m.statusText = msg
+				m.isErr = false
+				return taskUpdatedMsg{} // Trigger reload
+			}
+		}
+
+		if resp.Error != "" {
+			return errMsg{Err: errors.New(resp.Error)}
+		}
+		return nil
+	}
 }
