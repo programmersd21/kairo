@@ -17,8 +17,8 @@ builds:
 
     goos:
       - linux
-      - windows
       - darwin
+      - windows
 
     goarch:
       - amd64
@@ -36,12 +36,17 @@ builds:
       - -X github.com/programmersd21/kairo/internal/buildinfo.Date={{ .CommitDate }}
 
 archives:
-  - id: default
-    formats: [tar.gz]
+  - id: kairo
+    builds:
+      - kairo
+
+    formats:
+      - tar.gz
 
     format_overrides:
       - goos: windows
-        formats: [zip]
+        formats:
+          - zip
 
     name_template: >-
       {{ .ProjectName }}_{{ .Os }}_{{ if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
@@ -77,6 +82,12 @@ release:
 homebrew_casks:
   - name: kairo
 
+    ids:
+      - kairo
+
+    binaries:
+      - kairo
+
     repository:
       owner: programmersd21
       name: kairo_tap
@@ -88,8 +99,4 @@ homebrew_casks:
 
     homepage: "https://github.com/programmersd21/kairo"
     description: "Minimal, powerful task management"
-    license: "MIT"
-
-    ids:
-      - kairo
-      
+    
