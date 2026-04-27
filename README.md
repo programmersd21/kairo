@@ -50,6 +50,7 @@ kairo
 ```
 
 Press `n` → create your first task.
+Done writing? → `ctrl+s` to save your task!
 
 ---
 
@@ -275,7 +276,7 @@ Auto-generated on first run:
 * macOS: `~/Library/Application Support/kairo/config.toml`
 * Windows: `%APPDATA%\\kairo\\config.toml`
 
-In-app config: `ctrl+s`
+In-app config: `ctrl+s` (settings menu)
 
 ---
 
