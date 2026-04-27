@@ -50,6 +50,7 @@ kairo
 ```
 
 Press `n` → create your first task.
+
 Done writing? → `ctrl+s` to save your task!
 
 ---
