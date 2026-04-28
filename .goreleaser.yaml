@@ -79,24 +79,35 @@ release:
   draft: false
   prerelease: auto
 
-homebrew_casks:
+brews:
   - name: kairo
 
     ids:
       - kairo
 
-    binaries:
-      - kairo
-
     repository:
       owner: programmersd21
-      name: kairo_tap
+      name: homebrew-kairo
+      branch: main
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
 
-    directory: Casks
-
-    commit_msg_template: "Brew cask update for {{ .ProjectName }} {{ .Tag }}"
+    directory: Formula
 
     homepage: "https://github.com/programmersd21/kairo"
     description: "Minimal, powerful task management"
+    license: "MIT"
+
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+    commit_msg_template: "brew: update {{ .ProjectName }} to {{ .Tag }}"
+
+    install: |
+      bin.install "kairo"
+
+    test: |
+      system "#{bin}/kairo", "--version"
+
+    skip_upload: auto
     

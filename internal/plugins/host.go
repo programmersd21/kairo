@@ -200,6 +200,10 @@ func (h *Host) RunCommand(ctx context.Context, fullID string) error {
 	defer L.Close()
 
 	eng := klua.NewEngine(h.service, h.service.Hooks())
+	h.mu.RLock()
+	nf := h.notifyFunc
+	h.mu.RUnlock()
+	eng.SetNotifyFunc(nf)
 	eng.SetupKairoAPI(L)
 
 	if err := L.DoFile(ref.Path); err != nil {
@@ -292,6 +296,10 @@ func (h *Host) loadOne(path string) (PluginInfo, []CommandInfo, []ViewInfo, []th
 	defer L.Close()
 
 	eng := klua.NewEngine(h.service, h.service.Hooks())
+	h.mu.RLock()
+	nf := h.notifyFunc
+	h.mu.RUnlock()
+	eng.SetNotifyFunc(nf)
 	eng.SetupKairoAPI(L)
 
 	if err := L.DoFile(path); err != nil {

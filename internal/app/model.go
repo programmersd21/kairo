@@ -145,6 +145,7 @@ type Model struct {
 
 	statusText string
 	isErr      bool
+	statusID   int
 
 	updateAvailable *updateAvailableMsg
 
@@ -152,6 +153,7 @@ type Model struct {
 
 	plugHost *plugins.Host
 	plugCh   chan struct{}
+	statusCh chan statusMsg
 	configCh chan config.Config
 
 	RainbowAnimationOffset int
@@ -283,9 +285,12 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 		if dir != "" {
 			_ = os.MkdirAll(dir, 0o755)
 			m.plugHost = plugins.New(svc, dir)
+			m.statusCh = make(chan statusMsg, 8)
 			m.plugHost.SetNotifyFunc(func(msg string, isErr bool) {
-				m.statusText = msg
-				m.isErr = isErr
+				select {
+				case m.statusCh <- statusMsg{Message: msg, IsErr: isErr}:
+				default:
+				}
 			})
 			_ = m.plugHost.LoadAll()
 
@@ -343,6 +348,9 @@ func (m *Model) Init() tea.Cmd {
 	if m.plugCh != nil {
 		cmds = append(cmds, m.listenPluginsCmd())
 	}
+	if m.statusCh != nil {
+		cmds = append(cmds, m.listenStatusCmd())
+	}
 	if m.configCh != nil {
 		cmds = append(cmds, m.listenConfigCmd())
 	}
@@ -395,6 +403,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		m.statusText = x.Err.Error()
 		m.isErr = true
+		m.statusID++
+		return m, m.clearStatusCmd(m.statusID)
+
+	case statusMsg:
+		m.statusText = x.Message
+		m.isErr = x.IsErr
+		m.statusID++
+		return m, tea.Batch(m.listenStatusCmd(), m.clearStatusCmd(m.statusID))
+
+	case clearStatusMsg:
+		if x.ID == m.statusID {
+			m.statusText = ""
+			m.isErr = false
+		}
 		return m, nil
 
 	case tasksLoadedMsg:
@@ -1377,7 +1399,11 @@ func (m *Model) startMCPCmd() tea.Cmd {
 			return nil
 		}
 		exe, _ := os.Executable()
-		cmd := exec.Command(exe, "mcp")
+		args := []string{"mcp"}
+		if m.cfg.App.MCPPort != "" {
+			args = append(args, m.cfg.App.MCPPort)
+		}
+		cmd := exec.Command(exe, args...)
 		if err := cmd.Start(); err != nil {
 			return mcpStatusMsg{Running: false}
 		}
@@ -2197,6 +2223,18 @@ func keymapMatch(b interface{ Keys() []string }, k tea.KeyMsg) bool {
 		}
 	}
 	return false
+}
+
+func (m *Model) listenStatusCmd() tea.Cmd {
+	return func() tea.Msg {
+		return <-m.statusCh
+	}
+}
+
+func (m *Model) clearStatusCmd(id int) tea.Cmd {
+	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
+		return clearStatusMsg{ID: id}
+	})
 }
 func (m *Model) handleImportExportAction(action import_export_menu.Action, path string) tea.Cmd {
 	return func() tea.Msg {

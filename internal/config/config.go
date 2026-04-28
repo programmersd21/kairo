@@ -29,6 +29,7 @@ type AppConfig struct {
 	GeminiAPIKey string `toml:"gemini_api_key"`
 	AIModel      string `toml:"ai_model"`
 	MCPEnabled   bool   `toml:"mcp_enabled"`
+	MCPPort      string `toml:"mcp_port"`
 }
 
 type StorageConfig struct {
@@ -93,11 +94,13 @@ type KeymapConfig struct {
 func Default() Config {
 	return Config{
 		App: AppConfig{
-			Theme:    "catppuccin",
-			VimMode:  false,
-			ShowHelp: true,
-			Rainbow:  false,
-			AIModel:  "gemini-3.1-flash-lite-preview",
+			Theme:      "catppuccin",
+			VimMode:    false,
+			ShowHelp:   true,
+			Rainbow:    false,
+			AIModel:    "gemini-3.1-flash-lite-preview",
+			MCPEnabled: false,
+			MCPPort:    "8080",
 		},
 		Theme: ThemeConfig{
 			Bg:      "", // Use theme default

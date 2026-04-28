@@ -58,7 +58,56 @@ func DeleteTaskHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 
 func ListTasksHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args, _ := req.Params.Arguments.(map[string]interface{})
+
+	// Convert "status" string to "statuses" slice as expected by API handleList
+	if st, ok := args["status"].(string); ok && st != "" {
+		args["statuses"] = []string{st}
+		delete(args, "status")
+	}
+
 	return runAPI(ctx, "list", args)
+}
+
+func GetTaskHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args, _ := req.Params.Arguments.(map[string]interface{})
+	return runAPI(ctx, "get", args)
+}
+
+func ListTagsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return runAPI(ctx, "list_tags", nil)
+}
+
+func AllTasksResourceHandler(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	taskAPI := api.New(globalSvc)
+	resp := taskAPI.Execute(ctx, api.Request{Action: "list", Payload: []byte("{}")})
+	if !resp.Success {
+		return nil, nil // Return empty if error
+	}
+	b, _ := json.MarshalIndent(resp.Data, "", "  ")
+	return []mcp.ResourceContents{
+		mcp.TextResourceContents{
+			URI:      "tasks://all",
+			MIMEType: "application/json",
+			Text:     string(b),
+		},
+	}, nil
+}
+
+func ManageTasksPromptHandler(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	focus := req.Params.Arguments["focus"]
+	if focus == "" {
+		focus = "your upcoming deadlines and priorities"
+	}
+
+	return mcp.NewGetPromptResult(
+		"A prompt to help you manage your tasks",
+		[]mcp.PromptMessage{
+			mcp.NewPromptMessage(
+				mcp.RoleUser,
+				mcp.NewTextContent("I want to manage my Kairo tasks. Please focus on "+focus+". List my current tasks and suggest what I should work on next."),
+			),
+		},
+	), nil
 }
 
 func SetThemeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

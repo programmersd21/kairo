@@ -22,7 +22,7 @@ Pick your platform:
 ### 🍺 macOS (Homebrew)
 
 ```bash
-brew tap programmersd21/kairo_tap && brew install --cask kairo
+brew install programmersd21/kairo/kairo
 ```
 
 ### 🐧 Linux / macOS (curl)
@@ -96,7 +96,10 @@ Kairo is the missing middle:
 
 * Lua plugin system (event hooks: task_create, task_update, app_start, etc.)
 * Headless CLI API for automation
-* MCP server exposing full task schema to AI agents
+* **Professional MCP Server**: Full Model Context Protocol implementation
+    * **Tools**: CRUD operations, tag listing, and theme management
+    * **Resources**: Direct access to JSON task data (`tasks://all`)
+    * **Prompts**: Pre-configured AI workflows (`manage_tasks`)
 * Custom themes via Lua or config
 
 ### 🤖 AI (optional)
@@ -109,6 +112,7 @@ Kairo is the missing middle:
 ### 🎨 Terminal UI
 
 * Bento-style layout with Lip Gloss styling
+* **Markdown Preview**: Side-by-side real-time rendering in the task editor (`ctrl+p`)
 * 32 built-in themes (dark/light/hybrid)
 * Live theme switching (`t`)
 * Full-viewport rendering (no terminal bleed-through)
@@ -140,7 +144,8 @@ kairo api list --tag work
 kairo api update --id <id> --status done
 kairo export --format markdown
 kairo sync
-kairo mcp
+kairo mcp        # stdio mode (local)
+kairo mcp 8080   # sse mode (remote)
 ```
 
 ---

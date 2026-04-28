@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -143,7 +144,7 @@ func main() {
 			}
 			return
 		case "mcp":
-			if err := runMCP(ctx, svc); err != nil {
+			if err := runMCP(ctx, svc, os.Args[2:]); err != nil {
 				fmt.Fprintln(os.Stderr, "kairo mcp:", err)
 				os.Exit(2)
 			}
@@ -360,6 +361,7 @@ func runHelp(args []string) {
 		fmt.Println("  completion  Generate shell completion scripts")
 		fmt.Println("  export      Export tasks to JSON or Markdown")
 		fmt.Println("  import      Import tasks from JSON or Markdown")
+		fmt.Println("  mcp         Run the built-in MCP server")
 		fmt.Println("  sync        Sync tasks with Git repository")
 		fmt.Println("  update      Update Kairo to the latest version")
 		fmt.Println("  version     Show the current version")
@@ -394,12 +396,54 @@ func runHelp(args []string) {
 		fmt.Println("Sync tasks with Git repository.")
 		fmt.Println("\nUsage:")
 		fmt.Println("  kairo sync")
+	case "mcp":
+		fmt.Println("Run the built-in Model Context Protocol (MCP) server.")
+		fmt.Println("\nUsage:")
+		fmt.Println("  kairo mcp [port]")
+		fmt.Println("\nExample:")
+		fmt.Println("  kairo mcp        (Runs in Stdio mode for local AI agents)")
+		fmt.Println("  kairo mcp 8080   (Runs in SSE/HTTP mode on port 8080)")
+		fmt.Println("\nDescription:")
+		fmt.Println("  Exposes your Kairo tasks and tools to AI agents using the MCP standard.")
+		fmt.Println("  Stdio mode is used for local integration (e.g. Claude Desktop).")
+		fmt.Println("  SSE mode allows remote connections via HTTP.")
 	default:
 		fmt.Printf("Unknown help topic %q\n", args[0])
 	}
 }
-func runMCP(ctx context.Context, svc service.TaskService) error {
+func runMCP(ctx context.Context, svc service.TaskService, args []string) error {
 	s := mcp.NewServer(svc)
+
+	cfg, _ := config.Load()
+	port := os.Getenv("KAIRO_MCP_PORT")
+	if port == "" {
+		port = cfg.App.MCPPort
+	}
+	if len(args) > 0 {
+		port = args[0]
+	}
+
+	if port != "" {
+		addr := ":" + port
+		baseURL := "http://localhost" + addr
+		sseServer := mcpserver.NewSSEServer(s, mcpserver.WithBaseURL(baseURL))
+
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			sseServer.ServeHTTP(w, r)
+		})
+
+		fmt.Printf("Starting Kairo MCP SSE server on %s (CORS enabled)\n", addr)
+		fmt.Printf("SSE endpoint: %s/sse\n", baseURL)
+		return http.ListenAndServe(addr, handler)
+	}
+
 	server := mcpserver.NewStdioServer(s)
 	return server.Listen(ctx, os.Stdin, os.Stdout)
 }

@@ -15,6 +15,8 @@ func NewServer(svc service.TaskService) *server.MCPServer {
 		"kairo-mcp",
 		buildinfo.EffectiveVersion(),
 		server.WithToolCapabilities(true),
+		server.WithResourceCapabilities(true, true),
+		server.WithPromptCapabilities(true),
 	)
 
 	s.AddTool(mcp.NewTool("kairo_create_task",
@@ -39,13 +41,26 @@ func NewServer(svc service.TaskService) *server.MCPServer {
 	), UpdateTaskHandler)
 
 	s.AddTool(mcp.NewTool("kairo_list_tasks",
-		mcp.WithDescription("List all tasks"),
+		mcp.WithDescription("List tasks with optional filters"),
+		mcp.WithString("status", mcp.Description("Filter by status: todo, doing, or done")),
+		mcp.WithString("tags", mcp.Description("Filter by tags (comma-separated)")),
+		mcp.WithNumber("priority", mcp.Description("Filter by priority (0-3)")),
+		mcp.WithString("sort", mcp.Description("Sort by: created, updated, deadline, priority")),
 	), ListTasksHandler)
+
+	s.AddTool(mcp.NewTool("kairo_get_task",
+		mcp.WithDescription("Get full details of a specific task"),
+		mcp.WithString("id", mcp.Required(), mcp.Description("ID of the task")),
+	), GetTaskHandler)
 
 	s.AddTool(mcp.NewTool("kairo_delete_task",
 		mcp.WithDescription("Delete a task by ID"),
 		mcp.WithString("id", mcp.Required()),
 	), DeleteTaskHandler)
+
+	s.AddTool(mcp.NewTool("kairo_list_tags",
+		mcp.WithDescription("List all unique tags used across all tasks"),
+	), ListTagsHandler)
 
 	s.AddTool(mcp.NewTool("kairo_set_theme",
 		mcp.WithDescription("Change the UI theme of Kairo"),
@@ -71,6 +86,18 @@ func NewServer(svc service.TaskService) *server.MCPServer {
 		mcp.WithDescription("Delete a plugin"),
 		mcp.WithString("name", mcp.Required(), mcp.Description("Name of the plugin file")),
 	), PluginDeleteHandler)
+
+	// Add Resources
+	s.AddResource(mcp.NewResource("tasks://all", "All Tasks",
+		mcp.WithResourceDescription("A list of all tasks in the Kairo database"),
+		mcp.WithMIMEType("application/json"),
+	), AllTasksResourceHandler)
+
+	// Add Prompts
+	s.AddPrompt(mcp.NewPrompt("manage_tasks",
+		mcp.WithPromptDescription("Get help managing your daily tasks in Kairo"),
+		mcp.WithArgument("focus", mcp.ArgumentDescription("What area of your life to focus on (e.g. work, personal)")),
+	), ManageTasksPromptHandler)
 
 	return s
 }

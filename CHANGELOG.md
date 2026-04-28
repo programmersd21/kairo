@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* **Markdown Preview Panel**: The task editor now features a side-by-side markdown preview panel (toggled with `ctrl+p` or automatically on wide screens) for real-time visualization of task descriptions.
+* **Plugin Notification API**: Connected the Lua `kairo.notify` function to the TUI status bar, allowing plugins to provide visual feedback directly to the user.
+* **Fixed Plugin Notifications**: Resolved an issue where plugin notifications were not appearing in the status bar due to missing async message handling.
+* **MCP Server Port Control**: Added support for running the built-in MCP server in SSE/HTTP mode on a specific port (`kairo mcp <port>`).
+* **MCP Configuration**: Added `mcp_port` setting to `config.toml` and `KAIRO_MCP_PORT` environment variable support for flexible port overrides and auto-start configuration.
+* **REAL MCP Server Enhancements**: Transformed the built-in MCP server into a professional-grade implementation with support for Resources (`tasks://all`), Prompts (`manage_tasks`), and expanded Tools (including `kairo_get_task` and `kairo_list_tags`).
 * **AI Total App Control**: Updated the AI Assistant's system prompt and tool definitions to enable seamless control over UI themes and Lua plugins.
 * **Help Menu Clarity**: Added dedicated keybinding information for the Import/Export menu to the global help screen.
 

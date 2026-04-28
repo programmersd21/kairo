@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/programmersd21/kairo/internal/core"
@@ -51,6 +52,9 @@ type Model struct {
 	deadlinePreview string
 	deadlineValue   *time.Time
 	deadlineErr     string
+
+	showPreview bool
+	renderer    *glamour.TermRenderer
 }
 
 func New(s styles.Styles, mode Mode, t core.Task) Model {
@@ -96,16 +100,17 @@ func New(s styles.Styles, mode Mode, t core.Task) Model {
 	d.ShowLineNumbers = false
 
 	m := Model{
-		styles:   s,
-		mode:     mode,
-		orig:     t,
-		title:    ti,
-		tags:     tags,
-		priority: pr,
-		deadline: dl,
-		status:   st,
-		desc:     d,
-		focus:    0,
+		styles:      s,
+		mode:        mode,
+		orig:        t,
+		title:       ti,
+		tags:        tags,
+		priority:    pr,
+		deadline:    dl,
+		status:      st,
+		desc:        d,
+		focus:       0,
+		showPreview: true,
 	}
 	m.recomputeDeadline()
 	return m
@@ -113,13 +118,33 @@ func New(s styles.Styles, mode Mode, t core.Task) Model {
 
 func (m *Model) SetSize(w, h int) {
 	m.width, m.height = w, h
-	m.desc.SetWidth(max(20, min(76, w-10)))
+
+	// Base sizes
+	editorW := max(20, min(80, w-10))
+	if w > 120 && m.showPreview {
+		editorW = w / 2
+	}
+
+	m.desc.SetWidth(max(20, editorW-10))
 	m.desc.SetHeight(max(4, h-16))
-	m.title.Width = max(20, min(60, w-20))
-	m.tags.Width = max(20, min(60, w-20))
+	m.title.Width = max(20, editorW-20)
+	m.tags.Width = max(20, editorW-20)
 	m.priority.Width = 6
-	m.deadline.Width = max(20, min(60, w-20))
+	m.deadline.Width = max(20, editorW-20)
 	m.status.Width = 10
+
+	// Recreate renderer with new width
+	style := "dark"
+	if m.styles.Theme.IsLight {
+		style = "light"
+	}
+
+	previewW := w - editorW - 10
+	r, _ := glamour.NewTermRenderer(
+		glamour.WithStandardStyle(style),
+		glamour.WithWordWrap(max(20, previewW-4)),
+	)
+	m.renderer = r
 }
 
 func (m Model) Init() tea.Cmd { return textinput.Blink }
@@ -145,6 +170,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		case "ctrl+s":
 			return m, m.saveCmd()
+		case "ctrl+p":
+			m.showPreview = !m.showPreview
+			m.SetSize(m.width, m.height)
+			return m, nil
 		}
 	}
 
@@ -175,7 +204,12 @@ func (m Model) View() string {
 	if w <= 0 {
 		w = 80
 	}
+
+	useSplit := m.width > 120 && m.showPreview
 	cardW := min(84, w-6)
+	if useSplit {
+		cardW = m.width - 4
+	}
 
 	titleText := "NEW TASK"
 	if m.mode == ModeEdit {
@@ -203,10 +237,37 @@ func (m Model) View() string {
 	descView := m.desc.View()
 	fields = append(fields, "", lipgloss.NewStyle().Padding(0, 2).Render(descView))
 
-	content := lipgloss.JoinVertical(lipgloss.Left, fields...)
+	editorContent := lipgloss.JoinVertical(lipgloss.Left, fields...)
+
+	var finalContent string
+	if useSplit {
+		previewContent := "No description"
+		if strings.TrimSpace(m.desc.Value()) != "" {
+			var err error
+			previewContent, err = m.renderer.Render(m.desc.Value())
+			if err != nil {
+				previewContent = m.styles.Error.Render("Preview error: " + err.Error())
+			}
+		}
+
+		previewBox := lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(m.styles.Theme.Border).
+			Padding(0, 2).
+			Height(m.height - 10).
+			Width(m.width - (m.width / 2) - 10).
+			Render(previewContent)
+
+		finalContent = lipgloss.JoinHorizontal(lipgloss.Top,
+			lipgloss.NewStyle().Width(m.width/2).Render(editorContent),
+			previewBox,
+		)
+	} else {
+		finalContent = editorContent
+	}
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-		m.styles.Overlay.Width(cardW).Render(content),
+		m.styles.Overlay.Width(cardW).Render(finalContent),
 		lipgloss.WithWhitespaceBackground(m.styles.Theme.Bg),
 	)
 }

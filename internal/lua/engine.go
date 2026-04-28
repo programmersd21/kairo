@@ -16,9 +16,10 @@ import (
 
 // Engine manages the Lua runtime and plugin execution
 type Engine struct {
-	service service.TaskService
-	hooks   *hooks.Manager
-	timeout time.Duration
+	service    service.TaskService
+	hooks      *hooks.Manager
+	notifyFunc func(string, bool)
+	timeout    time.Duration
 }
 
 // NewEngine creates a new Lua engine with the given service and hooks
@@ -28,6 +29,11 @@ func NewEngine(svc service.TaskService, hks *hooks.Manager) *Engine {
 		hooks:   hks,
 		timeout: 5 * time.Second, // Default 5 second timeout for plugin execution
 	}
+}
+
+// SetNotifyFunc sets the notification callback for plugins
+func (e *Engine) SetNotifyFunc(f func(string, bool)) {
+	e.notifyFunc = f
 }
 
 // SetTimeout sets the execution timeout for plugin code
@@ -55,7 +61,7 @@ func (e *Engine) SetupKairoAPI(L *lua.LState) {
 	L.SetField(kairo, "notify", L.NewFunction(e.luaNotify))
 
 	// Meta
-	L.SetField(kairo, "version", lua.LString("1.3.1"))
+	L.SetField(kairo, "version", lua.LString("1.3.2"))
 
 	// Set as global
 	L.SetGlobal("kairo", kairo)
@@ -308,8 +314,7 @@ func (e *Engine) luaOff(L *lua.LState) int {
 	return 0
 }
 
-// luaNotify sends a notification (stub for now)
-// In production, this would emit to the UI
+// luaNotify sends a notification
 func (e *Engine) luaNotify(L *lua.LState) int {
 	msg := L.CheckString(1)
 	isErr := false
@@ -317,9 +322,9 @@ func (e *Engine) luaNotify(L *lua.LState) int {
 		isErr = lua.LVAsBool(L.Get(2))
 	}
 
-	// TODO: Emit notification to UI
-	_ = msg
-	_ = isErr
+	if e.notifyFunc != nil {
+		e.notifyFunc(msg, isErr)
+	}
 
 	return 0
 }

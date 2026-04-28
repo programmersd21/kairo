@@ -8,6 +8,15 @@ type tasksLoadedMsg struct{ Tasks []core.Task }
 type tagsLoadedMsg struct{ Tags []string }
 type allTasksLoadedMsg struct{ Tasks []core.Task }
 
+type statusMsg struct {
+	Message string
+	IsErr   bool
+}
+
+type clearStatusMsg struct {
+	ID int
+}
+
 type taskCreatedMsg struct{ Task core.Task }
 type taskUpdatedMsg struct{ Task core.Task }
 type taskDeletedMsg struct{ ID string }
