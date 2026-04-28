@@ -49,6 +49,10 @@ go install github.com/programmersd21/kairo/cmd/kairo@latest
 kairo
 ```
 
+> ⚠️ Rendering may break on some terminals.  
+> Works best on Alacritty.  
+> See [#16](https://github.com/programmersd21/kairo/issues/16)
+
 Press `n` → create your first task.
 
 Done writing? → `ctrl+s` to save your task!
