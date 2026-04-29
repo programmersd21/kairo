@@ -162,6 +162,8 @@ Available hooks: `task_create` · `task_update` · `task_delete` · `app_start` 
 
 Available API: `create_task`, `update_task`, `delete_task`, `list_tasks`, `on`, `notify`
 
+**Find sample plugins [here](https://github.com/programmersd21/kairo/tree/main/plugins).**
+
 ---
 
 ## 🧱 How it's built
