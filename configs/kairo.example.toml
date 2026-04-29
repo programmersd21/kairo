@@ -3,6 +3,10 @@ theme = "catppuccin"
 vim_mode = false
 show_help = true
 rainbow = false
+animations = true
+mcp_enabled = false
+mcp_port = "8080"
+ai_model = "gemini-3.1-flash-lite-preview"
 
 [theme]
 # Any field set here overrides the built-in theme colors.
@@ -53,3 +57,6 @@ help = "?"
 issues = "i"
 discussions = "u"
 changelog = "c"
+settings = "ctrl+s"
+import_export = "x"
+ai_panel_toggle = "ctrl+a"

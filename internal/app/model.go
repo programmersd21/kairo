@@ -218,7 +218,7 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 		tagFilterInput:         tagInput,
 		RainbowAnimationOffset: 0,
 	}
-	m.list = tasklist.New(m.s, cfg.App.VimMode, m.km)
+	m.list = tasklist.New(m.s, cfg.App.VimMode, cfg.App.Animations, m.km)
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
@@ -439,36 +439,48 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case palette.CloseMsg:
 		if m.mode == ModePalette {
 			m.mode = ModeList
-			m.transitioning = true
-			m.transitionStarted = time.Now()
-			return m, m.viewTransitionTickCmd()
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
 		}
 		return m, nil
 
 	case help.CloseMsg:
 		if m.mode == ModeHelp {
 			m.mode = ModeList
-			m.transitioning = true
-			m.transitionStarted = time.Now()
-			return m, m.viewTransitionTickCmd()
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
 		}
 		return m, nil
 
 	case theme_menu.CloseMsg:
 		if m.mode == ModeThemeMenu {
 			m.mode = ModeList
-			m.transitioning = true
-			m.transitionStarted = time.Now()
-			return m, m.viewTransitionTickCmd()
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
 		}
 		return m, nil
 
 	case settings.CloseMsg:
 		if m.mode == ModeSettings {
 			m.mode = ModeList
-			m.transitioning = true
-			m.transitionStarted = time.Now()
-			return m, m.viewTransitionTickCmd()
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
 		}
 		return m, nil
 
@@ -486,6 +498,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshStyles()
 		m.set.SetConfig(m.cfg)
 		m.set.SetStyles(m.s)
+		m.list.Animations = m.cfg.App.Animations // Sync animations setting to tasklist
 
 		m.rebuildViews()
 		m.rebuildPaletteIndex()
@@ -523,36 +536,49 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		_ = m.cfg.Save()
 		m.refreshStyles()
 		m.mode = ModeList
-		m.transitioning = true
-		m.transitionStarted = time.Now()
-		return m, m.viewTransitionTickCmd()
+		if m.cfg.App.Animations {
+			m.transitioning = true
+			m.transitionStarted = time.Now()
+			return m, m.viewTransitionTickCmd()
+		}
+		return m, nil
 
 	case plugin_menu.CloseMsg:
 		if m.mode == ModePluginMenu {
 			m.mode = ModeList
-			m.transitioning = true
-			m.transitionStarted = time.Now()
-			return m, m.viewTransitionTickCmd()
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
 		}
 		return m, nil
 
 	case import_export_menu.CloseMsg:
 		if m.mode == ModeImportExport {
 			m.mode = ModeList
-			m.transitioning = true
-			m.transitionStarted = time.Now()
-			return m, m.viewTransitionTickCmd()
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
 		}
 		return m, nil
 
 	case import_export_menu.SelectMsg:
 		if m.mode == ModeImportExport {
 			m.mode = ModeList
-			m.transitioning = true
-			m.transitionStarted = time.Now()
+			var animCmd tea.Cmd
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				animCmd = m.viewTransitionTickCmd()
+			}
 			return m, tea.Batch(
 				m.handleImportExportAction(x.Action, x.Path),
-				m.viewTransitionTickCmd(),
+				animCmd,
 			)
 		}
 		return m, nil
@@ -580,10 +606,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case plugin_menu.TransitionMsg:
 		if m.mode == ModePluginMenu {
-			m.transitioning = true
-			m.transitionStarted = time.Now()
-			m.animationGen++
-			return m, m.viewTransitionTickCmd()
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				m.animationGen++
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
 		}
 		return m, nil
 
@@ -621,9 +650,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tagFilter.Set(x.Item.ID)
 			m.prevActiveIdx = m.activeIdx
 			m.setActiveView(core.ViewTag)
-			m.rebuildComponentSizes() // Recalculate layout when filter changes
-			m.transitioning = true
-			m.transitionStarted = time.Now()
+			m.transitioning = m.cfg.App.Animations
+			if m.transitioning {
+				m.transitionStarted = time.Now()
+			}
 			return m, tea.Batch(m.loadTasksCmd(), m.viewTransitionTickCmd())
 		case search.KindCommand:
 			return m, m.runCommand(x.Item.ID)
@@ -632,12 +662,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case editor.CloseMsg:
 		if m.mode == ModeEditor {
-			m.edit = nil
 			m.mode = ModeList
-			m.transitioning = true
-			m.transitionStarted = time.Now()
-			m.animationGen++
-			return m, m.viewTransitionTickCmd()
+			if m.cfg.App.Animations {
+				m.transitioning = true
+				m.transitionStarted = time.Now()
+				m.animationGen++
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
 		}
 		return m, nil
 
@@ -657,7 +689,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loadTasksCmd(),
 			m.loadAllTasksCmd(),
 			m.syncIfEnabledCmd(),
-			m.bloomAnimationTickCmd(x.Task.ID),
+			func() tea.Cmd {
+				if m.cfg.App.Animations {
+					return m.bloomAnimationTickCmd(x.Task.ID)
+				}
+				return nil
+			}(),
 		)
 
 	case taskUpdatedMsg:
@@ -822,18 +859,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "y", "enter":
 				if t, ok := m.list.Selected(); ok {
 					m.mode = ModeList
-					m.deletingTaskID = t.ID
-					m.deleteStarted = time.Now()
-					m.deleteDuration = 600 * time.Millisecond
-					m.animationGen++
-					return m, m.deleteAnimationTickCmd(t.ID)
+					if m.cfg.App.Animations {
+						m.deletingTaskID = t.ID
+						m.deleteStarted = time.Now()
+						m.deleteDuration = 600 * time.Millisecond
+						m.animationGen++
+						return m, m.deleteAnimationTickCmd(t.ID)
+					}
+					return m, m.deleteTaskCmd(t.ID)
 				}
 			case "a":
 				m.mode = ModeList
-				m.transitioning = true
-				m.transitionStarted = time.Now()
-				m.animationGen++
-				return m, tea.Batch(m.deleteAllTasksCmd(), m.viewTransitionTickCmd())
+				var animCmd tea.Cmd
+				if m.cfg.App.Animations {
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					m.animationGen++
+					animCmd = m.viewTransitionTickCmd()
+				}
+				return m, tea.Batch(m.deleteAllTasksCmd(), animCmd)
 			case "n", "esc":
 				m.mode = ModeList
 				m.transitioning = true
@@ -902,10 +946,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.setActiveView(core.ViewTag)
 				m.rebuildComponentSizes()
 				m.mode = ModeList
-				m.transitioning = true
-				m.transitionStarted = time.Now()
-				m.animationGen++
-				return m, tea.Batch(m.loadTasksCmd(), m.viewTransitionTickCmd())
+				var animCmd tea.Cmd
+				if m.cfg.App.Animations {
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					m.animationGen++
+					animCmd = m.viewTransitionTickCmd()
+				}
+				return m, tea.Batch(m.loadTasksCmd(), animCmd)
 			case "ctrl+u":
 				// Clear the entire input
 				m.tagFilterInput.SetValue("")
@@ -941,17 +989,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Sub-menu specific toggles/actions that should work even in the menu themselves (to close them)
 			if keymapMatch(m.km.ManagePlugins, km) {
 				if m.mode == ModePluginMenu {
-					m.mode = ModeList
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, m.viewTransitionTickCmd()
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						return m, m.viewTransitionTickCmd()
+					}
+					return m, nil
 				}
 				if m.plugHost != nil {
 					m.pm.SetPlugins(m.plugHost.Plugins())
 					m.mode = ModePluginMenu
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, m.viewTransitionTickCmd()
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						return m, m.viewTransitionTickCmd()
+					}
+					return m, nil
 				}
 				return m, nil
 			}
@@ -963,30 +1016,44 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.applyPaletteIndex()
 					m.pal.SetPlaceholder("Search tasks, commands, tags…")
 					m.mode = ModePalette
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, tea.Batch(m.pal.Open(), m.viewTransitionTickCmd())
+					var animCmd tea.Cmd
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						animCmd = m.viewTransitionTickCmd()
+					}
+					return m, tea.Batch(m.pal.Open(), animCmd)
 				}
 				if keymapMatch(m.km.TaskSearch, km) {
 					m.palTasksOnly = true
 					m.applyPaletteIndex()
 					m.pal.SetPlaceholder("Search tasks…")
 					m.mode = ModePalette
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, tea.Batch(m.pal.Open(), m.viewTransitionTickCmd())
+					var animCmd tea.Cmd
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						animCmd = m.viewTransitionTickCmd()
+					}
+					return m, tea.Batch(m.pal.Open(), animCmd)
 				}
 				if keymapMatch(m.km.CycleTheme, km) {
 					m.mode = ModeThemeMenu
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, m.viewTransitionTickCmd()
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						return m, m.viewTransitionTickCmd()
+					}
+					return m, nil
 				}
 				if keymapMatch(m.km.ImportExport, km) {
 					m.mode = ModeImportExport
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, m.viewTransitionTickCmd()
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						return m, m.viewTransitionTickCmd()
+					}
+					return m, nil
 				}
 				if keymapMatch(m.km.OpenPluginDir, km) {
 					if m.plugHost != nil {
@@ -1005,9 +1072,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if keymapMatch(m.km.Help, km) {
 					m.mode = ModeHelp
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, m.viewTransitionTickCmd()
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						return m, m.viewTransitionTickCmd()
+					}
+					return m, nil
 				}
 				if keymapMatch(m.km.Issues, km) {
 					return m, openURLCmd("https://github.com/programmersd21/kairo/issues")
@@ -1020,9 +1090,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if keymapMatch(m.km.Settings, km) {
 					m.mode = ModeSettings
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, m.viewTransitionTickCmd()
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						return m, m.viewTransitionTickCmd()
+					}
+					return m, nil
 				}
 			}
 
@@ -1036,9 +1109,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.activeIdx = idx
 						m.tagFilter.Clear()
 						m.rebuildComponentSizes()
-						m.transitioning = true
-						m.transitionStarted = time.Now()
-						return m, tea.Batch(m.loadTasksCmd(), m.viewTransitionTickCmd())
+						var animCmd tea.Cmd
+						if m.cfg.App.Animations {
+							m.transitioning = true
+							m.transitionStarted = time.Now()
+							animCmd = m.viewTransitionTickCmd()
+						}
+						return m, tea.Batch(m.loadTasksCmd(), animCmd)
 					}
 				}
 
@@ -1051,18 +1128,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case km.String() == "tab":
 					m.prevActiveIdx = m.activeIdx
 					m.activeIdx = (m.activeIdx + 1) % len(m.views)
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, tea.Batch(m.loadTasksCmd(), m.viewTransitionTickCmd())
+					var animCmd tea.Cmd
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						animCmd = m.viewTransitionTickCmd()
+					}
+					return m, tea.Batch(m.loadTasksCmd(), animCmd)
 				case km.String() == "shift+tab":
 					m.prevActiveIdx = m.activeIdx
 					m.activeIdx--
 					if m.activeIdx < 0 {
 						m.activeIdx = len(m.views) - 1
 					}
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					return m, tea.Batch(m.loadTasksCmd(), m.viewTransitionTickCmd())
+					var animCmd tea.Cmd
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						animCmd = m.viewTransitionTickCmd()
+					}
+					return m, tea.Batch(m.loadTasksCmd(), animCmd)
 				case keymapMatch(m.km.NewTask, km):
 					task := core.Task{Status: core.StatusTodo, Priority: core.P1}
 					m.activeFilter().ApplyToTask(&task)
@@ -1087,11 +1172,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case keymapMatch(m.km.ToggleStrike, km):
 					if t, ok := m.list.Selected(); ok {
 						m.animationGen++
-						m.animatingTaskID = t.ID
-						m.animationStarted = time.Now()
-						m.animationDuration = 400 * time.Millisecond
 						m.animationReverse = (t.Status == core.StatusDone)
-						return m, m.strikeAnimationTickCmd(t.ID)
+						if m.cfg.App.Animations {
+							return m, m.strikeAnimationTickCmd(t.ID)
+						}
+						// No animation, just update
+						newStatus := core.StatusDone
+						if t.Status == core.StatusDone {
+							newStatus = core.StatusTodo
+						}
+						return m, m.updateTaskCmd(t.ID, core.TaskPatch{Status: &newStatus})
 					}
 				}
 			}
@@ -1099,10 +1189,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.mode == ModeDetail {
 				if keymapMatch(m.km.Back, km) {
 					m.mode = ModeList
-					m.transitioning = true
-					m.transitionStarted = time.Now()
-					m.animationGen++
-					return m, m.viewTransitionTickCmd()
+					if m.cfg.App.Animations {
+						m.transitioning = true
+						m.transitionStarted = time.Now()
+						m.animationGen++
+						return m, m.viewTransitionTickCmd()
+					}
+					return m, nil
 				}
 				if keymapMatch(m.km.EditTask, km) {
 					return m, m.fetchOpenEditCmd(m.det.Task().ID)
@@ -1110,11 +1203,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if keymapMatch(m.km.ToggleStrike, km) {
 					t := m.det.Task()
 					m.animationGen++
-					m.animatingTaskID = t.ID
-					m.animationStarted = time.Now()
-					m.animationDuration = 400 * time.Millisecond
 					m.animationReverse = (t.Status == core.StatusDone)
-					return m, m.strikeAnimationTickCmd(t.ID)
+					if m.cfg.App.Animations {
+						return m, m.strikeAnimationTickCmd(t.ID)
+					}
+					newStatus := core.StatusDone
+					if t.Status == core.StatusDone {
+						newStatus = core.StatusTodo
+					}
+					return m, m.updateTaskCmd(t.ID, core.TaskPatch{Status: &newStatus})
 				}
 			}
 		}
@@ -1948,7 +2045,7 @@ func (m *Model) fetchOpenEditCmd(id string) tea.Cmd {
 
 func (m *Model) refreshStyles() {
 	m.s = styles.New(m.theme)
-	m.list = tasklist.New(m.s, m.cfg.App.VimMode, m.km)
+	m.list = tasklist.New(m.s, m.cfg.App.VimMode, m.cfg.App.Animations, m.km)
 	m.list.SetTasks(m.tasks)
 	m.list.SetAllTasks(m.all)
 	m.pal = palette.New(m.s)

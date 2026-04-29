@@ -15,9 +15,10 @@ import (
 )
 
 type Model struct {
-	styles  styles.Styles
-	vimMode bool
-	km      keymap.Keymap
+	styles     styles.Styles
+	vimMode    bool
+	Animations bool
+	km         keymap.Keymap
 
 	width  int
 	height int
@@ -45,8 +46,8 @@ type Model struct {
 	lastKey string // For tracking key sequences like 'gg'
 }
 
-func New(s styles.Styles, vimMode bool, km keymap.Keymap) Model {
-	return Model{styles: s, vimMode: vimMode, km: km}
+func New(s styles.Styles, vimMode bool, animations bool, km keymap.Keymap) Model {
+	return Model{styles: s, vimMode: vimMode, Animations: animations, km: km}
 }
 
 func (m Model) Selected() (core.Task, bool) {
@@ -165,7 +166,7 @@ func (m Model) View() string {
 		t := m.tasks[i]
 
 		// Cascading reveal: wait until view transition reaches a threshold for this row
-		if m.ViewTransitioning && m.ViewTransitionProgress < 1.0 {
+		if m.Animations && m.ViewTransitioning && m.ViewTransitionProgress < 1.0 {
 			idx := i - start
 			startThresh := float64(idx) * 0.05
 			if m.ViewTransitionProgress < startThresh {
@@ -295,7 +296,7 @@ func (m Model) renderEmpty() string {
 func (m Model) renderRow(t core.Task, selected bool) string {
 	// Compute animation progress for strike (completion toggle).
 	// Progress is always clamped to [0, 1] — no overshoot.
-	isAnimating := m.animatingTaskID == t.ID && m.animatingTaskID != ""
+	isAnimating := m.Animations && m.animatingTaskID == t.ID && m.animatingTaskID != ""
 	animProgress := 0.0
 	if isAnimating {
 		elapsed := time.Since(m.animationStart)
@@ -308,7 +309,7 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	}
 
 	// Compute animation progress for bloom (new task creation).
-	isCreating := m.creatingTaskID == t.ID && m.creatingTaskID != ""
+	isCreating := m.Animations && m.creatingTaskID == t.ID && m.creatingTaskID != ""
 	creationProgress := 0.0
 	if isCreating {
 		elapsed := time.Since(m.creationStart)

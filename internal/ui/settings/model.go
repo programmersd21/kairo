@@ -56,6 +56,7 @@ func (m *Model) rebuildItems() {
 		{"Git Sync Enabled", "sync_enabled", "bool", m.cfg.Sync.Enabled},
 		{"Auto Push (Git)", "auto_push", "bool", m.cfg.Sync.AutoPush},
 		{"MCP Server Enabled", "mcp_enabled", "bool", m.cfg.App.MCPEnabled},
+		{"Animations", "animations", "bool", m.cfg.App.Animations},
 		{"AI Model (←/→)", "ai_model", "enum", m.cfg.App.AIModel},
 		{"Gemini API Key", "gemini_api_key", "string", m.cfg.App.GeminiAPIKey},
 		{"AI Assistant Shortcut", "ai_toggle", "string", m.cfg.Keymap.AIPanelToggle},
@@ -127,11 +128,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.rebuildItems()
 			_ = m.cfg.Save()
 			return m, func() tea.Msg { return ConfigChangedMsg{Config: m.cfg} }
-		case "up", "j":
+		case "up", "k":
 			if m.sel > 0 {
 				m.sel--
 			}
-		case "down", "k":
+		case "down", "j":
 			if m.sel < len(m.items)-1 {
 				m.sel++
 			}
@@ -181,6 +182,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.cfg.Sync.AutoPush = val
 				case "mcp_enabled":
 					m.cfg.App.MCPEnabled = val
+				case "animations":
+					m.cfg.App.Animations = val
 				}
 				m.rebuildItems()
 				// Save config immediately and notify app
@@ -255,7 +258,7 @@ func (m Model) View() string {
 	}
 
 	hint := m.styles.Muted.Render("\n Tip: You can edit 'config.toml' for advanced options.")
-	footer := m.styles.Muted.Render(" esc/ctrl+s close • 'g' open config • 'r' reset • enter toggle • 'j' move up • 'k' move down")
+	footer := m.styles.Muted.Render(" esc/ctrl+s close • 'g' open config • 'r' reset • enter toggle • 'j' move down • 'k' move up")
 	lines = append(lines, hint, footer)
 
 	return lipgloss.Place(w, m.height, lipgloss.Center, lipgloss.Center,

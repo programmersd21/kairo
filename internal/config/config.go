@@ -30,6 +30,7 @@ type AppConfig struct {
 	AIModel      string `toml:"ai_model"`
 	MCPEnabled   bool   `toml:"mcp_enabled"`
 	MCPPort      string `toml:"mcp_port"`
+	Animations   bool   `toml:"animations"`
 }
 
 type StorageConfig struct {
@@ -101,6 +102,7 @@ func Default() Config {
 			AIModel:    "gemini-3.1-flash-lite-preview",
 			MCPEnabled: false,
 			MCPPort:    "8080",
+			Animations: true,
 		},
 		Theme: ThemeConfig{
 			Bg:      "", // Use theme default

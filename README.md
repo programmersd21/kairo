@@ -90,7 +90,7 @@ A Lua plugin system lets you hook into task events. A headless CLI API means you
 Optional Gemini integration (2.0 / 2.5 / 2.5 Flash). Toggle it with `ctrl+a`. It never runs unless you invoke it. Your workflow, your call.
 
 ### Beautiful by default
-32 built-in themes. Live switching with `t`. Bento-style layout. Real-time Markdown preview (`ctrl+p`). Cinematic animations for create, complete, and delete. It's a terminal app that you'll actually enjoy looking at.
+32 built-in themes. Live switching with `t`. Bento-style layout. Real-time Markdown preview (`ctrl+p`). Cinematic animations for create, complete, and delete (with a global toggle in `ctrl+s` to disable them for maximum speed). It's a terminal app that you'll actually enjoy looking at.
 
 ---
 
@@ -107,6 +107,8 @@ Optional Gemini integration (2.0 / 2.5 / 2.5 Flash). Toggle it with `ctrl+a`. It
 | `ctrl+p` | Command palette |
 | `ctrl+a` | AI panel |
 | `?` | Help |
+| `ctrl+s` | Settings |
+| `x` | Import/Export |
 
 ---
 
