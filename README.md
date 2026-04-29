@@ -2,12 +2,16 @@
 
 # 📚 Kairo
 
-### ✨ A fast, keyboard-driven task manager that lives in your terminal — and never phones home.
+**A terminal task manager built for developers who are tired of fighting their tools.**
+
+Fast. Local. Yours.
 
 ![Demo](screenshots/demo.gif)
 
-[![Release](https://img.shields.io/github/v/release/programmersd21/kairo?style=for-the-badge\&logo=github\&color=7c3aed)](https://github.com/programmersd21/kairo/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/programmersd21/kairo/ci.yml?branch=main\&style=for-the-badge\&logo=githubactions\&color=2563eb)](https://github.com/programmersd21/kairo/actions)
+<br/>
+
+[![Release](https://img.shields.io/github/v/release/programmersd21/kairo?style=for-the-badge&logo=github&color=7c3aed)](https://github.com/programmersd21/kairo/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/programmersd21/kairo/ci.yml?branch=main&style=for-the-badge&logo=githubactions&color=2563eb)](https://github.com/programmersd21/kairo/actions)
 [![Go Report Card](https://img.shields.io/badge/go%20report-A%2B-brightgreen?style=for-the-badge&logo=go&logoColor=white)](https://goreportcard.com/report/github.com/programmersd21/kairo)
 [![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
@@ -15,229 +19,130 @@
 
 ---
 
-## ⚡ Install & run in seconds
+You know that feeling when your task manager gets in the way of your actual work?
 
-Pick your platform:
+Kairo was built because of that feeling.
 
-### 🍺 macOS (Homebrew)
+No browser tabs. No subscriptions. No mouse. Just you, your terminal, and your tasks — right where your brain already lives.
 
+---
+
+## ⚡ Get started in seconds
+
+**macOS (Homebrew)**
 ```bash
 brew install programmersd21/kairo/kairo
 ```
 
-### 🐧 Linux / macOS (curl)
-
+**Linux / macOS**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/programmersd21/kairo/main/scripts/install.sh | bash
 ```
 
-### 🪟 Windows (PowerShell)
-
+**Windows (PowerShell)**
 ```powershell
 iwr -useb https://raw.githubusercontent.com/programmersd21/kairo/main/scripts/install.ps1 | iex
 ```
 
-### 🧰 Go install
-
+**Go**
 ```bash
 go install github.com/programmersd21/kairo/cmd/kairo@latest
 ```
 
-### ▶️ Run
-
+Then just run:
 ```bash
 kairo
 ```
 
-> ⚠️ Rendering may break on some terminals.  
-> Works best on Alacritty.  
-> See [#16](https://github.com/programmersd21/kairo/issues/16)
+Press `n` to create your first task. `ctrl+s` to save it. That's it.
 
-Press `n` → create your first task.
-
-Done writing? → `ctrl+s` to save your task!
+> Works best on Alacritty. Some terminals may have rendering quirks — see [#16](https://github.com/programmersd21/kairo/issues/16).
 
 ---
 
-## 🧠 One-line definition
+## 🧠 Why Kairo?
 
-Kairo is a **terminal task manager built in Go for developers who want speed, structure, and full local control**.
+Most tools ask you to adapt to them. Kairo adapts to you.
 
----
+| The problem | What Kairo does instead |
+|---|---|
+| GUI apps pull you away from your flow | Lives entirely in your terminal |
+| Cloud tools own your data | Everything stays local, in SQLite |
+| Plain-text tools lack structure | Full tagging, filtering, and fuzzy search |
+| Legacy TUIs feel clunky | Modern, animated, keyboard-first UX |
 
-## 🔥 Why this exists
-
-Most task managers are built wrong for developers:
-
-* GUI apps → slow, mouse-driven, context switching
-* Plain-text tools → flexible but no structure or querying
-* Cloud apps → lock-in, subscriptions, data ownership loss
-* Legacy TUIs → powerful but outdated UX
-
-Kairo is the missing middle:
-
-> A **modern, scriptable, AI-aware, local-first task system inside your terminal**
+Your tasks are yours. They don't belong in someone else's cloud.
 
 ---
 
-## ✨ Core capabilities
+## ✨ What it can do
 
-### 🔒 Data sovereignty
+### It's fast — genuinely fast
+Sub-millisecond fuzzy search. Full keyboard control. Vim bindings (`j/k/gg/G`). Natural language deadlines like `tomorrow 10am` or `next friday`. You never have to leave the keyboard.
 
-* SQLite storage (WAL-enabled)
-* Fully offline operation
-* Optional Git-backed sync (no backend)
-* Export: JSON / CSV / Markdown / plain text
+### It respects your data
+SQLite storage with WAL mode. Fully offline. Optional Git-backed sync — no backend, no account, no lock-in. Export to JSON, CSV, Markdown, or plain text whenever you want.
 
-### ⚡ Speed at every layer
+### It grows with you
+A Lua plugin system lets you hook into task events. A headless CLI API means you can automate anything. And an MCP server opens Kairo up to AI agents that can read and manage your tasks directly.
 
-* Sub-millisecond fuzzy search with ranked results
-* Full keyboard control (no mouse)
-* Vim mode (j/k/gg/G)
-* Natural language deadlines (tomorrow 10am, next friday, in 2 hours)
+### AI — when you want it, invisible when you don't
+Optional Gemini integration (2.0 / 2.5 / 2.5 Flash). Toggle it with `ctrl+a`. It never runs unless you invoke it. Your workflow, your call.
 
-### 🧩 Extensibility
-
-* Lua plugin system (event hooks: task_create, task_update, app_start, etc.)
-* Headless CLI API for automation
-* **Professional MCP Server**: Full Model Context Protocol implementation
-    * **Tools**: CRUD operations, tag listing, and theme management
-    * **Resources**: Direct access to JSON task data (`tasks://all`)
-    * **Prompts**: Pre-configured AI workflows (`manage_tasks`)
-* Custom themes via Lua or config
-
-### 🤖 AI (optional)
-
-* Gemini integration (2.0 / 2.5 / 3.1 flash)
-* Full task CRUD from chat panel
-* Toggle anytime (`ctrl+a`)
-* Fully disabled unless invoked
-
-### 🎨 Terminal UI
-
-* Bento-style layout with Lip Gloss styling
-* **Markdown Preview**: Side-by-side real-time rendering in the task editor (`ctrl+p`)
-* 32 built-in themes (dark/light/hybrid)
-* Live theme switching (`t`)
-* Full-viewport rendering (no terminal bleed-through)
-* Cinematic animations for create/complete/delete
+### Beautiful by default
+32 built-in themes. Live switching with `t`. Bento-style layout. Real-time Markdown preview (`ctrl+p`). Cinematic animations for create, complete, and delete. It's a terminal app that you'll actually enjoy looking at.
 
 ---
 
-## 🧭 Feature snapshot
+## ⌨️ The shortcuts that matter
 
-| Capability             | Status |
-| ---------------------- | ------ |
-| Local-first storage    | ✅      |
-| Full TUI with themes   | ✅      |
-| Keyboard-only workflow | ✅      |
-| Git sync (no backend)  | ✅      |
-| Lua plugin system      | ✅      |
-| CLI automation API     | ✅      |
-| AI assistant           | ✅      |
-| MCP server             | ✅      |
-| Free & open source     | ✅      |
+| Key | What it does |
+|---|---|
+| `n` | New task |
+| `e` | Edit |
+| `z` | Complete |
+| `d` | Delete |
+| `t` | Switch theme |
+| `f` | Filter by tag |
+| `ctrl+p` | Command palette |
+| `ctrl+a` | AI panel |
+| `?` | Help |
 
 ---
 
-## 🚀 Quick commands
+## 🚀 Automate everything
+
+Kairo has a full CLI API for scripting and pipelines:
 
 ```bash
-kairo api create --title "Finish report"
+# Create a task from anywhere
+kairo api create --title "Finish report" --priority 1
+
+# List tasks by tag
 kairo api list --tag work
+
+# Mark done
 kairo api update --id <id> --status done
+
+# Export your whole list
 kairo export --format markdown
+
+# Sync via Git
 kairo sync
-kairo mcp        # stdio mode (local)
-kairo mcp 8080   # sse mode (remote)
+
+# Start the MCP server (for AI agents)
+kairo mcp        # stdio mode
+kairo mcp 8080   # SSE mode
 ```
 
----
-
-## 🧱 Architecture
-
-```
-User Input (CLI / UI / Lua / AI)
-        ↓
-Task Service (single source of truth)
-        ↓
-SQLite (WAL) + optional Git sync
-        ↓
-Bubble Tea TUI (instant rendering)
-```
-
----
-
-## 🧠 Plugin system (Lua)
-
-```lua
-kairo.on("task_create", function(event)
-    kairo.notify("New task: " .. event.task.title)
-end)
-```
-
-Lua API: create_task, update_task, delete_task, list_tasks, on, notify
-
-Events: task_create · task_update · task_delete · app_start · app_stop
-
----
-
-## ⌨️ Keyboard shortcuts
-
-| Key    | Action          |
-| ------ | --------------- |
-| n      | New task        |
-| e      | Edit            |
-| z      | Complete        |
-| d      | Delete          |
-| t      | Switch theme    |
-| f      | Filter tags     |
-| ctrl+p | Command palette |
-| ctrl+a | AI panel        |
-| ?      | Help            |
-
----
-
-## 📦 Full capability set
-
-* Views: Inbox, Today, Upcoming, Completed, by Tag, Priority
-* Fuzzy command palette (ctrl+p)
-* Shell completions (bash/zsh/fish/powershell)
-* Import/export: JSON, CSV, Markdown
-* Git-backed sync (per-task JSON)
-* MCP server for AI agents
-* Plugin hooks for automation
-
----
-
-## 🚀 Automation API
-
-```bash
-kairo api create --title "task" --priority 1
-kairo api list --tag work
-kairo api update --id <id> --status done
-kairo api delete all
-```
-
-JSON mode:
-
+JSON mode for maximum scriptability:
 ```bash
 kairo api --json '{"action":"create","payload":{"title":"API task"}}'
 ```
 
-Extras:
-
-```bash
-kairo api set_theme --theme nord
-kairo api plugin_list
-kairo export --format csv
-kairo sync
-kairo mcp
-```
-
 ---
 
-## 🧩 Plugin system (full example)
+## 🧩 Extend it with Lua
 
 ```lua
 local plugin = {
@@ -253,28 +158,41 @@ end)
 return plugin
 ```
 
----
+Available hooks: `task_create` · `task_update` · `task_delete` · `app_start` · `app_stop`
 
-## 🧱 Architecture stack
-
-* TUI: Bubble Tea (state machine)
-* Styling: Lip Gloss
-* Storage: SQLite (WAL)
-* Search: in-memory fuzzy index
-* Plugins: GopherLua VM
-* Sync: Git-based per-task files
-* AI: Gemini tool-calling API
+Available API: `create_task`, `update_task`, `delete_task`, `list_tasks`, `on`, `notify`
 
 ---
 
-## 🗺 Roadmap
+## 🧱 How it's built
 
-* encrypted multi-workspace support
-* event-sourced sync engine
-* sandboxed plugins
-* smart task suggestions
-* plugin marketplace
-* streaming performance optimizations
+```
+Your input (CLI / TUI / Lua / AI)
+          ↓
+  Task Service (single source of truth)
+          ↓
+  SQLite (WAL) + optional Git sync
+          ↓
+  Bubble Tea TUI (instant rendering)
+```
+
+**Stack:** Bubble Tea · Lip Gloss · SQLite (WAL) · GopherLua · Gemini API · Git
+
+---
+
+## ✅ Everything included
+
+| Feature | Status |
+|---|---|
+| Local-first SQLite storage | ✅ |
+| Full TUI with 32 themes | ✅ |
+| Keyboard-only workflow | ✅ |
+| Git sync (no backend) | ✅ |
+| Lua plugin system | ✅ |
+| CLI automation API | ✅ |
+| AI assistant (optional) | ✅ |
+| MCP server | ✅ |
+| Free & open source | ✅ |
 
 ---
 
@@ -282,35 +200,41 @@ return plugin
 
 Auto-generated on first run:
 
-* Linux: `~/.config/kairo/config.toml`
-* macOS: `~/Library/Application Support/kairo/config.toml`
-* Windows: `%APPDATA%\\kairo\\config.toml`
+- **Linux:** `~/.config/kairo/config.toml`
+- **macOS:** `~/Library/Application Support/kairo/config.toml`
+- **Windows:** `%APPDATA%\kairo\config.toml`
 
-In-app config: `ctrl+s` (settings menu)
+Prefer in-app settings? `ctrl+s` opens the settings menu.
+
+---
+
+## 🗺 What's coming
+
+- Encrypted multi-workspace support
+- Event-sourced sync engine
+- Sandboxed plugin environment
+- Smart task suggestions
+- Plugin marketplace
+- Streaming performance optimizations
 
 ---
 
 ## 🤝 Contributing
 
-PRs welcome:
+If something bugs you, fix it. PRs are welcome — especially for themes, plugins, performance, and docs.
 
-* themes
-* plugins
-* performance
-* docs
-
-Special thanks to @Tornado300 for key bug fixes and contributions.
+A huge thank you to [@Tornado300](https://github.com/Tornado300) for key bug fixes and contributions that made Kairo better for everyone.
 
 ---
 
-## ⭐ Star this repo
+## ⭐ If Kairo helps you
 
-If Kairo improves your workflow, star it so more developers can discover it.
+Star the repo. It's the simplest way to help other developers find this tool and spend less time fighting their workflow.
 
 ---
 
 <div align="center">
 
-**Fast. Local. Scriptable. Terminal-native.**
+*Built for the terminal. Built for focus. Built for you.*
 
 </div>
