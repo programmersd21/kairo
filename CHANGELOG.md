@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4]
+
+* **Editor Preview Hint**: Added a visual keybinding hint (`ctrl+p preview`) to the task editor footer. This makes the real-time Markdown preview feature more discoverable for new users.
+
+
 ## [1.3.3]
 
 * **Global Animations Toggle**: Added a new "Animations" setting (default: on) to toggle app-wide cinematic effects. When disabled, the UI bypasses all creation, completion, deletion, and view transition animations for a snappier, instant-feedback experience.

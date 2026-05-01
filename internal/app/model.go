@@ -1757,7 +1757,7 @@ func (m *Model) renderFooter() string {
 				}
 				left = " " + strings.Join(items, sep)
 			case ModeEditor:
-				left = " " + makePill("ctrl+s save") + sep + makePill("esc cancel") + sep + makePill("tab nav")
+				left = " " + makePill("ctrl+s save") + sep + makePill("ctrl+p preview") + sep + makePill("esc cancel") + sep + makePill("tab nav")
 			case ModePalette:
 				left = " " + makePill("enter select") + sep + makePill("esc/p cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
 			case ModeHelp:

@@ -116,7 +116,7 @@ Optional Gemini integration (2.0 / 2.5 / 2.5 Flash). Toggle it with `ctrl+a`. It
 | `d` | Delete |
 | `t` | Switch theme |
 | `f` | Filter by tag |
-| `ctrl+p` | Command palette |
+| `ctrl+p` | Command palette / Preview |
 | `ctrl+a` | AI panel |
 | `?` | Help |
 | `ctrl+s` | Settings |
