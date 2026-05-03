@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5]
+- **CLI Validation**: Added robust validation for subcommands and flags. Kairo now warns the user and provides helpful guidance when an invalid command or flag is provided.
+- **Global Flags**: Added support for `-h`/`--help` and `-v`/`--version` as global flags.
+- **Enhanced Error Feedback**: Improved CLI error messages to include specific details about unknown arguments and automatically list available commands or flags.
+
 ## [1.3.4]
 
 * **Editor Preview Hint**: Added a visual keybinding hint (`ctrl+p preview`) to the task editor footer. This makes the real-time Markdown preview feature more discoverable for new users.

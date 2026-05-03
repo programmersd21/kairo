@@ -39,6 +39,45 @@ func main() {
 		return
 	}
 
+	// Validate subcommands and flags
+	if len(os.Args) > 1 {
+		cmd := strings.ToLower(os.Args[1])
+
+		// Global Flags
+		if strings.HasPrefix(cmd, "-") {
+			switch cmd {
+			case "-h", "--help":
+				runHelp(nil)
+				return
+			case "-v", "--version":
+				runVersion()
+				return
+			default:
+				fmt.Fprintf(os.Stderr, "Error: unknown flag %q\n", os.Args[1])
+				runHelp(nil)
+				os.Exit(1)
+			}
+		}
+
+		validCmds := map[string]bool{
+			"api":        true,
+			"completion": true,
+			"export":     true,
+			"import":     true,
+			"mcp":        true,
+			"sync":       true,
+			"update":     true,
+			"version":    true,
+			"help":       true,
+		}
+
+		if !validCmds[cmd] {
+			fmt.Fprintf(os.Stderr, "Error: unknown command %q\n", os.Args[1])
+			runHelp(nil)
+			os.Exit(1)
+		}
+	}
+
 	// Immediate subcommands (no config/DB needed)
 	if len(os.Args) > 1 {
 		switch strings.ToLower(os.Args[1]) {
@@ -253,6 +292,10 @@ func runExport(ctx context.Context, repo *storage.Repository, args []string) err
 				out = args[i+1]
 				i++
 			}
+		default:
+			fmt.Fprintf(os.Stderr, "Error: unknown flag %q\n", args[i])
+			runHelp([]string{"export"})
+			os.Exit(1)
 		}
 	}
 	tasks, err := repo.AllTasks(ctx)
@@ -305,6 +348,10 @@ func runImport(ctx context.Context, repo *storage.Repository, args []string) err
 				in = args[i+1]
 				i++
 			}
+		default:
+			fmt.Fprintf(os.Stderr, "Error: unknown flag %q\n", args[i])
+			runHelp([]string{"import"})
+			os.Exit(1)
 		}
 	}
 	if in == "" {
@@ -420,6 +467,11 @@ func runMCP(ctx context.Context, svc service.TaskService, args []string) error {
 		port = cfg.App.MCPPort
 	}
 	if len(args) > 0 {
+		if strings.HasPrefix(args[0], "-") {
+			fmt.Fprintf(os.Stderr, "Error: unknown flag %q\n", args[0])
+			runHelp([]string{"mcp"})
+			os.Exit(1)
+		}
 		port = args[0]
 	}
 
