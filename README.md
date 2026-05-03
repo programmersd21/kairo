@@ -99,7 +99,7 @@ SQLite storage with WAL mode. Fully offline. Optional Git-backed sync — no bac
 A Lua plugin system lets you hook into task events. A headless CLI API means you can automate anything. And an MCP server opens Kairo up to AI agents that can read and manage your tasks directly.
 
 ### AI — when you want it, invisible when you don't
-Optional Gemini integration (2.0 / 2.5 / 2.5 Flash). Toggle it with `ctrl+a`. It never runs unless you invoke it. Your workflow, your call.
+Optional Gemini integration (`gemini-3.1-flash-lite-preview` / `gemini-2.0-flash-lite` / `gemini-2.5-flash-lite`). Toggle it with `ctrl+a`. It never runs unless you invoke it. Your workflow, your call.
 
 ### Beautiful by default
 32 built-in themes. Live switching with `t`. Bento-style layout. Real-time Markdown preview (`ctrl+p`). Cinematic animations for create, complete, and delete (with a global toggle in `ctrl+s` to disable them for maximum speed). It's a terminal app that you'll actually enjoy looking at.
