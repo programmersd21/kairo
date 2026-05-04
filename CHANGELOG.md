@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1]
+
+### Added
+
+- **Interactive Onboarding**: A complete, keyboard-driven welcome tour for new users with a "smooth af" animated slanted logo that cycles through theme colors. Teaches core navigation, task creation, and completion in under 60 seconds.
+- **Onboarding Trigger**: Added `ctrl+d` as a global shortcut to relaunch the welcome tour at any time.
+- **Auto-Onboarding**: Kairo now automatically launches the welcome tour on new installations to ensure a smooth first-time experience.
+- **AI Assistant Polish**: The AI Assistant shortcut (`ctrl+a`), footer pill, and help menu entry are now fully disabled and hidden if no Gemini API key is configured, providing a cleaner interface for new users.
+
 ## [1.4.0]
 - **Recurring Tasks**: Introduced a robust, minimal system for tasks that automatically reappear.
   - Supports Weekly recurrence (e.g. `mon,wed,fri`).

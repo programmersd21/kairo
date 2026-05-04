@@ -120,10 +120,11 @@ Optional Gemini integration (`gemini-3.1-flash-lite-preview` / `gemini-2.0-flash
 | `t` | Switch theme |
 | `f` | Filter by tag |
 | `ctrl+p` | Command palette / Preview |
-| `ctrl+a` | AI panel |
-| `?` | Help |
-| `ctrl+s` | Settings |
-| `x` | Import/Export |
+| `ctrl+a` | AI panel | Hidden if API key is missing |
+| `?` | Help | |
+| `ctrl+s` | Settings | |
+| `x` | Import/Export | |
+| `ctrl+d` | Welcome tour | |
 
 ---
 

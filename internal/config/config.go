@@ -22,16 +22,17 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Theme        string `toml:"theme"`
-	VimMode      bool   `toml:"vim_mode"`
-	ShowHelp     bool   `toml:"show_help"`
-	ShowID       bool   `toml:"show_id"`
-	Rainbow      bool   `toml:"rainbow"`
-	GeminiAPIKey string `toml:"gemini_api_key"`
-	AIModel      string `toml:"ai_model"`
-	MCPEnabled   bool   `toml:"mcp_enabled"`
-	MCPPort      string `toml:"mcp_port"`
-	Animations   bool   `toml:"animations"`
+	Theme               string `toml:"theme"`
+	VimMode             bool   `toml:"vim_mode"`
+	ShowHelp            bool   `toml:"show_help"`
+	ShowID              bool   `toml:"show_id"`
+	Rainbow             bool   `toml:"rainbow"`
+	GeminiAPIKey        string `toml:"gemini_api_key"`
+	AIModel             string `toml:"ai_model"`
+	MCPEnabled          bool   `toml:"mcp_enabled"`
+	MCPPort             string `toml:"mcp_port"`
+	Animations          bool   `toml:"animations"`
+	OnboardingCompleted bool   `toml:"onboarding_completed"`
 }
 
 type StorageConfig struct {

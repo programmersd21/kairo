@@ -14,10 +14,11 @@ import (
 type CloseMsg struct{}
 
 type Model struct {
-	styles styles.Styles
-	km     keymap.Keymap
-	width  int
-	height int
+	styles    styles.Styles
+	km        keymap.Keymap
+	width     int
+	height    int
+	AIEnabled bool
 }
 
 func New(s styles.Styles, km keymap.Keymap) Model {
@@ -59,6 +60,35 @@ func (m Model) View() string {
 		return strings.Join(b.Keys(), ", ")
 	}
 
+	appKeys := []struct {
+		key  string
+		desc string
+	}{
+		{getK(m.km.Palette), styles.IconPalette + "Command palette"},
+		{getK(m.km.TaskSearch), "󰍉 " + "Search tasks"},
+		{getK(m.km.CycleTheme), "󰏘 " + "Theme menu"},
+		{getK(m.km.OpenPluginDir), "󰝰 " + "Open plugins folder"},
+		{getK(m.km.ManagePlugins), styles.IconPlugin + "Manage plugins"},
+		{getK(m.km.Settings), "󰒓 " + "Settings menu"},
+		{getK(m.km.ImportExport), "󰛖 " + "Import / Export menu"},
+		{"ctrl+d", "󰙠 " + "Welcome tour"},
+	}
+
+	if m.AIEnabled {
+		appKeys = append(appKeys, struct{ key, desc string }{getK(m.km.AIPanelToggle), "🤖 " + "AI Assistant panel"})
+	}
+
+	appKeys = append(appKeys, []struct {
+		key  string
+		desc string
+	}{
+		{getK(m.km.Help), styles.IconHelp + "Show help"},
+		{getK(m.km.Issues), styles.IconIssues + "Open GitHub issues"},
+		{getK(m.km.Discussions), styles.IconDiscuss + "Open GitHub discussions"},
+		{getK(m.km.Changelog), styles.IconChangelog + "Open changelog"},
+		{getK(m.km.Quit), "󰈆 " + "Quit"},
+	}...)
+
 	sections := []struct {
 		title string
 		keys  []struct {
@@ -86,21 +116,7 @@ func (m Model) View() string {
 		},
 		{
 			"App",
-			[]struct{ key, desc string }{
-				{getK(m.km.Palette), styles.IconPalette + "Command palette"},
-				{getK(m.km.TaskSearch), "󰍉 " + "Search tasks"},
-				{getK(m.km.CycleTheme), "󰏘 " + "Theme menu"},
-				{getK(m.km.OpenPluginDir), "󰝰 " + "Open plugins folder"},
-				{getK(m.km.ManagePlugins), styles.IconPlugin + "Manage plugins"},
-				{getK(m.km.Settings), "󰒓 " + "Settings menu"},
-				{getK(m.km.ImportExport), "󰛖 " + "Import / Export menu"},
-				{getK(m.km.AIPanelToggle), "🤖 " + "AI Assistant panel"},
-				{getK(m.km.Help), styles.IconHelp + "Show help"},
-				{getK(m.km.Issues), styles.IconIssues + "Open GitHub issues"},
-				{getK(m.km.Discussions), styles.IconDiscuss + "Open GitHub discussions"},
-				{getK(m.km.Changelog), styles.IconChangelog + "Open changelog"},
-				{getK(m.km.Quit), "󰈆 " + "Quit"},
-			},
+			appKeys,
 		},
 	}
 

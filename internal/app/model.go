@@ -32,6 +32,7 @@ import (
 	"github.com/programmersd21/kairo/internal/ui/help"
 	"github.com/programmersd21/kairo/internal/ui/import_export_menu"
 	"github.com/programmersd21/kairo/internal/ui/keymap"
+	"github.com/programmersd21/kairo/internal/ui/onboarding"
 	"github.com/programmersd21/kairo/internal/ui/palette"
 	"github.com/programmersd21/kairo/internal/ui/plugin_menu"
 	"github.com/programmersd21/kairo/internal/ui/render"
@@ -94,6 +95,7 @@ const (
 	ModeConfirmQuit
 	ModeSettings
 	ModeImportExport
+	ModeOnboarding
 )
 
 type Model struct {
@@ -122,6 +124,7 @@ type Model struct {
 	det        detail.Model
 	edit       *editor.Model
 	hlp        help.Model
+	onb        onboarding.Model
 	tm         theme_menu.Model
 	pm         plugin_menu.Model
 	set        settings.Model
@@ -222,6 +225,7 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 	m.pal = palette.New(m.s)
 	m.det = detail.New(m.s)
 	m.hlp = help.New(m.s, m.km)
+	m.onb = onboarding.New(m.s, m.km)
 	m.tm = theme_menu.New(m.s, nil)
 	m.pm = plugin_menu.New(m.s)
 	m.set = settings.New(m.s, cfg)
@@ -316,6 +320,11 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 
 	m.rebuildViews()
 	m.activeIdx = 0
+
+	if !m.cfg.App.OnboardingCompleted {
+		m.mode = ModeOnboarding
+	}
+
 	return m, nil
 }
 
@@ -357,6 +366,9 @@ func (m *Model) Init() tea.Cmd {
 	if m.aiChan != nil {
 		cmds = append(cmds, m.listenAICmd())
 	}
+	if m.mode == ModeOnboarding {
+		cmds = append(cmds, m.onb.Init())
+	}
 	if m.cfg.App.MCPEnabled {
 		cmds = append(cmds, m.startMCPCmd())
 	}
@@ -391,6 +403,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = x.Width, x.Height
 		m.list.SetSize(x.Width, x.Height)
+		m.onb.SetSize(x.Width, x.Height)
 		m.pal.SetSize(x.Width, x.Height)
 		m.det.SetSize(x.Width, x.Height)
 		m.tm.SetSize(x.Width, x.Height)
@@ -434,6 +447,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.all = x.Tasks
 		m.list.SetAllTasks(m.all)
 		m.rebuildPaletteIndex()
+		return m, nil
+
+	case onboarding.CloseMsg:
+		m.mode = ModeList
+		if !x.Skipped {
+			m.cfg.App.OnboardingCompleted = true
+			_ = m.cfg.Save()
+		}
+		if m.cfg.App.Animations {
+			m.transitioning = true
+			m.transitionStarted = time.Now()
+			m.animationGen++
+			return m, m.viewTransitionTickCmd()
+		}
 		return m, nil
 
 	case palette.CloseMsg:
@@ -491,6 +518,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.aiKey != "" {
 			m.aiClient, _ = ai.NewClient(m.ctx, m.aiKey, m.cfg.App.AIModel)
 			ai.SetService(m.svc)
+		} else {
+			m.aiClient = nil
 		}
 		m.km = keymap.FromConfig(m.cfg.Keymap)
 		m.thBuiltin = theme.FindBuiltin(m.cfg.App.Theme)
@@ -980,6 +1009,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			if km.String() == "ctrl+d" {
+				m.onb = onboarding.New(m.s, m.km)
+				m.onb.SetSize(m.width, m.height)
+				m.mode = ModeOnboarding
+				var animCmd tea.Cmd
+				if m.cfg.App.Animations {
+					m.transitioning = true
+					m.transitionStarted = time.Now()
+					m.animationGen++
+					animCmd = m.viewTransitionTickCmd()
+				}
+				return m, tea.Batch(m.onb.Init(), animCmd)
+			}
+
 			if keymapMatch(m.km.AIPanelToggle, km) {
 				m.aiPanel.Toggle()
 				m.aiPanel.SetSize(m.width, m.height)
@@ -1294,6 +1337,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.iem, cmd = m.iem.Update(msg)
 		return m, cmd
+	case ModeOnboarding:
+		var cmd tea.Cmd
+		m.onb, cmd = m.onb.Update(msg)
+		return m, cmd
 	}
 
 	return m, nil
@@ -1360,6 +1407,7 @@ func (m *Model) renderMainUI() string {
 	m.pm.SetSize(mainW, availableHeight)
 	m.set.SetSize(mainW, availableHeight)
 	m.hlp.SetSize(mainW, availableHeight)
+	m.hlp.AIEnabled = m.aiKey != ""
 	m.tm.SetSize(mainW, availableHeight)
 	m.iem.SetSize(mainW, availableHeight)
 	if m.edit != nil {
@@ -1403,6 +1451,8 @@ func (m *Model) renderMainUI() string {
 		}
 	case ModeImportExport:
 		body = m.iem.View()
+	case ModeOnboarding:
+		body = m.list.View()
 	default:
 		body = m.list.View()
 	}
@@ -1438,6 +1488,15 @@ func (m *Model) renderMainUI() string {
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+
+	if m.mode == ModeOnboarding {
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			m.onb.View(),
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
+		)
+	}
+
 	if m.aiPanel.Visible {
 		return lipgloss.JoinHorizontal(lipgloss.Top, content, m.aiPanel.View())
 	}
@@ -1780,9 +1839,11 @@ func (m *Model) renderFooter() string {
 					makePill(fk(m.km.ToggleStrike) + " " + styles.IconStrike + "done"),
 					makePill(fk(m.km.DeleteTask) + " " + styles.IconDelete + "delete"),
 					makePill(fk(m.km.Settings) + " settings"),
-					makePill(fk(m.km.AIPanelToggle) + " assistant"),
-					makePill(fk(m.km.Help) + " " + styles.IconHelp + "help"),
 				}
+				if m.aiKey != "" {
+					items = append(items, makePill(fk(m.km.AIPanelToggle)+" assistant"))
+				}
+				items = append(items, makePill(fk(m.km.Help)+" "+styles.IconHelp+"help"))
 				left = " " + strings.Join(items, sep)
 			}
 		}
@@ -2090,7 +2151,12 @@ func (m *Model) rebuildPaletteIndex() {
 		search.Item{ID: "cmd:view:tag", Kind: search.KindCommand, Title: "View: By Tag", Hint: "f"},
 		search.Item{ID: "cmd:view:priority", Kind: search.KindCommand, Title: "View: By Priority", Hint: "5"},
 		search.Item{ID: "cmd:import-export", Kind: search.KindCommand, Title: "Import/Export", Hint: "x"},
+		search.Item{ID: "cmd:onboarding", Kind: search.KindCommand, Title: "Welcome Tour", Hint: "ctrl+d"},
 	)
+
+	if m.aiKey != "" {
+		items = append(items, search.Item{ID: "cmd:ai", Kind: search.KindCommand, Title: "AI Assistant", Hint: "ctrl+a"})
+	}
 
 	for _, t := range m.tags {
 		items = append(items, search.Item{ID: t, Kind: search.KindTag, Title: "#" + t, Hint: "tag"})
@@ -2194,6 +2260,11 @@ func (m *Model) runCommand(id string) tea.Cmd {
 	case "cmd:import-export":
 		m.mode = ModeImportExport
 		return nil
+	case "cmd:onboarding":
+		m.onb = onboarding.New(m.s, m.km)
+		m.onb.SetSize(m.width, m.height)
+		m.mode = ModeOnboarding
+		return m.onb.Init()
 	}
 
 	if strings.HasPrefix(id, "cmd:view:plugin:") {
