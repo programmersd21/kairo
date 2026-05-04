@@ -52,6 +52,7 @@ func (m *Model) rebuildItems() {
 	m.items = []settingItem{
 		{"Vim Mode", "vim_mode", "bool", m.cfg.App.VimMode},
 		{"Show Help Footer", "show_help", "bool", m.cfg.App.ShowHelp},
+		{"Show Task IDs", "show_id", "bool", m.cfg.App.ShowID},
 		{"Rainbow Logo", "rainbow", "bool", m.cfg.App.Rainbow},
 		{"Git Sync Enabled", "sync_enabled", "bool", m.cfg.Sync.Enabled},
 		{"Auto Push (Git)", "auto_push", "bool", m.cfg.Sync.AutoPush},
@@ -174,6 +175,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.cfg.App.VimMode = val
 				case "show_help":
 					m.cfg.App.ShowHelp = val
+				case "show_id":
+					m.cfg.App.ShowID = val
 				case "rainbow":
 					m.cfg.App.Rainbow = val
 				case "sync_enabled":

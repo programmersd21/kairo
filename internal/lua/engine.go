@@ -61,7 +61,7 @@ func (e *Engine) SetupKairoAPI(L *lua.LState) {
 	L.SetField(kairo, "notify", L.NewFunction(e.luaNotify))
 
 	// Meta
-	L.SetField(kairo, "version", lua.LString("1.3.5"))
+	L.SetField(kairo, "version", lua.LString("1.4.0"))
 
 	// Set as global
 	L.SetGlobal("kairo", kairo)
@@ -347,6 +347,16 @@ func (e *Engine) taskToLua(L *lua.LState, task core.Task) lua.LValue {
 	if task.Deadline != nil {
 		L.SetField(tbl, "deadline", lua.LString(task.Deadline.Format(time.RFC3339)))
 	}
+	L.SetField(tbl, "recurrence", lua.LString(string(task.Recurrence)))
+	if len(task.RecurrenceWeekly) > 0 {
+		weeklyTable := L.NewTable()
+		for i, day := range task.RecurrenceWeekly {
+			L.RawSetInt(weeklyTable, i+1, lua.LString(day))
+		}
+		L.SetField(tbl, "recurrence_weekly", weeklyTable)
+	}
+	L.SetField(tbl, "recurrence_monthly", lua.LNumber(float64(task.RecurrenceMonthly)))
+
 	L.SetField(tbl, "created_at", lua.LString(task.CreatedAt.Format(time.RFC3339)))
 	L.SetField(tbl, "updated_at", lua.LString(task.UpdatedAt.Format(time.RFC3339)))
 

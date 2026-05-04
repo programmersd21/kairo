@@ -92,14 +92,17 @@ Your tasks are yours. They don't belong in someone else's cloud.
 ### It's fast — genuinely fast
 Sub-millisecond fuzzy search. Full keyboard control. Vim bindings (`j/k/gg/G`). Natural language deadlines like `tomorrow 10am` or `next friday`. You never have to leave the keyboard.
 
+### Recurring tasks
+Tasks can automatically reappear based on a schedule. Weekly (e.g. `mon,wed,fri`) or Monthly (e.g. `15`). When a recurring task is completed, Kairo automatically generates the next instance with a smart due date preview in the editor, ensuring you never miss a beat.
+
 ### It respects your data
 SQLite storage with WAL mode. Fully offline. Optional Git-backed sync — no backend, no account, no lock-in. Export to JSON, CSV, Markdown, or plain text whenever you want.
 
 ### It grows with you
-A Lua plugin system lets you hook into task events. A headless CLI API means you can automate anything. And an MCP server opens Kairo up to AI agents that can read and manage your tasks directly.
+A Lua plugin system lets you hook into task events. A headless CLI API means you can automate anything. And an MCP server opens Kairo up to AI agents that can read and manage your tasks directly — now with full support for recurring schedules.
 
 ### AI — when you want it, invisible when you don't
-Optional Gemini integration (`gemini-3.1-flash-lite-preview` / `gemini-2.0-flash-lite` / `gemini-2.5-flash-lite`). Toggle it with `ctrl+a`. It never runs unless you invoke it. Your workflow, your call.
+Optional Gemini integration (`gemini-3.1-flash-lite-preview` / `gemini-2.0-flash-lite` / `gemini-2.5-flash-lite`). Toggle it with `ctrl+a`. It never runs unless you invoke it. Now you can create and manage complex recurring tasks using simple natural language prompts. Your workflow, your call.
 
 ### Beautiful by default
 32 built-in themes. Live switching with `t`. Bento-style layout. Real-time Markdown preview (`ctrl+p`). Cinematic animations for create, complete, and delete (with a global toggle in `ctrl+s` to disable them for maximum speed). It's a terminal app that you'll actually enjoy looking at.
@@ -219,6 +222,15 @@ Auto-generated on first run:
 - **Linux:** `~/.config/kairo/config.toml`
 - **macOS:** `~/Library/Application Support/kairo/config.toml`
 - **Windows:** `%APPDATA%\kairo\config.toml`
+
+| Option | Description | Default |
+|---|---|---|
+| `theme` | UI theme name | `catppuccin` |
+| `vim_mode` | Enable Vim keybindings | `false` |
+| `show_help` | Show help footer | `true` |
+| `show_id` | Show task IDs in detail view | `true` |
+| `animations` | Enable UI animations | `true` |
+| `rainbow` | Animated rainbow logo | `false` |
 
 Prefer in-app settings? `ctrl+s` opens the settings menu.
 

@@ -97,28 +97,34 @@ func (api *TaskAPI) cleanup(ctx context.Context) Response {
 
 // TaskDTO is the data transfer object for tasks (matches Lua and JSON schema)
 type TaskDTO struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	Priority    int      `json:"priority"`
-	Status      string   `json:"status"`
-	Deadline    *string  `json:"deadline,omitempty"`
-	CreatedAt   string   `json:"created_at"`
-	UpdatedAt   string   `json:"updated_at"`
+	ID                string   `json:"id"`
+	Title             string   `json:"title"`
+	Description       string   `json:"description,omitempty"`
+	Tags              []string `json:"tags,omitempty"`
+	Priority          int      `json:"priority"`
+	Status            string   `json:"status"`
+	Deadline          *string  `json:"deadline,omitempty"`
+	Recurrence        string   `json:"recurrence,omitempty"`
+	RecurrenceWeekly  []string `json:"recurrence_weekly,omitempty"`
+	RecurrenceMonthly int      `json:"recurrence_monthly,omitempty"`
+	CreatedAt         string   `json:"created_at"`
+	UpdatedAt         string   `json:"updated_at"`
 }
 
 // toDTO converts a core.Task to a DTO for serialization
 func toDTO(t core.Task) TaskDTO {
 	dto := TaskDTO{
-		ID:          t.ID,
-		Title:       t.Title,
-		Description: t.Description,
-		Tags:        t.Tags,
-		Priority:    int(t.Priority),
-		Status:      string(t.Status),
-		CreatedAt:   t.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   t.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                t.ID,
+		Title:             t.Title,
+		Description:       t.Description,
+		Tags:              t.Tags,
+		Priority:          int(t.Priority),
+		Status:            string(t.Status),
+		Recurrence:        string(t.Recurrence),
+		RecurrenceWeekly:  t.RecurrenceWeekly,
+		RecurrenceMonthly: t.RecurrenceMonthly,
+		CreatedAt:         t.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:         t.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 	if t.Deadline != nil {
 		s := t.Deadline.Format("2006-01-02T15:04:05Z")
@@ -130,12 +136,15 @@ func toDTO(t core.Task) TaskDTO {
 // handleCreate processes a create request
 func (api *TaskAPI) handleCreate(ctx context.Context, payload json.RawMessage) Response {
 	type CreatePayload struct {
-		Title       string   `json:"title"`
-		Description string   `json:"description,omitempty"`
-		Tags        []string `json:"tags,omitempty"`
-		Priority    *int     `json:"priority,omitempty"`
-		Status      string   `json:"status,omitempty"`
-		Deadline    *string  `json:"deadline,omitempty"`
+		Title             string   `json:"title"`
+		Description       string   `json:"description,omitempty"`
+		Tags              []string `json:"tags,omitempty"`
+		Priority          *int     `json:"priority,omitempty"`
+		Status            string   `json:"status,omitempty"`
+		Deadline          *string  `json:"deadline,omitempty"`
+		Recurrence        string   `json:"recurrence,omitempty"`
+		RecurrenceWeekly  []string `json:"recurrence_weekly,omitempty"`
+		RecurrenceMonthly *int     `json:"recurrence_monthly,omitempty"`
 	}
 
 	var p CreatePayload
@@ -154,10 +163,17 @@ func (api *TaskAPI) handleCreate(ctx context.Context, payload json.RawMessage) R
 	}
 
 	task := core.Task{
-		Title:       p.Title,
-		Description: p.Description,
-		Tags:        p.Tags,
-		Status:      core.StatusTodo,
+		Title:             p.Title,
+		Description:       p.Description,
+		Tags:              p.Tags,
+		Status:            core.StatusTodo,
+		Recurrence:        core.RecurrenceType(p.Recurrence),
+		RecurrenceWeekly:  p.RecurrenceWeekly,
+		RecurrenceMonthly: 0,
+	}
+
+	if p.RecurrenceMonthly != nil {
+		task.RecurrenceMonthly = *p.RecurrenceMonthly
 	}
 
 	if p.Status != "" {
@@ -225,13 +241,16 @@ func (api *TaskAPI) handleGet(ctx context.Context, payload json.RawMessage) Resp
 // handleUpdate processes an update request
 func (api *TaskAPI) handleUpdate(ctx context.Context, payload json.RawMessage) Response {
 	type UpdatePayload struct {
-		ID          string   `json:"id"`
-		Title       *string  `json:"title,omitempty"`
-		Description *string  `json:"description,omitempty"`
-		Tags        []string `json:"tags,omitempty"`
-		Priority    *int     `json:"priority,omitempty"`
-		Status      *string  `json:"status,omitempty"`
-		Deadline    *string  `json:"deadline,omitempty"`
+		ID                string   `json:"id"`
+		Title             *string  `json:"title,omitempty"`
+		Description       *string  `json:"description,omitempty"`
+		Tags              []string `json:"tags,omitempty"`
+		Priority          *int     `json:"priority,omitempty"`
+		Status            *string  `json:"status,omitempty"`
+		Deadline          *string  `json:"deadline,omitempty"`
+		Recurrence        *string  `json:"recurrence,omitempty"`
+		RecurrenceWeekly  []string `json:"recurrence_weekly,omitempty"`
+		RecurrenceMonthly *int     `json:"recurrence_monthly,omitempty"`
 	}
 
 	var p UpdatePayload
@@ -252,6 +271,17 @@ func (api *TaskAPI) handleUpdate(ctx context.Context, payload json.RawMessage) R
 	patch := core.TaskPatch{
 		Title:       p.Title,
 		Description: p.Description,
+	}
+
+	if p.Recurrence != nil {
+		r := core.RecurrenceType(*p.Recurrence)
+		patch.Recurrence = &r
+	}
+	if len(p.RecurrenceWeekly) > 0 {
+		patch.RecurrenceWeekly = &p.RecurrenceWeekly
+	}
+	if p.RecurrenceMonthly != nil {
+		patch.RecurrenceMonthly = p.RecurrenceMonthly
 	}
 
 	if len(p.Tags) > 0 {

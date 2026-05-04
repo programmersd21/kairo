@@ -8,7 +8,8 @@
 //
 // This package solves it with two complementary strategies:
 //   - PaintBg: Re-applies the background color after every ANSI reset
-//   - FillViewport: Pads every line to full width and fills missing lines
+//   - FillViewport: Pads every line to full width and ensures background
+//     color fills the entire terminal using erase-to-end-of-line (\x1b[K).
 //
 // Together, they guarantee that every cell in the viewport has the
 // intended background color, regardless of what individual components render.
@@ -60,10 +61,16 @@ func PaintBg(s string, bg lipgloss.Color) string {
 // FillViewport ensures a rendered string covers exactly width×height terminal
 // cells, with every unfilled cell receiving the specified background color.
 //
-// It performs three operations:
-//  1. Right-pads every existing line to full width with background-colored spaces
-//  2. Appends background-colored empty lines to reach the target height
-//  3. Applies PaintBg to the entire result to fix internal ANSI resets
+// It performs four operations:
+//  1. Strips stray \r characters for cross-platform robustness
+//  2. Right-pads every existing line to full width with background-colored spaces
+//  3. Appends background-colored empty lines to reach the target height
+//  4. Applies PaintBg to the entire result to fix internal ANSI resets
+//
+// After PaintBg, each line is also suffixed with the "erase to end of line"
+// sequence (\x1b[K) which tells the terminal to fill the remainder of the
+// line with the currently active background color. This catches any cells
+// that lipgloss.Width might have miscounted.
 //
 // This is the definitive viewport-filling function. Apply it as the LAST step
 // in the top-level View() to guarantee a seamless, gap-free background.
@@ -71,6 +78,9 @@ func FillViewport(content string, width, height int, bg lipgloss.Color) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
+
+	// Strip \r to normalize line endings across platforms.
+	content = strings.ReplaceAll(content, "\r", "")
 
 	lines := strings.Split(content, "\n")
 	bgStyle := lipgloss.NewStyle().Background(bg)
@@ -92,7 +102,20 @@ func FillViewport(content string, width, height int, bg lipgloss.Color) string {
 		}
 	}
 
-	return PaintBg(strings.Join(result, "\n"), bg)
+	seq := bgAnsi(bg)
+	painted := PaintBg(strings.Join(result, "\n"), bg)
+
+	// Append the "erase in line" (EL) sequence after each line.
+	// \x1b[K clears from the cursor to the end of the line using the
+	// currently active background color. This is the definitive fix for
+	// any cells beyond the painted width—even if lipgloss.Width miscounted.
+	if seq != "" {
+		painted = strings.ReplaceAll(painted, "\n", "\x1b[K\n")
+		// Also clear to end-of-line on the very last line.
+		painted += "\x1b[K"
+	}
+
+	return painted
 }
 
 // BarLine creates a single full-width line with left-aligned and right-aligned

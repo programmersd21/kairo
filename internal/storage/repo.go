@@ -74,6 +74,9 @@ func (r *Repository) CreateTask(ctx context.Context, t core.Task) (core.Task, er
 	if t.Status == "" {
 		t.Status = core.StatusTodo
 	}
+	if t.Recurrence == "" {
+		t.Recurrence = core.RecurrenceNone
+	}
 	t.Priority = t.Priority.Clamp()
 	t.Tags = t.NormalizedTags()
 	if t.CreatedAt.IsZero() {
@@ -92,10 +95,12 @@ func (r *Repository) CreateTask(ctx context.Context, t core.Task) (core.Task, er
 			deadline = nil
 		}
 
+		weekly := strings.Join(t.RecurrenceWeekly, ",")
+
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, created_at_ms, updated_at_ms)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`, t.ID, t.Title, t.Description, int(t.Priority), deadline, string(t.Status), t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli())
+			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, t.ID, t.Title, t.Description, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli())
 		if err != nil {
 			return err
 		}
@@ -125,11 +130,13 @@ func (r *Repository) UpdateTask(ctx context.Context, id string, patch core.TaskP
 		} else {
 			deadline = nil
 		}
+		weekly := strings.Join(updated.RecurrenceWeekly, ",")
+
 		_, err := tx.ExecContext(ctx, `
 			UPDATE tasks
-			SET title=?, description=?, priority=?, deadline_ms=?, status=?, updated_at_ms=?
+			SET title=?, description=?, priority=?, deadline_ms=?, status=?, recurrence=?, recurrence_weekly=?, recurrence_monthly=?, updated_at_ms=?
 			WHERE id=? AND deleted_at_ms IS NULL
-		`, updated.Title, updated.Description, int(updated.Priority), deadline, string(updated.Status), updated.UpdatedAt.UTC().UnixMilli(), updated.ID)
+		`, updated.Title, updated.Description, int(updated.Priority), deadline, string(updated.Status), string(updated.Recurrence), weekly, updated.RecurrenceMonthly, updated.UpdatedAt.UTC().UnixMilli(), updated.ID)
 		if err != nil {
 			return err
 		}
@@ -161,7 +168,7 @@ type Tombstone struct {
 
 func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, description, priority, deadline_ms, status, created_at_ms, updated_at_ms
+		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms
 		FROM tasks
 		WHERE deleted_at_ms IS NULL
 		ORDER BY updated_at_ms DESC
@@ -176,34 +183,11 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 	}()
 	var tasks []core.Task
 	for rows.Next() {
-		var (
-			id         string
-			title      string
-			desc       string
-			priority   int
-			deadlineMs sql.NullInt64
-			status     string
-			createdMs  int64
-			updatedMs  int64
-		)
-		if err := rows.Scan(&id, &title, &desc, &priority, &deadlineMs, &status, &createdMs, &updatedMs); err != nil {
+		t, err := scanTask(rows)
+		if err != nil {
 			return nil, nil, err
 		}
-		var deadline *time.Time
-		if deadlineMs.Valid {
-			d := time.UnixMilli(deadlineMs.Int64).UTC()
-			deadline = &d
-		}
-		tasks = append(tasks, core.Task{
-			ID:          id,
-			Title:       title,
-			Description: desc,
-			Priority:    core.Priority(priority).Clamp(),
-			Deadline:    deadline,
-			Status:      core.Status(status),
-			CreatedAt:   time.UnixMilli(createdMs).UTC(),
-			UpdatedAt:   time.UnixMilli(updatedMs).UTC(),
-		})
+		tasks = append(tasks, t)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, nil, err
@@ -293,7 +277,7 @@ func (r *Repository) ApplyTombstone(ctx context.Context, t Tombstone) error {
 
 func (r *Repository) GetTask(ctx context.Context, id string) (core.Task, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, title, description, priority, deadline_ms, status, created_at_ms, updated_at_ms
+		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms
 		FROM tasks
 		WHERE id=? AND deleted_at_ms IS NULL
 	`, id)
@@ -362,7 +346,7 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	}
 
 	query := `
-		SELECT t.id, t.title, t.description, t.priority, t.deadline_ms, t.status, t.created_at_ms, t.updated_at_ms
+		SELECT t.id, t.title, t.description, t.priority, t.deadline_ms, t.status, t.recurrence, t.recurrence_weekly, t.recurrence_monthly, t.created_at_ms, t.updated_at_ms
 		FROM tasks t
 		WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY ` + orderBy + `
@@ -381,34 +365,11 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 
 	out := []core.Task{}
 	for rows.Next() {
-		var (
-			id         string
-			title      string
-			desc       string
-			priority   int
-			deadlineMs sql.NullInt64
-			status     string
-			createdMs  int64
-			updatedMs  int64
-		)
-		if err := rows.Scan(&id, &title, &desc, &priority, &deadlineMs, &status, &createdMs, &updatedMs); err != nil {
+		t, err := scanTask(rows)
+		if err != nil {
 			return nil, err
 		}
-		var deadline *time.Time
-		if deadlineMs.Valid {
-			d := time.UnixMilli(deadlineMs.Int64).UTC()
-			deadline = &d
-		}
-		out = append(out, core.Task{
-			ID:          id,
-			Title:       title,
-			Description: desc,
-			Priority:    core.Priority(priority).Clamp(),
-			Deadline:    deadline,
-			Status:      core.Status(status),
-			CreatedAt:   time.UnixMilli(createdMs).UTC(),
-			UpdatedAt:   time.UnixMilli(updatedMs).UTC(),
-		})
+		out = append(out, t)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -476,7 +437,7 @@ func (r *Repository) ListTags(ctx context.Context) ([]string, error) {
 
 func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, description, priority, deadline_ms, status, created_at_ms, updated_at_ms
+		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms
 		FROM tasks
 		WHERE deleted_at_ms IS NULL
 		ORDER BY updated_at_ms DESC
@@ -491,34 +452,11 @@ func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	}()
 	var out []core.Task
 	for rows.Next() {
-		var (
-			id         string
-			title      string
-			desc       string
-			priority   int
-			deadlineMs sql.NullInt64
-			status     string
-			createdMs  int64
-			updatedMs  int64
-		)
-		if err := rows.Scan(&id, &title, &desc, &priority, &deadlineMs, &status, &createdMs, &updatedMs); err != nil {
+		t, err := scanTask(rows)
+		if err != nil {
 			return nil, err
 		}
-		var deadline *time.Time
-		if deadlineMs.Valid {
-			d := time.UnixMilli(deadlineMs.Int64).UTC()
-			deadline = &d
-		}
-		out = append(out, core.Task{
-			ID:          id,
-			Title:       title,
-			Description: desc,
-			Priority:    core.Priority(priority).Clamp(),
-			Deadline:    deadline,
-			Status:      core.Status(status),
-			CreatedAt:   time.UnixMilli(createdMs).UTC(),
-			UpdatedAt:   time.UnixMilli(updatedMs).UTC(),
-		})
+		out = append(out, t)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -576,6 +514,9 @@ func (r *Repository) UpsertTask(ctx context.Context, t core.Task) error {
 	if t.Status == "" {
 		t.Status = core.StatusTodo
 	}
+	if t.Recurrence == "" {
+		t.Recurrence = core.RecurrenceNone
+	}
 	t.Priority = t.Priority.Clamp()
 	t.Tags = t.NormalizedTags()
 	if t.CreatedAt.IsZero() {
@@ -600,19 +541,24 @@ func (r *Repository) UpsertTask(ctx context.Context, t core.Task) error {
 		} else {
 			deadline = nil
 		}
+		weekly := strings.Join(t.RecurrenceWeekly, ",")
+
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, created_at_ms, updated_at_ms)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET
 				title=excluded.title,
 				description=excluded.description,
 				priority=excluded.priority,
 				deadline_ms=excluded.deadline_ms,
 				status=excluded.status,
+				recurrence=excluded.recurrence,
+				recurrence_weekly=excluded.recurrence_weekly,
+				recurrence_monthly=excluded.recurrence_monthly,
 				created_at_ms=excluded.created_at_ms,
 				updated_at_ms=excluded.updated_at_ms,
 				deleted_at_ms=NULL
-		`, t.ID, t.Title, t.Description, int(t.Priority), deadline, string(t.Status), t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli())
+		`, t.ID, t.Title, t.Description, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli())
 		if err != nil {
 			return err
 		}
@@ -686,10 +632,13 @@ func scanTask(s scanner) (core.Task, error) {
 		priority   int
 		deadlineMs sql.NullInt64
 		status     string
+		rec        string
+		weekly     sql.NullString
+		monthly    int
 		createdMs  int64
 		updatedMs  int64
 	)
-	if err := s.Scan(&id, &title, &desc, &priority, &deadlineMs, &status, &createdMs, &updatedMs); err != nil {
+	if err := s.Scan(&id, &title, &desc, &priority, &deadlineMs, &status, &rec, &weekly, &monthly, &createdMs, &updatedMs); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return core.Task{}, err
 		}
@@ -700,15 +649,24 @@ func scanTask(s scanner) (core.Task, error) {
 		d := time.UnixMilli(deadlineMs.Int64).UTC()
 		deadline = &d
 	}
+
+	var weeklyDays []string
+	if weekly.Valid && weekly.String != "" {
+		weeklyDays = strings.Split(weekly.String, ",")
+	}
+
 	return core.Task{
-		ID:          id,
-		Title:       title,
-		Description: desc,
-		Priority:    core.Priority(priority).Clamp(),
-		Deadline:    deadline,
-		Status:      core.Status(status),
-		CreatedAt:   time.UnixMilli(createdMs).UTC(),
-		UpdatedAt:   time.UnixMilli(updatedMs).UTC(),
+		ID:                id,
+		Title:             title,
+		Description:       desc,
+		Priority:          core.Priority(priority).Clamp(),
+		Deadline:          deadline,
+		Status:            core.Status(status),
+		Recurrence:        core.RecurrenceType(rec),
+		RecurrenceWeekly:  weeklyDays,
+		RecurrenceMonthly: monthly,
+		CreatedAt:         time.UnixMilli(createdMs).UTC(),
+		UpdatedAt:         time.UnixMilli(updatedMs).UTC(),
 	}, nil
 }
 

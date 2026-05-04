@@ -7,6 +7,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/programmersd21/kairo/internal/core"
 	"github.com/programmersd21/kairo/internal/hooks"
@@ -121,6 +122,27 @@ func (s *taskService) Update(ctx context.Context, id string, patch core.TaskPatc
 	updated, err := s.repo.UpdateTask(ctx, id, patch)
 	if err != nil {
 		return core.Task{}, fmt.Errorf("failed to update task: %w", err)
+	}
+
+	// Recurrence logic: if marked done and is recurring, create next instance
+	if patch.Status != nil && *patch.Status == core.StatusDone && updated.Recurrence != core.RecurrenceNone {
+		// Use deadline as reference if available, else now
+		ref := time.Now()
+		if updated.Deadline != nil {
+			ref = *updated.Deadline
+		}
+
+		nextDue := updated.NextOccurrence(ref)
+		if nextDue != nil {
+			nextTask := updated
+			nextTask.ID = "" // New ID
+			nextTask.Status = core.StatusTodo
+			nextTask.Deadline = nextDue
+			nextTask.CreatedAt = time.Time{}
+			nextTask.UpdatedAt = time.Time{}
+
+			_, _ = s.repo.CreateTask(ctx, nextTask)
+		}
 	}
 
 	// Emit event

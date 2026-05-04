@@ -2,6 +2,7 @@
 theme = "catppuccin"
 vim_mode = false
 show_help = true
+show_id = true
 rainbow = false
 animations = true
 mcp_enabled = false

@@ -25,6 +25,7 @@ type AppConfig struct {
 	Theme        string `toml:"theme"`
 	VimMode      bool   `toml:"vim_mode"`
 	ShowHelp     bool   `toml:"show_help"`
+	ShowID       bool   `toml:"show_id"`
 	Rainbow      bool   `toml:"rainbow"`
 	GeminiAPIKey string `toml:"gemini_api_key"`
 	AIModel      string `toml:"ai_model"`
@@ -98,6 +99,7 @@ func Default() Config {
 			Theme:      "catppuccin",
 			VimMode:    false,
 			ShowHelp:   true,
+			ShowID:     true,
 			Rainbow:    false,
 			AIModel:    "gemini-3.1-flash-lite-preview",
 			MCPEnabled: false,

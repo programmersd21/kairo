@@ -29,6 +29,20 @@ func runAPI(ctx context.Context, action string, args map[string]interface{}) (*m
 		args["tags"] = []string{}
 	}
 
+	// Convert "recurrence_weekly" from comma-separated string to slice if needed
+	if rwStr, ok := args["recurrence_weekly"].(string); ok && rwStr != "" {
+		days := []string{}
+		for _, d := range strings.Split(rwStr, ",") {
+			day := strings.TrimSpace(strings.ToLower(d))
+			if day != "" {
+				days = append(days, day)
+			}
+		}
+		args["recurrence_weekly"] = days
+	} else if ok && rwStr == "" {
+		args["recurrence_weekly"] = []string{}
+	}
+
 	b, _ := json.Marshal(args)
 	taskAPI := api.New(globalSvc)
 	resp := taskAPI.Execute(ctx, api.Request{Action: action, Payload: b})

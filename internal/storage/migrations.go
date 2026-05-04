@@ -49,6 +49,11 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			CREATE INDEX IF NOT EXISTS idx_task_tags_task ON task_tags(task_id);
 			CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
 		`},
+		{2, `
+			ALTER TABLE tasks ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none';
+			ALTER TABLE tasks ADD COLUMN recurrence_weekly TEXT NULL;
+			ALTER TABLE tasks ADD COLUMN recurrence_monthly INTEGER NOT NULL DEFAULT 0;
+		`},
 	}
 
 	for _, s := range steps {

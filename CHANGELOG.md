@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0]
+- **Recurring Tasks**: Introduced a robust, minimal system for tasks that automatically reappear.
+  - Supports Weekly recurrence (e.g. `mon,wed,fri`).
+  - Supports Monthly recurrence (e.g. `15`).
+  - Automatically generates the next instance when a recurring task is marked as done.
+  - Smart due date computation with missed cycle protection.
+  - Integrated into the task editor TUI for seamless workflow.
+- **Enhanced Recurrence Previews**: Added real-time "Next Occurrence" date previews to the task editor, providing instant feedback as you type recurrence rules.
+- **AI & MCP Recurrence Support**: Extended the Gemini-powered assistant and MCP server to support managing recurring tasks via natural language and external AI agents.
+- **Backward Compatibility**: Ensured that existing tasks and older database records default safely to `none` recurrence, preventing validation errors.
+- **Task ID Visibility**: Added a new setting to toggle the visibility of task IDs in the detail view.
+  - Configurable via `config.toml` (`show_id = true/false`) or the Settings TUI.
+  - Useful for users who prefer a cleaner interface without technical metadata.
+
+### Fixed
+- **Background Bleed**: Background not fully filling terminal viewport when using colored themes.
+
 ## [1.3.5]
 - **CLI Validation**: Added robust validation for subcommands and flags. Kairo now warns the user and provides helpful guidance when an invalid command or flag is provided.
 - **Global Flags**: Added support for `-h`/`--help` and `-v`/`--version` as global flags.

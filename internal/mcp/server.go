@@ -27,6 +27,9 @@ func NewServer(svc service.TaskService) *server.MCPServer {
 		mcp.WithString("status", mcp.Description("'todo', 'doing', or 'done'")),
 		mcp.WithString("deadline", mcp.Description("RFC3339 formatted date-time string")),
 		mcp.WithString("tags", mcp.Description("Comma-separated list of tags")),
+		mcp.WithString("recurrence", mcp.Description("'none', 'weekly', or 'monthly'")),
+		mcp.WithString("recurrence_weekly", mcp.Description("Comma-separated list of weekdays (mon,tue,wed,thu,fri,sat,sun)")),
+		mcp.WithNumber("recurrence_monthly", mcp.Description("Day of month (1-31)")),
 	), CreateTaskHandler)
 
 	s.AddTool(mcp.NewTool("kairo_update_task",
@@ -38,6 +41,9 @@ func NewServer(svc service.TaskService) *server.MCPServer {
 		mcp.WithString("status", mcp.Description("'todo', 'doing', or 'done'")),
 		mcp.WithString("deadline", mcp.Description("RFC3339 formatted date-time string (or empty string to clear)")),
 		mcp.WithString("tags", mcp.Description("Comma-separated list of tags")),
+		mcp.WithString("recurrence", mcp.Description("'none', 'weekly', or 'monthly'")),
+		mcp.WithString("recurrence_weekly", mcp.Description("Comma-separated list of weekdays")),
+		mcp.WithNumber("recurrence_monthly", mcp.Description("Day of month (1-31)")),
 	), UpdateTaskHandler)
 
 	s.AddTool(mcp.NewTool("kairo_list_tasks",

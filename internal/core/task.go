@@ -45,16 +45,36 @@ func (p Priority) Clamp() Priority {
 	}
 }
 
+type RecurrenceType string
+
+const (
+	RecurrenceNone    RecurrenceType = "none"
+	RecurrenceWeekly  RecurrenceType = "weekly"
+	RecurrenceMonthly RecurrenceType = "monthly"
+)
+
+func (r RecurrenceType) Valid() bool {
+	switch r {
+	case RecurrenceNone, RecurrenceWeekly, RecurrenceMonthly:
+		return true
+	default:
+		return false
+	}
+}
+
 type Task struct {
-	ID          string
-	Title       string
-	Description string
-	Tags        []string
-	Priority    Priority
-	Deadline    *time.Time
-	Status      Status
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID                string
+	Title             string
+	Description       string
+	Tags              []string
+	Priority          Priority
+	Deadline          *time.Time
+	Status            Status
+	Recurrence        RecurrenceType
+	RecurrenceWeekly  []string
+	RecurrenceMonthly int
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 func (t Task) NormalizedTags() []string {
@@ -101,16 +121,25 @@ func (t Task) Validate() error {
 	if !t.Status.Valid() {
 		return errors.New("invalid status")
 	}
+	if !t.Recurrence.Valid() {
+		return errors.New("invalid recurrence type")
+	}
+	if t.Recurrence == RecurrenceMonthly && (t.RecurrenceMonthly < 1 || t.RecurrenceMonthly > 31) {
+		return errors.New("invalid monthly recurrence day (must be 1-31)")
+	}
 	return nil
 }
 
 type TaskPatch struct {
-	Title       *string
-	Description *string
-	Tags        *[]string
-	Priority    *Priority
-	Deadline    **time.Time
-	Status      *Status
+	Title             *string
+	Description       *string
+	Tags              *[]string
+	Priority          *Priority
+	Deadline          **time.Time
+	Status            *Status
+	Recurrence        *RecurrenceType
+	RecurrenceWeekly  *[]string
+	RecurrenceMonthly *int
 }
 
 func (p TaskPatch) ApplyTo(t Task) Task {
@@ -132,20 +161,32 @@ func (p TaskPatch) ApplyTo(t Task) Task {
 	if p.Status != nil {
 		t.Status = *p.Status
 	}
+	if p.Recurrence != nil {
+		t.Recurrence = *p.Recurrence
+	}
+	if p.RecurrenceWeekly != nil {
+		t.RecurrenceWeekly = append([]string(nil), (*p.RecurrenceWeekly)...)
+	}
+	if p.RecurrenceMonthly != nil {
+		t.RecurrenceMonthly = *p.RecurrenceMonthly
+	}
 	return t
 }
 
 func (t Task) MarshalJSON() ([]byte, error) {
 	type wire struct {
-		ID          string    `json:"id"`
-		Title       string    `json:"title"`
-		Description string    `json:"description,omitempty"`
-		Tags        []string  `json:"tags,omitempty"`
-		Priority    int       `json:"priority"`
-		Deadline    *string   `json:"deadline,omitempty"`
-		Status      Status    `json:"status"`
-		CreatedAt   time.Time `json:"created_at"`
-		UpdatedAt   time.Time `json:"updated_at"`
+		ID                string    `json:"id"`
+		Title             string    `json:"title"`
+		Description       string    `json:"description,omitempty"`
+		Tags              []string  `json:"tags,omitempty"`
+		Priority          int       `json:"priority"`
+		Deadline          *string   `json:"deadline,omitempty"`
+		Status            Status    `json:"status"`
+		Recurrence        string    `json:"recurrence,omitempty"`
+		RecurrenceWeekly  []string  `json:"recurrence_weekly,omitempty"`
+		RecurrenceMonthly int       `json:"recurrence_monthly,omitempty"`
+		CreatedAt         time.Time `json:"created_at"`
+		UpdatedAt         time.Time `json:"updated_at"`
 	}
 	var d *string
 	if t.Deadline != nil {
@@ -153,14 +194,17 @@ func (t Task) MarshalJSON() ([]byte, error) {
 		d = &s
 	}
 	return json.Marshal(wire{
-		ID:          t.ID,
-		Title:       t.Title,
-		Description: t.Description,
-		Tags:        t.NormalizedTags(),
-		Priority:    int(t.Priority.Clamp()),
-		Deadline:    d,
-		Status:      t.Status,
-		CreatedAt:   t.CreatedAt.UTC(),
-		UpdatedAt:   t.UpdatedAt.UTC(),
+		ID:                t.ID,
+		Title:             t.Title,
+		Description:       t.Description,
+		Tags:              t.NormalizedTags(),
+		Priority:          int(t.Priority.Clamp()),
+		Deadline:          d,
+		Status:            t.Status,
+		Recurrence:        string(t.Recurrence),
+		RecurrenceWeekly:  t.RecurrenceWeekly,
+		RecurrenceMonthly: t.RecurrenceMonthly,
+		CreatedAt:         t.CreatedAt.UTC(),
+		UpdatedAt:         t.UpdatedAt.UTC(),
 	})
 }

@@ -710,7 +710,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd, m.listenAICmd())
 
 		if x.Chunk.Refresh {
-			cmds = append(cmds, m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd())
+			m.statusText = "AI updated database"
+			m.isErr = false
+			m.statusID++
+			cmds = append(cmds, m.loadTagsCmd(), m.loadTasksCmd(), m.loadAllTasksCmd(), m.syncIfEnabledCmd(), m.clearStatusCmd(m.statusID))
 		}
 		return m, tea.Batch(cmds...)
 
@@ -1351,6 +1354,7 @@ func (m *Model) renderMainUI() string {
 
 	// Update sizes dynamically — use mainW so components don't overflow
 	m.list.SetSize(mainW, availableHeight)
+	m.det.ShowID = m.cfg.App.ShowID
 	m.det.SetSize(mainW, availableHeight)
 	m.pal.SetSize(mainW, availableHeight)
 	m.pm.SetSize(mainW, availableHeight)

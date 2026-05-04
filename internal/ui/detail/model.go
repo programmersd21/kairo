@@ -15,7 +15,8 @@ type Model struct {
 	width  int
 	height int
 
-	task core.Task
+	task   core.Task
+	ShowID bool
 
 	renderer *glamour.TermRenderer
 	mdCache  string
@@ -115,11 +116,13 @@ func (m Model) renderMeta() string {
 	var meta []string
 
 	// ID
-	idLine := lipgloss.JoinHorizontal(lipgloss.Left,
-		m.styles.Muted.Render("ID:       "),
-		m.styles.DetailValue.Render(m.task.ID),
-	)
-	meta = append(meta, lipgloss.NewStyle().Padding(1, 2, 0, 2).Render(idLine))
+	if m.ShowID {
+		idLine := lipgloss.JoinHorizontal(lipgloss.Left,
+			m.styles.Muted.Render("ID:       "),
+			m.styles.DetailValue.Render(m.task.ID),
+		)
+		meta = append(meta, lipgloss.NewStyle().Padding(1, 2, 0, 2).Render(idLine))
+	}
 
 	// Status & Priority in one line
 	status := lipgloss.JoinHorizontal(lipgloss.Left,
@@ -131,8 +134,8 @@ func (m Model) renderMeta() string {
 		m.styles.PriorityBadge(m.task.Priority),
 	)
 	meta = append(meta, lipgloss.JoinHorizontal(lipgloss.Left,
-		lipgloss.NewStyle().Padding(0, 2).Render(status),
-		lipgloss.NewStyle().Padding(0, 4).Render(priority),
+		lipgloss.NewStyle().Padding(m.getTopPadding(), 2).Render(status),
+		lipgloss.NewStyle().Padding(m.getTopPadding(), 4).Render(priority),
 	))
 
 	// Deadline & Tags
@@ -160,6 +163,13 @@ func (m Model) renderMeta() string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, meta...)
+}
+
+func (m Model) getTopPadding() int {
+	if m.ShowID {
+		return 0
+	}
+	return 1
 }
 
 func (m *Model) renderMarkdown(src string) string {

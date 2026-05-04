@@ -31,7 +31,7 @@ func GetKairoTools() *genai.Tool {
 						},
 						"payload": {
 							Type:        genai.TypeObject,
-							Description: "JSON payload for the action. For 'set_theme', use 'theme' (string). For 'plugin_list', use {}. For 'plugin_get/delete', use 'name' (string). For 'plugin_write', use 'name' and 'content' (string). Tasks use title, description, tags, priority, status, deadline.",
+							Description: "JSON payload for the action. For 'set_theme', use 'theme' (string). For 'plugin_list', use {}. For 'plugin_get/delete', use 'name' (string). For 'plugin_write', use 'name' and 'content' (string). Tasks use title, description, tags, priority, status, deadline, recurrence (none|weekly|monthly), recurrence_weekly (array of strings), recurrence_monthly (number).",
 						},
 					},
 					Required: []string{"action", "payload"},

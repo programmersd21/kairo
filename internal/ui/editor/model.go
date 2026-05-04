@@ -45,6 +45,7 @@ type Model struct {
 	priority textinput.Model
 	deadline textinput.Model
 	status   textinput.Model
+	recur    textinput.Model
 	desc     textarea.Model
 
 	focus int
@@ -52,6 +53,9 @@ type Model struct {
 	deadlinePreview string
 	deadlineValue   *time.Time
 	deadlineErr     string
+
+	recurPreview string
+	recurErr     string
 
 	showPreview bool
 	renderer    *glamour.TermRenderer
@@ -92,6 +96,16 @@ func New(s styles.Styles, mode Mode, t core.Task) Model {
 		st.SetValue(string(t.Status))
 	}
 
+	re := textinput.New()
+	re.Prompt = "󰑖 Recur: "
+	re.CharLimit = 64
+	switch t.Recurrence {
+	case core.RecurrenceWeekly:
+		re.SetValue(strings.Join(t.RecurrenceWeekly, ","))
+	case core.RecurrenceMonthly:
+		re.SetValue(fmt.Sprintf("%d", t.RecurrenceMonthly))
+	}
+
 	d := textarea.New()
 	d.Placeholder = "Description (Markdown)…"
 	d.SetValue(t.Description)
@@ -108,11 +122,13 @@ func New(s styles.Styles, mode Mode, t core.Task) Model {
 		priority:    pr,
 		deadline:    dl,
 		status:      st,
+		recur:       re,
 		desc:        d,
 		focus:       0,
 		showPreview: true,
 	}
 	m.recomputeDeadline()
+	m.recomputeRecurrence()
 	return m
 }
 
@@ -121,17 +137,22 @@ func (m *Model) SetSize(w, h int) {
 
 	// Base sizes
 	editorW := max(20, min(80, w-10))
-	if w > 120 && m.showPreview {
-		editorW = w / 2
+	useSplit := m.width >= 100 && m.showPreview
+	if useSplit {
+		editorW = m.width / 2
+		if editorW < 50 {
+			editorW = 50
+		}
 	}
 
 	m.desc.SetWidth(max(20, editorW-10))
-	m.desc.SetHeight(max(4, h-16))
+	m.desc.SetHeight(max(4, h-18)) // Reduced height to fit more fields
 	m.title.Width = max(20, editorW-20)
 	m.tags.Width = max(20, editorW-20)
 	m.priority.Width = 6
 	m.deadline.Width = max(20, editorW-20)
 	m.status.Width = 10
+	m.recur.Width = max(20, editorW-20)
 
 	// Recreate renderer with new width
 	style := "dark"
@@ -139,7 +160,11 @@ func (m *Model) SetSize(w, h int) {
 		style = "light"
 	}
 
-	previewW := w - editorW - 10
+	previewW := w - editorW - 6
+	if !useSplit {
+		previewW = w - 10
+	}
+
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStandardStyle(style),
 		glamour.WithWordWrap(max(20, previewW-4)),
@@ -157,14 +182,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, func() tea.Msg { return CloseMsg{} }
 		case "tab":
 			m.blurAll()
-			m.focus = (m.focus + 1) % 6
+			m.focus = (m.focus + 1) % 7
 			m.focusField()
 			return m, nil
 		case "shift+tab":
 			m.blurAll()
 			m.focus--
 			if m.focus < 0 {
-				m.focus = 5
+				m.focus = 6
 			}
 			m.focusField()
 			return m, nil
@@ -186,14 +211,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case 2:
 		m.priority, cmd = m.priority.Update(msg)
 	case 3:
+		m.status, cmd = m.status.Update(msg)
+	case 4:
 		prev := m.deadline.Value()
 		m.deadline, cmd = m.deadline.Update(msg)
 		if m.deadline.Value() != prev {
 			m.recomputeDeadline()
 		}
-	case 4:
-		m.status, cmd = m.status.Update(msg)
 	case 5:
+		prev := m.recur.Value()
+		m.recur, cmd = m.recur.Update(msg)
+		if m.recur.Value() != prev {
+			m.recomputeRecurrence()
+		}
+	case 6:
 		m.desc, cmd = m.desc.Update(msg)
 	}
 	return m, cmd
@@ -205,7 +236,7 @@ func (m Model) View() string {
 		w = 80
 	}
 
-	useSplit := m.width > 120 && m.showPreview
+	useSplit := m.width >= 100 && m.showPreview
 	cardW := min(84, w-6)
 	if useSplit {
 		cardW = m.width - 4
@@ -223,15 +254,24 @@ func (m Model) View() string {
 		m.renderField("Tags", m.tags.View(), m.focus == 1),
 		lipgloss.JoinHorizontal(lipgloss.Left,
 			m.renderField("Pri", m.priority.View(), m.focus == 2),
-			m.renderField("Status", m.status.View(), m.focus == 4),
+			m.renderField("Status", m.status.View(), m.focus == 3),
 		),
-		m.renderField("Due", m.deadline.View(), m.focus == 3),
+		m.renderField("Due", m.deadline.View(), m.focus == 4),
 	}
 
 	if m.deadlineErr != "" {
 		fields = append(fields, m.styles.Error.Padding(0, 2).Render(m.deadlineErr))
 	} else if m.deadlinePreview != "" {
 		fields = append(fields, m.styles.Muted.Padding(0, 2).Render(m.deadlinePreview))
+	}
+
+	fields = append(fields, m.renderField("Recur", m.recur.View(), m.focus == 5))
+	if m.recurErr != "" {
+		fields = append(fields, m.styles.Error.Padding(0, 2).Render(m.recurErr))
+	} else if m.recurPreview != "" {
+		fields = append(fields, m.styles.Muted.Padding(0, 2).Render(m.recurPreview))
+	} else {
+		fields = append(fields, m.styles.Muted.Padding(0, 2).Render("e.g. mon,wed or 15"))
 	}
 
 	descView := m.desc.View()
@@ -289,6 +329,7 @@ func (m *Model) blurAll() {
 	m.priority.Blur()
 	m.deadline.Blur()
 	m.status.Blur()
+	m.recur.Blur()
 	m.desc.Blur()
 }
 
@@ -301,10 +342,12 @@ func (m *Model) focusField() {
 	case 2:
 		m.priority.Focus()
 	case 3:
-		m.deadline.Focus()
-	case 4:
 		m.status.Focus()
+	case 4:
+		m.deadline.Focus()
 	case 5:
+		m.recur.Focus()
+	case 6:
 		m.desc.Focus()
 	}
 }
@@ -327,6 +370,45 @@ func (m *Model) recomputeDeadline() {
 	}
 	m.deadlineValue = t
 	m.deadlinePreview = t.Local().Format("Mon Jan 2 15:04")
+	// If deadline changes, recurrence preview might change too
+	m.recomputeRecurrence()
+}
+
+func (m *Model) recomputeRecurrence() {
+	m.recurErr = ""
+	m.recurPreview = ""
+	raw := strings.TrimSpace(m.recur.Value())
+	if raw == "" {
+		return
+	}
+
+	recType, weekly, monthly, err := core.ParseRecurrence(raw)
+	if err != nil {
+		m.recurErr = err.Error()
+		return
+	}
+
+	if recType == core.RecurrenceNone {
+		return
+	}
+
+	// Use deadline as reference if available, else now
+	ref := time.Now()
+	if m.deadlineValue != nil {
+		ref = *m.deadlineValue
+	}
+
+	task := core.Task{
+		Recurrence:        recType,
+		RecurrenceWeekly:  weekly,
+		RecurrenceMonthly: monthly,
+		Deadline:          m.deadlineValue,
+	}
+
+	next := task.NextOccurrence(ref)
+	if next != nil {
+		m.recurPreview = "Next: " + next.Local().Format("Mon Jan 2 15:04")
+	}
 }
 
 func (m Model) saveCmd() tea.Cmd {
@@ -347,14 +429,23 @@ func (m Model) saveCmd() tea.Cmd {
 		deadline = &d
 	}
 
+	recType, weekly, monthly, err := core.ParseRecurrence(m.recur.Value())
+	if err != nil {
+		m.recurErr = err.Error()
+		return nil
+	}
+
 	if m.mode == ModeNew {
 		task := core.Task{
-			Title:       title,
-			Description: desc,
-			Tags:        tags,
-			Priority:    pri,
-			Deadline:    deadline,
-			Status:      st,
+			Title:             title,
+			Description:       desc,
+			Tags:              tags,
+			Priority:          pri,
+			Deadline:          deadline,
+			Status:            st,
+			Recurrence:        recType,
+			RecurrenceWeekly:  weekly,
+			RecurrenceMonthly: monthly,
 		}
 		return func() tea.Msg { return SaveNewMsg{Task: task} }
 	}
@@ -380,6 +471,15 @@ func (m Model) saveCmd() tea.Cmd {
 	}
 	if st != m.orig.Status {
 		patch.Status = &st
+	}
+	if recType != m.orig.Recurrence {
+		patch.Recurrence = &recType
+	}
+	if strings.Join(weekly, ",") != strings.Join(m.orig.RecurrenceWeekly, ",") {
+		patch.RecurrenceWeekly = &weekly
+	}
+	if monthly != m.orig.RecurrenceMonthly {
+		patch.RecurrenceMonthly = &monthly
 	}
 	return func() tea.Msg { return SavePatchMsg{ID: m.orig.ID, Patch: patch} }
 }
