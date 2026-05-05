@@ -98,9 +98,9 @@ func (r *Repository) CreateTask(ctx context.Context, t core.Task) (core.Task, er
 		weekly := strings.Join(t.RecurrenceWeekly, ",")
 
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, t.ID, t.Title, t.Description, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli())
+			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, t.ID, t.Title, t.Description, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.ParentID, t.Collapsed, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli())
 		if err != nil {
 			return err
 		}
@@ -134,9 +134,9 @@ func (r *Repository) UpdateTask(ctx context.Context, id string, patch core.TaskP
 
 		_, err := tx.ExecContext(ctx, `
 			UPDATE tasks
-			SET title=?, description=?, priority=?, deadline_ms=?, status=?, recurrence=?, recurrence_weekly=?, recurrence_monthly=?, updated_at_ms=?
+			SET title=?, description=?, priority=?, deadline_ms=?, status=?, recurrence=?, recurrence_weekly=?, recurrence_monthly=?, parent_id=?, collapsed=?, updated_at_ms=?
 			WHERE id=? AND deleted_at_ms IS NULL
-		`, updated.Title, updated.Description, int(updated.Priority), deadline, string(updated.Status), string(updated.Recurrence), weekly, updated.RecurrenceMonthly, updated.UpdatedAt.UTC().UnixMilli(), updated.ID)
+		`, updated.Title, updated.Description, int(updated.Priority), deadline, string(updated.Status), string(updated.Recurrence), weekly, updated.RecurrenceMonthly, updated.ParentID, updated.Collapsed, updated.UpdatedAt.UTC().UnixMilli(), updated.ID)
 		if err != nil {
 			return err
 		}
@@ -168,7 +168,7 @@ type Tombstone struct {
 
 func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms
+		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms
 		FROM tasks
 		WHERE deleted_at_ms IS NULL
 		ORDER BY updated_at_ms DESC
@@ -277,7 +277,7 @@ func (r *Repository) ApplyTombstone(ctx context.Context, t Tombstone) error {
 
 func (r *Repository) GetTask(ctx context.Context, id string) (core.Task, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms
+		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms
 		FROM tasks
 		WHERE id=? AND deleted_at_ms IS NULL
 	`, id)
@@ -346,7 +346,7 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	}
 
 	query := `
-		SELECT t.id, t.title, t.description, t.priority, t.deadline_ms, t.status, t.recurrence, t.recurrence_weekly, t.recurrence_monthly, t.created_at_ms, t.updated_at_ms
+		SELECT t.id, t.title, t.description, t.priority, t.deadline_ms, t.status, t.recurrence, t.recurrence_weekly, t.recurrence_monthly, t.parent_id, t.collapsed, t.created_at_ms, t.updated_at_ms
 		FROM tasks t
 		WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY ` + orderBy + `
@@ -437,7 +437,7 @@ func (r *Repository) ListTags(ctx context.Context) ([]string, error) {
 
 func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms
+		SELECT id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms
 		FROM tasks
 		WHERE deleted_at_ms IS NULL
 		ORDER BY updated_at_ms DESC
@@ -544,8 +544,8 @@ func (r *Repository) UpsertTask(ctx context.Context, t core.Task) error {
 		weekly := strings.Join(t.RecurrenceWeekly, ",")
 
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, created_at_ms, updated_at_ms)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET
 				title=excluded.title,
 				description=excluded.description,
@@ -555,10 +555,12 @@ func (r *Repository) UpsertTask(ctx context.Context, t core.Task) error {
 				recurrence=excluded.recurrence,
 				recurrence_weekly=excluded.recurrence_weekly,
 				recurrence_monthly=excluded.recurrence_monthly,
+				parent_id=excluded.parent_id,
+				collapsed=excluded.collapsed,
 				created_at_ms=excluded.created_at_ms,
 				updated_at_ms=excluded.updated_at_ms,
 				deleted_at_ms=NULL
-		`, t.ID, t.Title, t.Description, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli())
+		`, t.ID, t.Title, t.Description, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.ParentID, t.Collapsed, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli())
 		if err != nil {
 			return err
 		}
@@ -635,10 +637,12 @@ func scanTask(s scanner) (core.Task, error) {
 		rec        string
 		weekly     sql.NullString
 		monthly    int
+		parentID   sql.NullString
+		collapsed  bool
 		createdMs  int64
 		updatedMs  int64
 	)
-	if err := s.Scan(&id, &title, &desc, &priority, &deadlineMs, &status, &rec, &weekly, &monthly, &createdMs, &updatedMs); err != nil {
+	if err := s.Scan(&id, &title, &desc, &priority, &deadlineMs, &status, &rec, &weekly, &monthly, &parentID, &collapsed, &createdMs, &updatedMs); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return core.Task{}, err
 		}
@@ -665,6 +669,8 @@ func scanTask(s scanner) (core.Task, error) {
 		Recurrence:        core.RecurrenceType(rec),
 		RecurrenceWeekly:  weeklyDays,
 		RecurrenceMonthly: monthly,
+		ParentID:          parentID.String,
+		Collapsed:         collapsed,
 		CreatedAt:         time.UnixMilli(createdMs).UTC(),
 		UpdatedAt:         time.UnixMilli(updatedMs).UTC(),
 	}, nil

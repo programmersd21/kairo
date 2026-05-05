@@ -25,17 +25,18 @@ type Keymap struct {
 	ViewTag       key.Binding
 	ViewPriority  key.Binding
 
-	CycleTheme    key.Binding
-	OpenPluginDir key.Binding
-	ManagePlugins key.Binding
-	ToggleStrike  key.Binding
-	Help          key.Binding
-	Issues        key.Binding
-	Discussions   key.Binding
-	Changelog     key.Binding
-	Settings      key.Binding
-	ImportExport  key.Binding
-	AIPanelToggle key.Binding
+	CycleTheme     key.Binding
+	OpenPluginDir  key.Binding
+	ManagePlugins  key.Binding
+	ToggleStrike   key.Binding
+	ToggleCollapse key.Binding
+	Help           key.Binding
+	Issues         key.Binding
+	Discussions    key.Binding
+	Changelog      key.Binding
+	Settings       key.Binding
+	ImportExport   key.Binding
+	AIPanelToggle  key.Binding
 }
 
 func FromConfig(c config.KeymapConfig) Keymap {
@@ -56,17 +57,18 @@ func FromConfig(c config.KeymapConfig) Keymap {
 		ViewTag:       bind(c.ViewTag, "tag", "tag view"),
 		ViewPriority:  bind(c.ViewPriority, "priority", "priority view"),
 
-		CycleTheme:    bind(c.CycleTheme, "theme", "theme menu"),
-		OpenPluginDir: bind(c.OpenPluginDir, "plugins-dir", "open plugins folder"),
-		ManagePlugins: bind(c.ManagePlugins, "manage-plugins", "manage plugins"),
-		ToggleStrike:  bind(c.ToggleStrike, "strike", "toggle completion with animation"),
-		Help:          bind(c.Help, "help", "show help"),
-		Issues:        bind(c.Issues, "issues", "open github issues"),
-		Discussions:   bind(c.Discussions, "discussions", "open github discussions"),
-		Changelog:     bind(c.Changelog, "changelog", "open changelog"),
-		Settings:      bind(c.Settings, "settings", "open settings"),
-		ImportExport:  bind(c.ImportExport, "import-export", "import or export tasks"),
-		AIPanelToggle: bind(c.AIPanelToggle, "ai", "toggle AI assistant"),
+		CycleTheme:     bind(c.CycleTheme, "theme", "theme menu"),
+		OpenPluginDir:  bind(c.OpenPluginDir, "plugins-dir", "open plugins folder"),
+		ManagePlugins:  bind(c.ManagePlugins, "manage-plugins", "manage plugins"),
+		ToggleStrike:   bind(c.ToggleStrike, "strike", "toggle completion with animation"),
+		ToggleCollapse: bind(c.ToggleCollapse, "expand/collapse", "toggle folder/task collapse"),
+		Help:           bind(c.Help, "help", "show help"),
+		Issues:         bind(c.Issues, "issues", "open github issues"),
+		Discussions:    bind(c.Discussions, "discussions", "open github discussions"),
+		Changelog:      bind(c.Changelog, "changelog", "open changelog"),
+		Settings:       bind(c.Settings, "settings", "open settings"),
+		ImportExport:   bind(c.ImportExport, "import-export", "import or export tasks"),
+		AIPanelToggle:  bind(c.AIPanelToggle, "ai", "toggle AI assistant"),
 	}
 }
 func bind(keys, helpKey, helpDesc string) key.Binding {

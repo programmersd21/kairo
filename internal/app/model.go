@@ -456,7 +456,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_ = m.cfg.Save()
 		}
 		if m.cfg.App.Animations {
-			m.transitioning = true
+			m.transitioning = m.cfg.App.Animations
 			m.transitionStarted = time.Now()
 			m.animationGen++
 			return m, m.viewTransitionTickCmd()
@@ -467,7 +467,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == ModePalette {
 			m.mode = ModeList
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				return m, m.viewTransitionTickCmd()
 			}
@@ -479,7 +479,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == ModeHelp {
 			m.mode = ModeList
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				return m, m.viewTransitionTickCmd()
 			}
@@ -491,7 +491,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == ModeThemeMenu {
 			m.mode = ModeList
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				return m, m.viewTransitionTickCmd()
 			}
@@ -503,7 +503,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == ModeSettings {
 			m.mode = ModeList
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				return m, m.viewTransitionTickCmd()
 			}
@@ -566,7 +566,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshStyles()
 		m.mode = ModeList
 		if m.cfg.App.Animations {
-			m.transitioning = true
+			m.transitioning = m.cfg.App.Animations
 			m.transitionStarted = time.Now()
 			return m, m.viewTransitionTickCmd()
 		}
@@ -576,7 +576,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == ModePluginMenu {
 			m.mode = ModeList
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				return m, m.viewTransitionTickCmd()
 			}
@@ -588,7 +588,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == ModeImportExport {
 			m.mode = ModeList
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				return m, m.viewTransitionTickCmd()
 			}
@@ -601,7 +601,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = ModeList
 			var animCmd tea.Cmd
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				animCmd = m.viewTransitionTickCmd()
 			}
@@ -636,7 +636,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case plugin_menu.TransitionMsg:
 		if m.mode == ModePluginMenu {
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				m.animationGen++
 				return m, m.viewTransitionTickCmd()
@@ -693,7 +693,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == ModeEditor {
 			m.mode = ModeList
 			if m.cfg.App.Animations {
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				m.animationGen++
 				return m, m.viewTransitionTickCmd()
@@ -889,7 +889,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == ModeConfirmDelete {
 			switch km.String() {
 			case "y", "enter":
-				if t, ok := m.list.Selected(); ok {
+				if item, ok := m.list.Selected(); ok {
+					t := item.Task
 					m.mode = ModeList
 					if m.cfg.App.Animations {
 						m.deletingTaskID = t.ID
@@ -904,7 +905,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = ModeList
 				var animCmd tea.Cmd
 				if m.cfg.App.Animations {
-					m.transitioning = true
+					m.transitioning = m.cfg.App.Animations
 					m.transitionStarted = time.Now()
 					m.animationGen++
 					animCmd = m.viewTransitionTickCmd()
@@ -912,7 +913,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(m.deleteAllTasksCmd(), animCmd)
 			case "n", "esc":
 				m.mode = ModeList
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				m.animationGen++
 				return m, m.viewTransitionTickCmd()
@@ -925,7 +926,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case "n", "esc":
 				m.mode = ModeList
-				m.transitioning = true
+				m.transitioning = m.cfg.App.Animations
 				m.transitionStarted = time.Now()
 				m.animationGen++
 				return m, m.viewTransitionTickCmd()
@@ -980,7 +981,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = ModeList
 				var animCmd tea.Cmd
 				if m.cfg.App.Animations {
-					m.transitioning = true
+					m.transitioning = m.cfg.App.Animations
 					m.transitionStarted = time.Now()
 					m.animationGen++
 					animCmd = m.viewTransitionTickCmd()
@@ -993,10 +994,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.tagFilterInput.Blur()
 				m.mode = ModeList
-				m.transitioning = true
-				m.transitionStarted = time.Now()
-				m.animationGen++
-				return m, m.viewTransitionTickCmd()
+				if m.cfg.App.Animations {
+					m.transitioning = m.cfg.App.Animations
+					m.transitionStarted = time.Now()
+					m.animationGen++
+					return m, m.viewTransitionTickCmd()
+				}
+				return m, nil
 			}
 		}
 
@@ -1015,7 +1019,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = ModeOnboarding
 				var animCmd tea.Cmd
 				if m.cfg.App.Animations {
-					m.transitioning = true
+					m.transitioning = m.cfg.App.Animations
 					m.transitionStarted = time.Now()
 					m.animationGen++
 					animCmd = m.viewTransitionTickCmd()
@@ -1036,7 +1040,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if keymapMatch(m.km.ManagePlugins, km) {
 				if m.mode == ModePluginMenu {
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						return m, m.viewTransitionTickCmd()
 					}
@@ -1046,7 +1050,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pm.SetPlugins(m.plugHost.Plugins())
 					m.mode = ModePluginMenu
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						return m, m.viewTransitionTickCmd()
 					}
@@ -1064,7 +1068,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.mode = ModePalette
 					var animCmd tea.Cmd
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						animCmd = m.viewTransitionTickCmd()
 					}
@@ -1077,7 +1081,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.mode = ModePalette
 					var animCmd tea.Cmd
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						animCmd = m.viewTransitionTickCmd()
 					}
@@ -1086,7 +1090,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if keymapMatch(m.km.CycleTheme, km) {
 					m.mode = ModeThemeMenu
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						return m, m.viewTransitionTickCmd()
 					}
@@ -1095,7 +1099,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if keymapMatch(m.km.ImportExport, km) {
 					m.mode = ModeImportExport
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						return m, m.viewTransitionTickCmd()
 					}
@@ -1119,7 +1123,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if keymapMatch(m.km.Help, km) {
 					m.mode = ModeHelp
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						return m, m.viewTransitionTickCmd()
 					}
@@ -1137,7 +1141,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if keymapMatch(m.km.Settings, km) {
 					m.mode = ModeSettings
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						return m, m.viewTransitionTickCmd()
 					}
@@ -1157,7 +1161,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.rebuildComponentSizes()
 						var animCmd tea.Cmd
 						if m.cfg.App.Animations {
-							m.transitioning = true
+							m.transitioning = m.cfg.App.Animations
 							m.transitionStarted = time.Now()
 							animCmd = m.viewTransitionTickCmd()
 						}
@@ -1171,12 +1175,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.tagFilterInput.Focus()
 					m.mode = ModeTagFilter
 					return m, nil
+				case km.String() == " ":
+					// Handle space key for toggle collapse
+					if item, ok := m.list.Selected(); ok && item.HasChildren {
+						newCollapsed := !item.Collapsed
+						patch := core.TaskPatch{Collapsed: &newCollapsed}
+						return m, m.updateTaskCmd(item.ID, patch)
+					}
 				case km.String() == "tab":
 					m.prevActiveIdx = m.activeIdx
 					m.activeIdx = (m.activeIdx + 1) % len(m.views)
 					var animCmd tea.Cmd
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						animCmd = m.viewTransitionTickCmd()
 					}
@@ -1189,7 +1200,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					var animCmd tea.Cmd
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						animCmd = m.viewTransitionTickCmd()
 					}
@@ -1203,7 +1214,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.mode = ModeEditor
 					return m, m.edit.Init()
 				case keymapMatch(m.km.EditTask, km):
-					if t, ok := m.list.Selected(); ok {
+					if item, ok := m.list.Selected(); ok {
+						t := item.Task
 						return m, m.fetchOpenEditCmd(t.ID)
 					}
 				case keymapMatch(m.km.DeleteTask, km):
@@ -1212,11 +1224,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 				case keymapMatch(m.km.OpenTask, km):
-					if t, ok := m.list.Selected(); ok {
+					if item, ok := m.list.Selected(); ok {
+						t := item.Task
 						return m, m.fetchOpenTaskCmd(t.ID)
 					}
+				case keymapMatch(m.km.ToggleCollapse, km):
+					if item, ok := m.list.Selected(); ok && item.HasChildren {
+						newCollapsed := !item.Collapsed
+						patch := core.TaskPatch{Collapsed: &newCollapsed}
+						return m, m.updateTaskCmd(item.ID, patch)
+					}
 				case keymapMatch(m.km.ToggleStrike, km):
-					if t, ok := m.list.Selected(); ok {
+					if item, ok := m.list.Selected(); ok {
+						t := item.Task
 						m.animationGen++
 						m.animationReverse = (t.Status == core.StatusDone)
 						if m.cfg.App.Animations {
@@ -1236,7 +1256,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if keymapMatch(m.km.Back, km) {
 					m.mode = ModeList
 					if m.cfg.App.Animations {
-						m.transitioning = true
+						m.transitioning = m.cfg.App.Animations
 						m.transitionStarted = time.Now()
 						m.animationGen++
 						return m, m.viewTransitionTickCmd()
@@ -1245,6 +1265,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if keymapMatch(m.km.EditTask, km) {
 					return m, m.fetchOpenEditCmd(m.det.Task().ID)
+				}
+				if km.String() == " " {
+					// Handle space key for toggle collapse
+					t := m.det.Task()
+					newCollapsed := !t.Collapsed
+					patch := core.TaskPatch{Collapsed: &newCollapsed}
+					return m, m.updateTaskCmd(t.ID, patch)
 				}
 				if keymapMatch(m.km.ToggleStrike, km) {
 					t := m.det.Task()
@@ -1258,6 +1285,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						newStatus = core.StatusTodo
 					}
 					return m, m.updateTaskCmd(t.ID, core.TaskPatch{Status: &newStatus})
+				}
+				if keymapMatch(m.km.ToggleCollapse, km) {
+					t := m.det.Task()
+					newCollapsed := !t.Collapsed
+					patch := core.TaskPatch{Collapsed: &newCollapsed}
+					return m, m.updateTaskCmd(t.ID, patch)
 				}
 			}
 		}
@@ -1364,12 +1397,16 @@ func (m *Model) View() string {
 
 	content := m.renderMainUI()
 
-	// Final rendering pipeline: FillViewport guarantees that every cell in
-	// the width×height viewport has the background color applied.
-	// It pads lines, fills missing rows, and—critically—re-applies the
-	// background ANSI sequence after every SGR reset (\x1b[0m), which is
-	// the root cause of terminal default background bleeding through.
-	return render.FillViewport(content, m.width, m.height, m.s.Theme.Bg)
+	// Fill the viewport completely using the background color.
+	// This ensures no terminal default background bleeds through.
+	filled := render.FillViewport(content, m.width, m.height, m.s.Theme.Bg)
+
+	// Return the painted string directly. `render.FillViewport` already
+	// paints background for every line, inserts per-line EL sequences,
+	// and appends ED at the end. Returning this raw painted string avoids
+	// any reflow or re-rendering that `lipgloss.Place` may perform during
+	// resizes which can re-introduce slivers in some terminals.
+	return filled
 }
 
 func (m *Model) renderMainUI() string {
@@ -1840,12 +1877,23 @@ func (m *Model) renderFooter() string {
 					makePill(fk(m.km.DeleteTask) + " " + styles.IconDelete + "delete"),
 					makePill(fk(m.km.Settings) + " settings"),
 				}
+
+				// Contextual toggle for collapse/expand
+				if item, ok := m.list.Selected(); ok && item.HasChildren {
+					label := "collapse"
+					if item.Collapsed {
+						label = "expand"
+					}
+					items = append(items, makePill(fk(m.km.ToggleCollapse)+" "+label))
+				}
+
 				if m.aiKey != "" {
 					items = append(items, makePill(fk(m.km.AIPanelToggle)+" assistant"))
 				}
 				items = append(items, makePill(fk(m.km.Help)+" "+styles.IconHelp+"help"))
 				left = " " + strings.Join(items, sep)
 			}
+
 		}
 	}
 

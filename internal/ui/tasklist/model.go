@@ -14,6 +14,12 @@ import (
 	"github.com/programmersd21/kairo/internal/ui/styles"
 )
 
+type TaskItem struct {
+	core.Task
+	Depth       int
+	HasChildren bool
+}
+
 type Model struct {
 	styles     styles.Styles
 	vimMode    bool
@@ -23,7 +29,7 @@ type Model struct {
 	width  int
 	height int
 
-	tasks    []core.Task
+	items    []TaskItem
 	allTasks []core.Task // All tasks for stats calculation
 	sel      int
 
@@ -50,11 +56,11 @@ func New(s styles.Styles, vimMode bool, animations bool, km keymap.Keymap) Model
 	return Model{styles: s, vimMode: vimMode, Animations: animations, km: km}
 }
 
-func (m Model) Selected() (core.Task, bool) {
-	if m.sel < 0 || m.sel >= len(m.tasks) {
-		return core.Task{}, false
+func (m Model) Selected() (TaskItem, bool) {
+	if m.sel < 0 || m.sel >= len(m.items) {
+		return TaskItem{}, false
 	}
-	return m.tasks[m.sel], true
+	return m.items[m.sel], true
 }
 
 func (m *Model) SetSize(w, h int) {
@@ -62,13 +68,58 @@ func (m *Model) SetSize(w, h int) {
 }
 
 func (m *Model) SetTasks(ts []core.Task) {
-	m.tasks = append([]core.Task(nil), ts...)
-	if m.sel >= len(m.tasks) {
-		m.sel = len(m.tasks) - 1
+	m.items = buildVisibleTree(ts)
+	if m.sel >= len(m.items) {
+		m.sel = len(m.items) - 1
 	}
 	if m.sel < 0 {
 		m.sel = 0
 	}
+}
+
+func buildVisibleTree(ts []core.Task) []TaskItem {
+	taskMap := make(map[string]core.Task)
+	for _, t := range ts {
+		taskMap[t.ID] = t
+	}
+
+	children := make(map[string][]core.Task)
+	for _, t := range ts {
+		if t.ParentID != "" {
+			children[t.ParentID] = append(children[t.ParentID], t)
+		}
+	}
+
+	var roots []core.Task
+	for _, t := range ts {
+		if t.ParentID == "" {
+			roots = append(roots, t)
+		} else if _, ok := taskMap[t.ParentID]; !ok {
+			roots = append(roots, t)
+		}
+	}
+
+	var out []TaskItem
+	var walk func(t core.Task, depth int)
+	walk = func(t core.Task, depth int) {
+		kids := children[t.ID]
+		out = append(out, TaskItem{
+			Task:        t,
+			Depth:       depth,
+			HasChildren: len(kids) > 0,
+		})
+
+		if !t.Collapsed {
+			for _, kid := range kids {
+				walk(kid, depth+1)
+			}
+		}
+	}
+
+	for _, r := range roots {
+		walk(r, 0)
+	}
+	return out
 }
 
 func (m *Model) SetAllTasks(ts []core.Task) {
@@ -105,7 +156,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if x.String() == "j" && !m.vimMode {
 				break
 			}
-			if m.sel < len(m.tasks)-1 {
+			if m.sel < len(m.items)-1 {
 				m.sel++
 			}
 		case "pgup":
@@ -117,8 +168,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case "pgdown":
 			m.lastKey = ""
 			m.sel += max(1, m.height-4)
-			if m.sel > len(m.tasks)-1 {
-				m.sel = len(m.tasks) - 1
+			if m.sel > len(m.items)-1 {
+				m.sel = len(m.items) - 1
 			}
 		case "home":
 			m.lastKey = ""
@@ -128,8 +179,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if x.String() == "G" && !m.vimMode {
 				break
 			}
-			if len(m.tasks) > 0 {
-				m.sel = len(m.tasks) - 1
+			if len(m.items) > 0 {
+				m.sel = len(m.items) - 1
 			}
 		case "g":
 			if !m.vimMode {
@@ -153,17 +204,17 @@ func (m Model) View() string {
 	if m.width <= 0 || m.height <= 0 {
 		return ""
 	}
-	if len(m.tasks) == 0 {
+	if len(m.items) == 0 {
 		return m.renderEmpty()
 	}
 
 	visible := m.height
-	start := clamp(m.sel-visible/2, 0, max(0, len(m.tasks)-visible))
-	end := min(len(m.tasks), start+visible)
+	start := clamp(m.sel-visible/2, 0, max(0, len(m.items)-visible))
+	end := min(len(m.items), start+visible)
 
 	lines := make([]string, 0, visible)
 	for i := start; i < end; i++ {
-		t := m.tasks[i]
+		item := m.items[i]
 
 		// Cascading reveal: wait until view transition reaches a threshold for this row
 		if m.Animations && m.ViewTransitioning && m.ViewTransitionProgress < 1.0 {
@@ -180,7 +231,7 @@ func (m Model) View() string {
 			}
 		}
 
-		line := m.renderRow(t, i == m.sel)
+		line := m.renderRow(item, i == m.sel)
 		lines = append(lines, line)
 	}
 
@@ -293,7 +344,8 @@ func (m Model) renderEmpty() string {
 		Align(lipgloss.Center, lipgloss.Center).
 		Render(dashboard)
 }
-func (m Model) renderRow(t core.Task, selected bool) string {
+func (m Model) renderRow(item TaskItem, selected bool) string {
+	t := item.Task
 	// Compute animation progress for strike (completion toggle).
 	// Progress is always clamped to [0, 1] — no overshoot.
 	isAnimating := m.Animations && m.animatingTaskID == t.ID && m.animatingTaskID != ""
@@ -342,6 +394,19 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 	indicator := lipgloss.NewStyle().Background(rowBg).Render("  ")
 	if selected {
 		indicator = lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Background(rowBg).Render("\u2503 ")
+	}
+
+	// Hierarchy indentation and icons
+	indent := strings.Repeat("  ", item.Depth)
+	expandIcon := ""
+	if item.HasChildren {
+		if t.Collapsed {
+			expandIcon = "▶ "
+		} else {
+			expandIcon = "▼ "
+		}
+	} else if item.Depth > 0 {
+		expandIcon = "  "
 	}
 
 	titleStyle := m.styles.RowNormal
@@ -399,12 +464,13 @@ func (m Model) renderRow(t core.Task, selected bool) string {
 		// Clean left-to-right strikethrough wipe
 		title = m.renderStrikeWipe(titleText, animProgress, rowBg)
 	} else {
-		title = titleStyle.Render(truncate(titleText, max(20, m.width-40)))
+		titleWidth := max(20, m.width-40-lipgloss.Width(indent)-lipgloss.Width(expandIcon))
+		title = titleStyle.Render(truncate(titleText, titleWidth))
 	}
 
 	// Build left side
 	spaceBg := lipgloss.NewStyle().Background(rowBg).Render(" ")
-	left := indicator + statusStyle.Render(statusIcon) + spaceBg + title
+	left := indicator + lipgloss.NewStyle().Background(rowBg).Render(indent) + lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Background(rowBg).Render(expandIcon) + statusStyle.Render(statusIcon) + spaceBg + title
 
 	rightParts := []string{}
 

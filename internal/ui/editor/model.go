@@ -46,6 +46,7 @@ type Model struct {
 	deadline textinput.Model
 	status   textinput.Model
 	recur    textinput.Model
+	parentID textinput.Model
 	desc     textarea.Model
 
 	focus int
@@ -106,6 +107,11 @@ func New(s styles.Styles, mode Mode, t core.Task) Model {
 		re.SetValue(fmt.Sprintf("%d", t.RecurrenceMonthly))
 	}
 
+	pid := textinput.New()
+	pid.Prompt = "󱗼 Parent:"
+	pid.CharLimit = 64
+	pid.SetValue(t.ParentID)
+
 	d := textarea.New()
 	d.Placeholder = "Description (Markdown)…"
 	d.SetValue(t.Description)
@@ -123,6 +129,7 @@ func New(s styles.Styles, mode Mode, t core.Task) Model {
 		deadline:    dl,
 		status:      st,
 		recur:       re,
+		parentID:    pid,
 		desc:        d,
 		focus:       0,
 		showPreview: true,
@@ -182,14 +189,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, func() tea.Msg { return CloseMsg{} }
 		case "tab":
 			m.blurAll()
-			m.focus = (m.focus + 1) % 7
+			m.focus = (m.focus + 1) % 8
 			m.focusField()
 			return m, nil
 		case "shift+tab":
 			m.blurAll()
 			m.focus--
 			if m.focus < 0 {
-				m.focus = 6
+				m.focus = 7
 			}
 			m.focusField()
 			return m, nil
@@ -225,6 +232,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.recomputeRecurrence()
 		}
 	case 6:
+		m.parentID, cmd = m.parentID.Update(msg)
+	case 7:
 		m.desc, cmd = m.desc.Update(msg)
 	}
 	return m, cmd
@@ -273,6 +282,8 @@ func (m Model) View() string {
 	} else {
 		fields = append(fields, m.styles.Muted.Padding(0, 2).Render("e.g. mon,wed or 15"))
 	}
+
+	fields = append(fields, m.renderField("Parent", m.parentID.View(), m.focus == 6))
 
 	descView := m.desc.View()
 	fields = append(fields, "", lipgloss.NewStyle().Padding(0, 2).Render(descView))
@@ -330,6 +341,7 @@ func (m *Model) blurAll() {
 	m.deadline.Blur()
 	m.status.Blur()
 	m.recur.Blur()
+	m.parentID.Blur()
 	m.desc.Blur()
 }
 
@@ -348,6 +360,8 @@ func (m *Model) focusField() {
 	case 5:
 		m.recur.Focus()
 	case 6:
+		m.parentID.Focus()
+	case 7:
 		m.desc.Focus()
 	}
 }
@@ -446,6 +460,7 @@ func (m Model) saveCmd() tea.Cmd {
 			Recurrence:        recType,
 			RecurrenceWeekly:  weekly,
 			RecurrenceMonthly: monthly,
+			ParentID:          strings.TrimSpace(m.parentID.Value()),
 		}
 		return func() tea.Msg { return SaveNewMsg{Task: task} }
 	}
@@ -480,6 +495,10 @@ func (m Model) saveCmd() tea.Cmd {
 	}
 	if monthly != m.orig.RecurrenceMonthly {
 		patch.RecurrenceMonthly = &monthly
+	}
+	pid := strings.TrimSpace(m.parentID.Value())
+	if pid != m.orig.ParentID {
+		patch.ParentID = &pid
 	}
 	return func() tea.Msg { return SavePatchMsg{ID: m.orig.ID, Patch: patch} }
 }

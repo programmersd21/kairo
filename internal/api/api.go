@@ -107,6 +107,8 @@ type TaskDTO struct {
 	Recurrence        string   `json:"recurrence,omitempty"`
 	RecurrenceWeekly  []string `json:"recurrence_weekly,omitempty"`
 	RecurrenceMonthly int      `json:"recurrence_monthly,omitempty"`
+	ParentID          string   `json:"parent_id,omitempty"`
+	Collapsed         bool     `json:"collapsed,omitempty"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
 }
@@ -123,6 +125,8 @@ func toDTO(t core.Task) TaskDTO {
 		Recurrence:        string(t.Recurrence),
 		RecurrenceWeekly:  t.RecurrenceWeekly,
 		RecurrenceMonthly: t.RecurrenceMonthly,
+		ParentID:          t.ParentID,
+		Collapsed:         t.Collapsed,
 		CreatedAt:         t.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:         t.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
@@ -145,6 +149,8 @@ func (api *TaskAPI) handleCreate(ctx context.Context, payload json.RawMessage) R
 		Recurrence        string   `json:"recurrence,omitempty"`
 		RecurrenceWeekly  []string `json:"recurrence_weekly,omitempty"`
 		RecurrenceMonthly *int     `json:"recurrence_monthly,omitempty"`
+		ParentID          string   `json:"parent_id,omitempty"`
+		Collapsed         bool     `json:"collapsed,omitempty"`
 	}
 
 	var p CreatePayload
@@ -170,6 +176,8 @@ func (api *TaskAPI) handleCreate(ctx context.Context, payload json.RawMessage) R
 		Recurrence:        core.RecurrenceType(p.Recurrence),
 		RecurrenceWeekly:  p.RecurrenceWeekly,
 		RecurrenceMonthly: 0,
+		ParentID:          p.ParentID,
+		Collapsed:         p.Collapsed,
 	}
 
 	if p.RecurrenceMonthly != nil {
@@ -251,6 +259,8 @@ func (api *TaskAPI) handleUpdate(ctx context.Context, payload json.RawMessage) R
 		Recurrence        *string  `json:"recurrence,omitempty"`
 		RecurrenceWeekly  []string `json:"recurrence_weekly,omitempty"`
 		RecurrenceMonthly *int     `json:"recurrence_monthly,omitempty"`
+		ParentID          *string  `json:"parent_id,omitempty"`
+		Collapsed         *bool    `json:"collapsed,omitempty"`
 	}
 
 	var p UpdatePayload
@@ -271,6 +281,8 @@ func (api *TaskAPI) handleUpdate(ctx context.Context, payload json.RawMessage) R
 	patch := core.TaskPatch{
 		Title:       p.Title,
 		Description: p.Description,
+		ParentID:    p.ParentID,
+		Collapsed:   p.Collapsed,
 	}
 
 	if p.Recurrence != nil {

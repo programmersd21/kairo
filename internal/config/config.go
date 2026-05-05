@@ -75,23 +75,24 @@ type KeymapConfig struct {
 	Back       string `toml:"back"`
 	Quit       string `toml:"quit"`
 
-	ViewInbox     string `toml:"view_inbox"`
-	ViewToday     string `toml:"view_today"`
-	ViewUpcoming  string `toml:"view_upcoming"`
-	ViewCompleted string `toml:"view_completed"`
-	ViewTag       string `toml:"view_tag"`
-	ViewPriority  string `toml:"view_priority"`
-	CycleTheme    string `toml:"cycle_theme"`
-	OpenPluginDir string `toml:"open_plugin_dir"`
-	ManagePlugins string `toml:"manage_plugins"`
-	ToggleStrike  string `toml:"toggle_strike"`
-	Help          string `toml:"help"`
-	Issues        string `toml:"issues"`
-	Discussions   string `toml:"discussions"`
-	Changelog     string `toml:"changelog"`
-	Settings      string `toml:"settings"`
-	ImportExport  string `toml:"import_export"`
-	AIPanelToggle string `toml:"ai_panel_toggle"`
+	ViewInbox      string `toml:"view_inbox"`
+	ViewToday      string `toml:"view_today"`
+	ViewUpcoming   string `toml:"view_upcoming"`
+	ViewCompleted  string `toml:"view_completed"`
+	ViewTag        string `toml:"view_tag"`
+	ViewPriority   string `toml:"view_priority"`
+	CycleTheme     string `toml:"cycle_theme"`
+	OpenPluginDir  string `toml:"open_plugin_dir"`
+	ManagePlugins  string `toml:"manage_plugins"`
+	ToggleStrike   string `toml:"toggle_strike"`
+	ToggleCollapse string `toml:"toggle_collapse"`
+	Help           string `toml:"help"`
+	Issues         string `toml:"issues"`
+	Discussions    string `toml:"discussions"`
+	Changelog      string `toml:"changelog"`
+	Settings       string `toml:"settings"`
+	ImportExport   string `toml:"import_export"`
+	AIPanelToggle  string `toml:"ai_panel_toggle"`
 }
 
 func Default() Config {
@@ -134,31 +135,32 @@ func Default() Config {
 			Dir:     "plugins",
 		},
 		Keymap: KeymapConfig{
-			Palette:       "ctrl+p",
-			TaskSearch:    "/",
-			NewTask:       "n",
-			EditTask:      "e",
-			DeleteTask:    "d",
-			OpenTask:      "enter",
-			Back:          "esc",
-			Quit:          "q",
-			ViewInbox:     "1",
-			ViewToday:     "2",
-			ViewUpcoming:  "3",
-			ViewCompleted: "4",
-			ViewTag:       "f",
-			ViewPriority:  "5",
-			CycleTheme:    "t",
-			OpenPluginDir: "ctrl+g",
-			ManagePlugins: "p",
-			ToggleStrike:  "z",
-			Help:          "?",
-			Issues:        "i",
-			Discussions:   "u",
-			Changelog:     "c",
-			Settings:      "ctrl+s",
-			ImportExport:  "x",
-			AIPanelToggle: "ctrl+a",
+			Palette:        "ctrl+p",
+			TaskSearch:     "/",
+			NewTask:        "n",
+			EditTask:       "e",
+			DeleteTask:     "d",
+			OpenTask:       "enter",
+			Back:           "esc",
+			Quit:           "q",
+			ViewInbox:      "1",
+			ViewToday:      "2",
+			ViewUpcoming:   "3",
+			ViewCompleted:  "4",
+			ViewTag:        "f",
+			ViewPriority:   "5",
+			CycleTheme:     "t",
+			OpenPluginDir:  "ctrl+g",
+			ManagePlugins:  "p",
+			ToggleStrike:   "z",
+			ToggleCollapse: "space",
+			Help:           "?",
+			Issues:         "i",
+			Discussions:    "u",
+			Changelog:      "c",
+			Settings:       "ctrl+s",
+			ImportExport:   "x",
+			AIPanelToggle:  "ctrl+a",
 		},
 	}
 }
@@ -278,6 +280,9 @@ func Load() (Config, error) {
 	}
 	if cfg.Keymap.ToggleStrike == "" {
 		cfg.Keymap.ToggleStrike = defaults.Keymap.ToggleStrike
+	}
+	if cfg.Keymap.ToggleCollapse == "" {
+		cfg.Keymap.ToggleCollapse = defaults.Keymap.ToggleCollapse
 	}
 	if cfg.Keymap.Help == "" {
 		cfg.Keymap.Help = defaults.Keymap.Help

@@ -16,7 +16,6 @@
 package render
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -25,13 +24,15 @@ import (
 // bgAnsi returns the raw ANSI escape sequence for setting a 24-bit
 // background color from a hex color string (e.g., "#1E1E2E").
 func bgAnsi(c lipgloss.Color) string {
-	hex := strings.TrimPrefix(string(c), "#")
-	if len(hex) != 6 {
+	if c == "" {
 		return ""
 	}
-	var r, g, b int
-	_, _ = fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
-	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm", r, g, b)
+	// Use lipgloss to generate the ANSI sequence for this color.
+	// We render an empty string with the background color set.
+	// This returns something like "\x1b[48;2;...m\x1b[0m".
+	s := lipgloss.NewStyle().Background(c).Render("")
+	// Strip the reset sequence (\x1b[0m) if it exists.
+	return strings.TrimSuffix(s, "\x1b[0m")
 }
 
 // PaintBg is a post-processing step that ensures a background color persists
@@ -84,7 +85,10 @@ func FillViewport(content string, width, height int, bg lipgloss.Color) string {
 
 	lines := strings.Split(content, "\n")
 	bgStyle := lipgloss.NewStyle().Background(bg)
-	emptyLine := bgStyle.Render(strings.Repeat(" ", width))
+	// Pad an extra column to guard against off-by-one width calculations
+	// in some terminals/lipgloss width computations. This extra column
+	// ensures the right-most cell is always painted.
+	emptyLine := bgStyle.Render(strings.Repeat(" ", width+1))
 
 	result := make([]string, 0, height)
 	for i := 0; i < height; i++ {
@@ -94,6 +98,10 @@ func FillViewport(content string, width, height int, bg lipgloss.Color) string {
 			if vis < width {
 				pad := bgStyle.Render(strings.Repeat(" ", width-vis))
 				result = append(result, line+pad)
+			} else if vis > width {
+				// Truncate line if it's too wide to prevent terminal wrapping
+				// which would break the vertical layout and cause bleeding.
+				result = append(result, lipgloss.NewStyle().MaxWidth(width).Render(line))
 			} else {
 				result = append(result, line)
 			}
@@ -101,6 +109,11 @@ func FillViewport(content string, width, height int, bg lipgloss.Color) string {
 			result = append(result, emptyLine)
 		}
 	}
+
+	// Append one extra full-width background line to ensure the bottom
+	// row is painted in terminals that may otherwise leave a thin strip.
+	// This is a harmless extra line when using the alternate screen buffer.
+	result = append(result, emptyLine)
 
 	seq := bgAnsi(bg)
 	painted := PaintBg(strings.Join(result, "\n"), bg)
@@ -111,8 +124,10 @@ func FillViewport(content string, width, height int, bg lipgloss.Color) string {
 	// any cells beyond the painted width—even if lipgloss.Width miscounted.
 	if seq != "" {
 		painted = strings.ReplaceAll(painted, "\n", "\x1b[K\n")
-		// Also clear to end-of-line on the very last line.
-		painted += "\x1b[K"
+		// Also clear to end-of-line on the very last line, and then clear
+		// the rest of the display. This ensures any terminal padding or
+		// margins are filled with our background color.
+		painted += "\x1b[K\x1b[J"
 	}
 
 	return painted

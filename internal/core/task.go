@@ -73,6 +73,8 @@ type Task struct {
 	Recurrence        RecurrenceType
 	RecurrenceWeekly  []string
 	RecurrenceMonthly int
+	ParentID          string
+	Collapsed         bool
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -140,6 +142,8 @@ type TaskPatch struct {
 	Recurrence        *RecurrenceType
 	RecurrenceWeekly  *[]string
 	RecurrenceMonthly *int
+	ParentID          *string
+	Collapsed         *bool
 }
 
 func (p TaskPatch) ApplyTo(t Task) Task {
@@ -170,6 +174,12 @@ func (p TaskPatch) ApplyTo(t Task) Task {
 	if p.RecurrenceMonthly != nil {
 		t.RecurrenceMonthly = *p.RecurrenceMonthly
 	}
+	if p.ParentID != nil {
+		t.ParentID = *p.ParentID
+	}
+	if p.Collapsed != nil {
+		t.Collapsed = *p.Collapsed
+	}
 	return t
 }
 
@@ -185,6 +195,8 @@ func (t Task) MarshalJSON() ([]byte, error) {
 		Recurrence        string    `json:"recurrence,omitempty"`
 		RecurrenceWeekly  []string  `json:"recurrence_weekly,omitempty"`
 		RecurrenceMonthly int       `json:"recurrence_monthly,omitempty"`
+		ParentID          string    `json:"parent_id,omitempty"`
+		Collapsed         bool      `json:"collapsed,omitempty"`
 		CreatedAt         time.Time `json:"created_at"`
 		UpdatedAt         time.Time `json:"updated_at"`
 	}
@@ -204,6 +216,8 @@ func (t Task) MarshalJSON() ([]byte, error) {
 		Recurrence:        string(t.Recurrence),
 		RecurrenceWeekly:  t.RecurrenceWeekly,
 		RecurrenceMonthly: t.RecurrenceMonthly,
+		ParentID:          t.ParentID,
+		Collapsed:         t.Collapsed,
 		CreatedAt:         t.CreatedAt.UTC(),
 		UpdatedAt:         t.UpdatedAt.UTC(),
 	})

@@ -54,6 +54,11 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			ALTER TABLE tasks ADD COLUMN recurrence_weekly TEXT NULL;
 			ALTER TABLE tasks ADD COLUMN recurrence_monthly INTEGER NOT NULL DEFAULT 0;
 		`},
+		{3, `
+			ALTER TABLE tasks ADD COLUMN parent_id TEXT;
+			ALTER TABLE tasks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;
+			CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
+		`},
 	}
 
 	for _, s := range steps {

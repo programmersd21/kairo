@@ -476,8 +476,23 @@ var ForestSanctuary = Theme{
 	Overlay: lipgloss.Color("#2D4A39"),
 }
 
+var Steel = Theme{
+	Name:    "steel",
+	IsLight: false,
+	Bg:      lipgloss.Color("#1e2a35"),
+	Fg:      lipgloss.Color("#dce8f0"),
+	Muted:   lipgloss.Color("#4a6478"),
+	Border:  lipgloss.Color("#3a4f62"),
+	Accent:  lipgloss.Color("#5dade2"),
+	Good:    lipgloss.Color("#a6e3a1"),
+	Warn:    lipgloss.Color("#f9e2af"),
+	Bad:     lipgloss.Color("#f38ba8"),
+	Overlay: lipgloss.Color("#253342"),
+}
+
 func Builtins() []Theme {
 	return []Theme{
+		Steel,
 		Catppuccin, Midnight, Aurora, Cyberpunk, Dracula, Nord,
 		ObsidianBloom, NeonReef, CarbonSunset, VantaAurora, PlasmaGrape, MidnightJade, SynthwaveMinimal, GraphiteMatcha,
 		Vanilla, Solarized, Rose, Matcha, Cloud, Sepia,

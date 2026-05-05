@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2]
+### Added
+- **Nested Tasks & Hierarchy**: Support for parent/child task relationships, including collapsible parent tasks and task nesting UI.
+- **API Support**: Added `parent_id` and `collapsed` fields to the API and data model.
+- **New Theme**: Added "Steel" theme, featuring a professional deep-blue industrial aesthetic.
+
+### Fixed
+- **Animation Bug**: Tab animation now correctly respects the animation toggle setting when cancelling a quit operation.
+
 ## [1.4.1]
 
 ### Added
