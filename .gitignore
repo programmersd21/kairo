@@ -1,0 +1,17 @@
+# Ignore everything in this directory
+*
+
+# Except for these:
+!.gitignore
+!*.png
+!*.jpg
+!*.jpeg
+!*.gif
+!*.svg
+!*.webp
+!*.mp4
+!*.mov
+
+# Ignore OS-specific junk
+.DS_Store
+Thumbs.db
