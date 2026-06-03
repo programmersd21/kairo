@@ -41,3 +41,35 @@ func TestTaskPatch_ApplyTo(t *testing.T) {
 		t.Error("original task title was mutated")
 	}
 }
+
+func TestTaskPatch_ApplyTo_NewFields(t *testing.T) {
+	task := Task{
+		ID:      "1",
+		Title:   "Test",
+		Status:  StatusTodo,
+		Project: "Work",
+	}
+
+	result := "Completed successfully"
+	responsible := "alice"
+	patch := TaskPatch{
+		Result:      &result,
+		Responsible: &responsible,
+	}
+
+	updated := patch.ApplyTo(task)
+
+	if updated.Result != "Completed successfully" {
+		t.Errorf("expected result 'Completed successfully', got %q", updated.Result)
+	}
+	if updated.Responsible != "alice" {
+		t.Errorf("expected responsible 'alice', got %q", updated.Responsible)
+	}
+	if updated.OpenIssueID != "" {
+		t.Errorf("expected empty OpenIssueID, got %q", updated.OpenIssueID)
+	}
+	// Verify immutability
+	if task.Result != "" || task.Responsible != "" {
+		t.Error("original task was mutated")
+	}
+}

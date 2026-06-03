@@ -98,6 +98,12 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			CREATE INDEX IF NOT EXISTS idx_focus_sessions_start ON focus_sessions(start_time_ms);
 			CREATE INDEX IF NOT EXISTS idx_focus_sessions_task ON focus_sessions(task_id);
 		`},
+		{7, `
+			ALTER TABLE tasks ADD COLUMN result TEXT NOT NULL DEFAULT '';
+			ALTER TABLE tasks ADD COLUMN open_issue_id TEXT NOT NULL DEFAULT '';
+			ALTER TABLE tasks ADD COLUMN responsible TEXT NOT NULL DEFAULT '';
+			CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+		`},
 	}
 
 	for _, s := range steps {

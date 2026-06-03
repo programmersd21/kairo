@@ -81,21 +81,32 @@ func (a Action) Format() string {
 	}
 }
 
+type Scope int
+
+const (
+	ScopeAll Scope = iota
+	ScopeCurrentProject
+)
+
 type SelectMsg struct {
 	Action Action
 	Path   string
+	Scope  Scope
 }
 
 type CloseMsg struct{}
 
 type Model struct {
-	styles styles.Styles
-	width  int
-	height int
-	sel    int
-	items  []Action
-	input  textinput.Model
-	isPath bool
+	styles     styles.Styles
+	width      int
+	height     int
+	sel        int
+	sel2       int
+	items      []Action
+	input      textinput.Model
+	isPath     bool
+	scope      bool
+	scopeValue Scope
 }
 
 func New(s styles.Styles) Model {
@@ -115,11 +126,51 @@ func New(s styles.Styles) Model {
 	}
 }
 
+func (m Model) ScopeValue() Scope {
+	return m.scopeValue
+}
+
+func (m Model) SetScope(s Scope) Model {
+	m.scopeValue = s
+	return m
+}
+
 func (m *Model) SetSize(w, h int) {
 	m.width, m.height = w, h
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	if m.scope {
+		switch x := msg.(type) {
+		case tea.KeyMsg:
+			switch x.String() {
+			case "esc", "q":
+				m.scope = false
+				return m, nil
+			case "up", "k":
+				if m.sel2 > 0 {
+					m.sel2--
+				}
+			case "down", "j":
+				if m.sel2 < 1 {
+					m.sel2++
+				}
+			case "enter":
+				m.scopeValue = ScopeAll
+				if m.sel2 == 1 {
+					m.scopeValue = ScopeCurrentProject
+				}
+				fname := fmt.Sprintf("kairo_export_%s%s", time.Now().Format("2006-01-02_150405"), m.items[m.sel].Extension())
+				m.input.SetValue(fname)
+				m.scope = false
+				m.isPath = true
+				m.input.Focus()
+				return m, nil
+			}
+		}
+		return m, nil
+	}
+
 	if m.isPath {
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
@@ -131,7 +182,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			case "enter":
 				path := m.input.Value()
 				if path != "" {
-					return m, func() tea.Msg { return SelectMsg{Action: m.items[m.sel], Path: path} }
+					scope := m.scopeValue
+					return m, func() tea.Msg { return SelectMsg{Action: m.items[m.sel], Path: path, Scope: scope} }
 				}
 			}
 		}
@@ -154,12 +206,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case "enter":
 			action := m.items[m.sel]
 			if action.IsExport() {
-				// Set default path for export
-				fname := fmt.Sprintf("kairo_export_%s%s", time.Now().Format("2006-01-02_150405"), action.Extension())
-				m.input.SetValue(fname)
-			} else {
-				m.input.SetValue("")
+				m.scope = true
+				m.sel2 = 0
+				return m, nil
 			}
+			m.input.SetValue("")
 			m.isPath = true
 			m.input.Focus()
 			return m, nil
@@ -183,7 +234,22 @@ func (m Model) View() string {
 	var lines []string
 	lines = append(lines, header, "")
 
-	if m.isPath {
+	if m.scope {
+		scopeItems := []string{"All Projects", "Current Project"}
+		lines = append(lines, m.styles.Muted.Render("Export scope:"))
+		lines = append(lines, "")
+		for i, s := range scopeItems {
+			style := m.styles.RowNormal
+			prefix := "  "
+			if i == m.sel2 {
+				style = m.styles.RowSelected
+				prefix = "> "
+			}
+			lines = append(lines, style.Render(prefix+s))
+		}
+		lines = append(lines, "")
+		lines = append(lines, m.styles.Muted.Render("Select scope, Esc to go back"))
+	} else if m.isPath {
 		action := m.items[m.sel]
 		label := "Save to:"
 		if !action.IsExport() {
@@ -197,7 +263,6 @@ func (m Model) View() string {
 		lines = append(lines, m.styles.Muted.Render("Press Enter to confirm, Esc to cancel"))
 	} else {
 		for i, action := range m.items {
-			// Add a separator between Export and Import
 			if i == 4 {
 				lines = append(lines, "")
 			}

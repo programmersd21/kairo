@@ -114,6 +114,9 @@ type TaskDTO struct {
 	Collapsed         bool     `json:"collapsed,omitempty"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
+	Result            string   `json:"result,omitempty"`
+	OpenIssueID       string   `json:"open_issue_id,omitempty"`
+	Responsible       string   `json:"responsible,omitempty"`
 }
 
 // toDTO converts a core.Task to a DTO for serialization
@@ -132,6 +135,9 @@ func toDTO(t core.Task) TaskDTO {
 		Collapsed:         t.Collapsed,
 		CreatedAt:         t.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:         t.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		Result:            t.Result,
+		OpenIssueID:       t.OpenIssueID,
+		Responsible:       t.Responsible,
 	}
 	if t.Deadline != nil {
 		s := t.Deadline.Format("2006-01-02T15:04:05Z")
@@ -513,7 +519,8 @@ func (api *TaskAPI) handleListTags(ctx context.Context) Response {
 // handleExport processes an export request
 func (api *TaskAPI) handleExport(ctx context.Context, payload json.RawMessage) Response {
 	type ExportPayload struct {
-		Format string `json:"format"`
+		Format  string `json:"format"`
+		Project string `json:"project"`
 	}
 
 	var p ExportPayload
@@ -521,7 +528,17 @@ func (api *TaskAPI) handleExport(ctx context.Context, payload json.RawMessage) R
 		p.Format = "json"
 	}
 
-	tasks, err := api.service.ListAll(ctx)
+	var tasks []core.Task
+	var err error
+	if p.Project != "" {
+		tasks, err = api.service.List(ctx, core.Filter{
+			Project:            p.Project,
+			Statuses:           []core.Status{core.StatusTodo, core.StatusDoing, core.StatusDone},
+			IncludeNilDeadline: true,
+		})
+	} else {
+		tasks, err = api.service.ListAll(ctx)
+	}
 	if err != nil {
 		return Response{Success: false, Error: err.Error()}
 	}

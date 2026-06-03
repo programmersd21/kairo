@@ -42,17 +42,18 @@ type Model struct {
 
 	orig core.Task
 
-	title     textinput.Model
-	tags      textinput.Model
-	priority  textinput.Model
-	deadline  textinput.Model
-	waitUntil textinput.Model
-	status    textinput.Model
-	recur     textinput.Model
-	until     textinput.Model
-	project   textinput.Model
-	parentID  textinput.Model
-	desc      textarea.Model
+	title       textinput.Model
+	tags        textinput.Model
+	priority    textinput.Model
+	deadline    textinput.Model
+	waitUntil   textinput.Model
+	status      textinput.Model
+	recur       textinput.Model
+	until       textinput.Model
+	project     textinput.Model
+	parentID    textinput.Model
+	responsible textinput.Model
+	desc        textarea.Model
 
 	focus int
 
@@ -163,6 +164,12 @@ func New(s styles.Styles, mode Mode, t core.Task, preview bool) Model {
 	pid.SetValue(t.ParentID)
 	applyFieldStyles(&pid)
 
+	resp := textinput.New()
+	resp.Prompt = ""
+	resp.CharLimit = 64
+	resp.SetValue(t.Responsible)
+	applyFieldStyles(&resp)
+
 	d := textarea.New()
 	d.Placeholder = "Description (Markdown)…"
 	d.SetValue(t.Description)
@@ -184,6 +191,7 @@ func New(s styles.Styles, mode Mode, t core.Task, preview bool) Model {
 		until:       un,
 		project:     pj,
 		parentID:    pid,
+		responsible: resp,
 		desc:        d,
 		focus:       0,
 		showPreview: preview,
@@ -220,8 +228,7 @@ func (m *Model) SetSize(w, h int) {
 	m.until.Width = max(20, editorW-20)
 	m.project.Width = max(20, editorW-20)
 	m.parentID.Width = max(20, editorW-20)
-
-	// Recreate renderer with new width
+	m.responsible.Width = max(20, editorW-20)
 	style := "dark"
 	if m.styles.Theme.IsLight {
 		style = "light"
@@ -257,14 +264,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, func() tea.Msg { return CloseMsg{} }
 		case "tab":
 			m.blurAll()
-			m.focus = (m.focus + 1) % 11
+			m.focus = (m.focus + 1) % 12
 			m.focusField()
 			return m, nil
 		case "shift+tab":
 			m.blurAll()
 			m.focus--
 			if m.focus < 0 {
-				m.focus = 10
+				m.focus = 11
 			}
 			m.focusField()
 			return m, nil
@@ -320,6 +327,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case 9:
 		m.parentID, cmd = m.parentID.Update(msg)
 	case 10:
+		m.responsible, cmd = m.responsible.Update(msg)
+	case 11:
 		m.desc, cmd = m.desc.Update(msg)
 	}
 	return m, cmd
@@ -405,8 +414,8 @@ func (m Model) View() string {
 	}
 
 	fields = append(fields, renderField("󱓡 ", "Project:", m.project.View(), m.focus == 8))
+	fields = append(fields, renderField("󰓆 ", "Resp:", m.responsible.View(), m.focus == 10))
 
-	// Replace parentID text input field with a selection field
 	parentIDDisplay := m.parentID.Value()
 	if parentIDDisplay == "" {
 		parentIDDisplay = "None"
@@ -467,6 +476,7 @@ func (m *Model) blurAll() {
 	m.until.Blur()
 	m.project.Blur()
 	m.parentID.Blur()
+	m.responsible.Blur()
 	m.desc.Blur()
 }
 
@@ -493,6 +503,8 @@ func (m *Model) focusField() {
 	case 9:
 		m.parentID.Focus()
 	case 10:
+		m.responsible.Focus()
+	case 11:
 		m.desc.Focus()
 	}
 }
@@ -654,6 +666,7 @@ func (m Model) saveCmd() tea.Cmd {
 			RecurrenceWeekly:  weekly,
 			RecurrenceMonthly: monthly,
 			ParentID:          strings.TrimSpace(m.parentID.Value()),
+			Responsible:       strings.TrimSpace(m.responsible.Value()),
 		}
 		return func() tea.Msg { return SaveNewMsg{Task: task} }
 	}
@@ -704,19 +717,9 @@ func (m Model) saveCmd() tea.Cmd {
 	if pid != m.orig.ParentID {
 		patch.ParentID = &pid
 	}
+	resp := strings.TrimSpace(m.responsible.Value())
+	if resp != m.orig.Responsible {
+		patch.Responsible = &resp
+	}
 	return func() tea.Msg { return SavePatchMsg{ID: m.orig.ID, Patch: patch} }
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

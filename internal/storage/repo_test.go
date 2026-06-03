@@ -170,3 +170,92 @@ func TestProjectFiltering(t *testing.T) {
 		t.Fatalf("expected 2 projects, got %d: %v", len(projects), projects)
 	}
 }
+
+func TestOpenIssueIDGeneration(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "kairo.db")
+	r, err := Open(ctx, dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := r.Close(); err != nil {
+			t.Errorf("failed to close repository: %v", err)
+		}
+	}()
+
+	t1, err := r.CreateTask(ctx, core.Task{
+		Title:  "Task A",
+		Status: core.StatusTodo,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if t1.OpenIssueID != "OI000001" {
+		t.Fatalf("expected OI000001, got %q", t1.OpenIssueID)
+	}
+
+	t2, err := r.CreateTask(ctx, core.Task{
+		Title:  "Task B",
+		Status: core.StatusTodo,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if t2.OpenIssueID != "OI000002" {
+		t.Fatalf("expected OI000002, got %q", t2.OpenIssueID)
+	}
+}
+
+func TestResultAndResponsibleFields(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "kairo.db")
+	r, err := Open(ctx, dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := r.Close(); err != nil {
+			t.Errorf("failed to close repository: %v", err)
+		}
+	}()
+
+	created, err := r.CreateTask(ctx, core.Task{
+		Title:       "Test task",
+		Status:      core.StatusTodo,
+		Result:      "",
+		Responsible: "bob",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if created.Responsible != "bob" {
+		t.Fatalf("expected responsible 'bob', got %q", created.Responsible)
+	}
+
+	result := "All done"
+	resp := "charlie"
+	updated, err := r.UpdateTask(ctx, created.ID, core.TaskPatch{
+		Result:      &result,
+		Responsible: &resp,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Result != "All done" {
+		t.Fatalf("expected result 'All done', got %q", updated.Result)
+	}
+	if updated.Responsible != "charlie" {
+		t.Fatalf("expected responsible 'charlie', got %q", updated.Responsible)
+	}
+
+	got, err := r.GetTask(ctx, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Result != "All done" || got.Responsible != "charlie" {
+		t.Fatalf("expected result=%q responsible=%q after GetTask, got result=%q responsible=%q",
+			"All done", "charlie", got.Result, got.Responsible)
+	}
+}

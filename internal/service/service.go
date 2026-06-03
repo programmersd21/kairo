@@ -104,18 +104,22 @@ func (s *taskService) Repo() *storage.Repository {
 
 // Create creates a new task with validation and ID generation.
 func (s *taskService) Create(ctx context.Context, task core.Task) (core.Task, error) {
-	// Normalize and validate
+	if task.ParentID != "" && task.Project == "" {
+		parent, err := s.repo.GetTask(ctx, task.ParentID)
+		if err == nil && parent.Project != "" {
+			task.Project = parent.Project
+		}
+	}
+
 	if err := task.Validate(); err != nil {
 		return core.Task{}, fmt.Errorf("invalid task: %w", err)
 	}
 
-	// Let repository handle ID generation, timestamps, and persistence
 	created, err := s.repo.CreateTask(ctx, task)
 	if err != nil {
 		return core.Task{}, fmt.Errorf("failed to create task: %w", err)
 	}
 
-	// Emit event
 	s.hooks.TaskCreated(created)
 
 	return created, nil
@@ -132,7 +136,6 @@ func (s *taskService) GetByID(ctx context.Context, id string) (core.Task, error)
 
 // Update applies a patch to a task.
 func (s *taskService) Update(ctx context.Context, id string, patch core.TaskPatch) (core.Task, error) {
-	// Repository handles validation of patch and atomic update
 	updated, err := s.repo.UpdateTask(ctx, id, patch)
 	if err != nil {
 		return core.Task{}, fmt.Errorf("failed to update task: %w", err)
@@ -149,7 +152,6 @@ func (s *taskService) Update(ctx context.Context, id string, patch core.TaskPatc
 			return updated, nil
 		}
 
-		// Use deadline as reference if available, else now
 		ref := now
 		if updated.Deadline != nil {
 			ref = *updated.Deadline
@@ -174,7 +176,6 @@ func (s *taskService) Update(ctx context.Context, id string, patch core.TaskPatc
 		}
 	}
 
-	// Emit event
 	s.hooks.TaskUpdated(updated, patch)
 
 	return updated, nil
@@ -186,7 +187,6 @@ func (s *taskService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to delete task: %w", err)
 	}
 
-	// Emit event
 	s.hooks.TaskDeleted(id)
 
 	return nil
@@ -198,7 +198,6 @@ func (s *taskService) DeleteAll(ctx context.Context) error {
 		return fmt.Errorf("failed to delete all tasks: %w", err)
 	}
 
-	// Emit event
 	s.hooks.TaskDeleteAll()
 
 	return nil
@@ -213,7 +212,6 @@ func (s *taskService) DeleteTasks(ctx context.Context, ids []string) error {
 		return fmt.Errorf("failed to delete tasks: %w", err)
 	}
 
-	// Emit events
 	for _, id := range ids {
 		s.hooks.TaskDeleted(id)
 	}

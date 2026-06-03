@@ -80,15 +80,10 @@ func FillViewport(content string, width, height int, bg lipgloss.Color) string {
 		return ""
 	}
 
-	// Strip \r to normalize line endings across platforms.
 	content = strings.ReplaceAll(content, "\r", "")
-
 	lines := strings.Split(content, "\n")
 	bgStyle := lipgloss.NewStyle().Background(bg)
-	// Pad an extra column to guard against off-by-one width calculations
-	// in some terminals/lipgloss width computations. This extra column
-	// ensures the right-most cell is always painted.
-	emptyLine := bgStyle.Render(strings.Repeat(" ", width+1))
+	padded := bgStyle.Render(strings.Repeat(" ", width))
 
 	result := make([]string, 0, height)
 	for i := 0; i < height; i++ {
@@ -99,49 +94,42 @@ func FillViewport(content string, width, height int, bg lipgloss.Color) string {
 				pad := bgStyle.Render(strings.Repeat(" ", width-vis))
 				result = append(result, line+pad)
 			} else if vis > width {
-				// Truncate line if it's too wide to prevent terminal wrapping
-				// which would break the vertical layout and cause bleeding.
 				result = append(result, lipgloss.NewStyle().MaxWidth(width).Render(line))
 			} else {
 				result = append(result, line)
 			}
 		} else {
-			result = append(result, emptyLine)
+			result = append(result, padded)
 		}
 	}
 
-	// Append one extra full-width background line to ensure the bottom
-	// row is painted in terminals that may otherwise leave a thin strip.
-	// This is a harmless extra line when using the alternate screen buffer.
-	result = append(result, emptyLine)
-
-	seq := bgAnsi(bg)
 	painted := PaintBg(strings.Join(result, "\n"), bg)
-
-	// Append the "erase in line" (EL) sequence after each line.
-	// \x1b[K clears from the cursor to the end of the line using the
-	// currently active background color. This is the definitive fix for
-	// any cells beyond the painted width—even if lipgloss.Width miscounted.
+	seq := bgAnsi(bg)
 	if seq != "" {
 		painted = strings.ReplaceAll(painted, "\n", "\x1b[K\n")
-		// Also clear to end-of-line on the very last line, and then clear
-		// the rest of the display. This ensures any terminal padding or
-		// margins are filled with our background color.
-		painted += "\x1b[K\x1b[J"
+		painted += "\x1b[K"
 	}
-
-	return painted
+	return painted + "\x1b[J"
 }
 
-// BarLine creates a single full-width line with left-aligned and right-aligned
-// content, filling the gap between them with background-colored spaces.
-// Both left and right content retain their existing ANSI styling.
 func BarLine(left, right string, width int, bg lipgloss.Color) string {
 	lw := lipgloss.Width(left)
 	rw := lipgloss.Width(right)
 	gap := width - lw - rw
 	if gap < 0 {
-		gap = 0
+		avail := width - lw
+		if avail < 0 {
+			avail = 0
+		}
+		right = lipgloss.NewStyle().MaxWidth(avail).Render(right)
+		rw = lipgloss.Width(right)
+		if rw > avail {
+			rw = avail
+		}
+		gap = width - lw - rw
+		if gap < 0 {
+			gap = 0
+		}
 	}
 	spacer := lipgloss.NewStyle().Background(bg).Render(strings.Repeat(" ", gap))
 	line := left + spacer + right

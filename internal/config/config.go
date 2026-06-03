@@ -64,10 +64,11 @@ func normalizeRightOrder(in []string) []string {
 		return def
 	}
 	allowed := map[string]struct{}{
-		"tags":     {},
-		"due":      {},
-		"priority": {},
-		"project":  {},
+		"tags":          {},
+		"due":           {},
+		"priority":      {},
+		"project":       {},
+		"open_issue_id": {},
 	}
 	seen := map[string]struct{}{}
 	out := make([]string, 0, len(in))
@@ -196,7 +197,7 @@ func Default() Config {
 		},
 		List: ListConfig{
 			Order: ListOrderConfig{
-				Right: []string{"tags", "due", "priority"},
+				Right: []string{"tags", "due", "priority", "open_issue_id"},
 			},
 			Fields: ListFieldsConfig{
 				Due: DueFieldConfig{

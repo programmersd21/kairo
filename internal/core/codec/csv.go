@@ -19,6 +19,7 @@ func MarshalCSV(tasks []core.Task) ([]byte, error) {
 		"ID", "Title", "Description", "Tags", "Priority", "Status",
 		"Deadline", "Recurrence", "RecurrenceWeekly", "RecurrenceMonthly",
 		"ParentID", "Collapsed", "CreatedAt", "UpdatedAt",
+		"OpenIssueID", "Result", "Responsible",
 	}
 	if err := w.Write(header); err != nil {
 		return nil, err
@@ -48,6 +49,9 @@ func MarshalCSV(tasks []core.Task) ([]byte, error) {
 			collapsed,
 			t.CreatedAt.Format(time.RFC3339),
 			t.UpdatedAt.Format(time.RFC3339),
+			t.OpenIssueID,
+			t.Result,
+			t.Responsible,
 		}
 		if err := w.Write(row); err != nil {
 			return nil, err

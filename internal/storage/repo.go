@@ -56,7 +56,13 @@ func Open(ctx context.Context, path string) (*Repository, error) {
 		return nil, err
 	}
 
-	return &Repository{db: db}, nil
+	r := &Repository{db: db}
+	if err := r.ensureIssueIDs(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	return r, nil
 }
 
 func (r *Repository) Close() error { return r.db.Close() }
@@ -73,6 +79,13 @@ func (r *Repository) CreateTask(ctx context.Context, t core.Task) (core.Task, er
 	t.Status = core.Status(strings.ToLower(string(t.Status)))
 	if t.Status == "" {
 		t.Status = core.StatusTodo
+	}
+	if t.OpenIssueID == "" {
+		oi, err := r.nextOpenIssueID(ctx)
+		if err != nil {
+			return core.Task{}, err
+		}
+		t.OpenIssueID = oi
 	}
 	if t.Status == core.StatusDone && t.CompletedAt == nil {
 		cNow := now.UTC()
@@ -109,9 +122,9 @@ func (r *Repository) CreateTask(ctx context.Context, t core.Task) (core.Task, er
 		}
 
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO tasks (id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, t.ID, t.Title, t.Description, t.Project, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.ParentID, t.Collapsed, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli(), completedAt)
+			INSERT INTO tasks (id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms, result, open_issue_id, responsible)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, t.ID, t.Title, t.Description, t.Project, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.ParentID, t.Collapsed, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli(), completedAt, t.Result, t.OpenIssueID, t.Responsible)
 		if err != nil {
 			return err
 		}
@@ -161,9 +174,9 @@ func (r *Repository) UpdateTask(ctx context.Context, id string, patch core.TaskP
 
 		_, err := tx.ExecContext(ctx, `
 			UPDATE tasks
-			SET title=?, description=?, project=?, priority=?, deadline_ms=?, status=?, recurrence=?, recurrence_weekly=?, recurrence_monthly=?, parent_id=?, collapsed=?, updated_at_ms=?, completed_at_ms=?
+			SET title=?, description=?, project=?, priority=?, deadline_ms=?, status=?, recurrence=?, recurrence_weekly=?, recurrence_monthly=?, parent_id=?, collapsed=?, updated_at_ms=?, completed_at_ms=?, result=?, open_issue_id=?, responsible=?
 			WHERE id=? AND deleted_at_ms IS NULL
-		`, updated.Title, updated.Description, updated.Project, int(updated.Priority), deadline, string(updated.Status), string(updated.Recurrence), weekly, updated.RecurrenceMonthly, updated.ParentID, updated.Collapsed, updated.UpdatedAt.UTC().UnixMilli(), completedAt, updated.ID)
+		`, updated.Title, updated.Description, updated.Project, int(updated.Priority), deadline, string(updated.Status), string(updated.Recurrence), weekly, updated.RecurrenceMonthly, updated.ParentID, updated.Collapsed, updated.UpdatedAt.UTC().UnixMilli(), completedAt, updated.Result, updated.OpenIssueID, updated.Responsible, updated.ID)
 		if err != nil {
 			return err
 		}
@@ -213,7 +226,7 @@ type Tombstone struct {
 
 func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms
+		SELECT id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms, result, open_issue_id, responsible
 		FROM tasks
 		WHERE deleted_at_ms IS NULL
 		ORDER BY updated_at_ms DESC
@@ -223,7 +236,7 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			_ = err // Suppress linter warning
+			_ = err
 		}
 	}()
 	var tasks []core.Task
@@ -255,7 +268,7 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 		if err == nil {
 			defer func() {
 				if err := tagRows.Close(); err != nil {
-					_ = err // Suppress linter warning
+					_ = err
 				}
 			}()
 			tagsByID := map[string][]string{}
@@ -282,7 +295,7 @@ func (r *Repository) SyncSnapshot(ctx context.Context) ([]core.Task, []Tombstone
 	}
 	defer func() {
 		if err := tRows.Close(); err != nil {
-			_ = err // Suppress linter warning
+			_ = err
 		}
 	}()
 	var tomb []Tombstone
@@ -310,8 +323,8 @@ func (r *Repository) ApplyTombstone(ctx context.Context, t Tombstone) error {
 			return nil
 		}
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, created_at_ms, updated_at_ms, deleted_at_ms)
-			VALUES (?, '', '', 0, NULL, 'todo', ?, ?, ?)
+			INSERT INTO tasks (id, title, description, priority, deadline_ms, status, created_at_ms, updated_at_ms, deleted_at_ms, result, open_issue_id, responsible)
+			VALUES (?, '', '', 0, NULL, 'todo', ?, ?, ?, '', '', '')
 			ON CONFLICT(id) DO UPDATE SET
 				deleted_at_ms=excluded.deleted_at_ms,
 				updated_at_ms=excluded.updated_at_ms
@@ -322,7 +335,7 @@ func (r *Repository) ApplyTombstone(ctx context.Context, t Tombstone) error {
 
 func (r *Repository) GetTask(ctx context.Context, id string) (core.Task, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms
+		SELECT id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms, result, open_issue_id, responsible
 		FROM tasks
 		WHERE id=? AND deleted_at_ms IS NULL
 	`, id)
@@ -395,7 +408,7 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	}
 
 	query := `
-		SELECT t.id, t.title, t.description, t.project, t.priority, t.deadline_ms, t.status, t.recurrence, t.recurrence_weekly, t.recurrence_monthly, t.parent_id, t.collapsed, t.created_at_ms, t.updated_at_ms, t.completed_at_ms
+		SELECT t.id, t.title, t.description, t.project, t.priority, t.deadline_ms, t.status, t.recurrence, t.recurrence_weekly, t.recurrence_monthly, t.parent_id, t.collapsed, t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.result, t.open_issue_id, t.responsible
 		FROM tasks t
 		WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY ` + orderBy + `
@@ -408,7 +421,7 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			_ = err // Suppress linter warning
+			_ = err
 		}
 	}()
 
@@ -445,7 +458,7 @@ func (r *Repository) ListTasks(ctx context.Context, opt ListOptions) ([]core.Tas
 	}
 	defer func() {
 		if err := tagRows.Close(); err != nil {
-			_ = err // Suppress linter warning
+			_ = err
 		}
 	}()
 
@@ -470,7 +483,7 @@ func (r *Repository) ListTags(ctx context.Context) ([]string, error) {
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			_ = err // Suppress linter warning
+			_ = err
 		}
 	}()
 	var out []string
@@ -507,7 +520,7 @@ func (r *Repository) ListProjects(ctx context.Context) ([]string, error) {
 
 func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms
+		SELECT id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms, result, open_issue_id, responsible
 		FROM tasks
 		WHERE deleted_at_ms IS NULL
 		ORDER BY updated_at_ms DESC
@@ -517,7 +530,7 @@ func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			_ = err // Suppress linter warning
+			_ = err
 		}
 	}()
 	var out []core.Task
@@ -552,7 +565,7 @@ func (r *Repository) AllTasks(ctx context.Context) ([]core.Task, error) {
 	}
 	defer func() {
 		if err := tagRows.Close(); err != nil {
-			_ = err // Suppress linter warning
+			_ = err
 		}
 	}()
 	tagsByID := map[string][]string{}
@@ -583,6 +596,13 @@ func (r *Repository) UpsertTask(ctx context.Context, t core.Task) error {
 	t.Status = core.Status(strings.ToLower(string(t.Status)))
 	if t.Status == "" {
 		t.Status = core.StatusTodo
+	}
+	if t.OpenIssueID == "" {
+		oi, err := r.nextOpenIssueID(ctx)
+		if err != nil {
+			return err
+		}
+		t.OpenIssueID = oi
 	}
 	if t.Recurrence == "" {
 		t.Recurrence = core.RecurrenceNone
@@ -621,8 +641,8 @@ func (r *Repository) UpsertTask(ctx context.Context, t core.Task) error {
 		}
 
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO tasks (id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO tasks (id, title, description, project, priority, deadline_ms, status, recurrence, recurrence_weekly, recurrence_monthly, parent_id, collapsed, created_at_ms, updated_at_ms, completed_at_ms, result, open_issue_id, responsible)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET
 				title=excluded.title,
 				description=excluded.description,
@@ -638,8 +658,11 @@ func (r *Repository) UpsertTask(ctx context.Context, t core.Task) error {
 				created_at_ms=excluded.created_at_ms,
 				updated_at_ms=excluded.updated_at_ms,
 				completed_at_ms=excluded.completed_at_ms,
+				result=excluded.result,
+				open_issue_id=excluded.open_issue_id,
+				responsible=excluded.responsible,
 				deleted_at_ms=NULL
-		`, t.ID, t.Title, t.Description, t.Project, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.ParentID, t.Collapsed, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli(), completedAt)
+		`, t.ID, t.Title, t.Description, t.Project, int(t.Priority), deadline, string(t.Status), string(t.Recurrence), weekly, t.RecurrenceMonthly, t.ParentID, t.Collapsed, t.CreatedAt.UTC().UnixMilli(), t.UpdatedAt.UTC().UnixMilli(), completedAt, t.Result, t.OpenIssueID, t.Responsible)
 		if err != nil {
 			return err
 		}
@@ -689,7 +712,7 @@ func (r *Repository) taskTags(ctx context.Context, id string) ([]string, error) 
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			_ = err // Suppress linter warning
+			_ = err
 		}
 	}()
 	var out []string
@@ -722,8 +745,11 @@ func scanTask(s scanner) (core.Task, error) {
 		createdMs   int64
 		updatedMs   int64
 		completedMs sql.NullInt64
+		result      sql.NullString
+		openIssueID sql.NullString
+		responsible sql.NullString
 	)
-	if err := s.Scan(&id, &title, &desc, &project, &priority, &deadlineMs, &status, &rec, &weekly, &monthly, &parentID, &collapsed, &createdMs, &updatedMs, &completedMs); err != nil {
+	if err := s.Scan(&id, &title, &desc, &project, &priority, &deadlineMs, &status, &rec, &weekly, &monthly, &parentID, &collapsed, &createdMs, &updatedMs, &completedMs, &result, &openIssueID, &responsible); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return core.Task{}, err
 		}
@@ -762,6 +788,9 @@ func scanTask(s scanner) (core.Task, error) {
 		CreatedAt:         time.UnixMilli(createdMs).UTC(),
 		UpdatedAt:         time.UnixMilli(updatedMs).UTC(),
 		CompletedAt:       completedAt,
+		Result:            result.String,
+		OpenIssueID:       openIssueID.String,
+		Responsible:       responsible.String,
 	}, nil
 }
 
@@ -790,6 +819,54 @@ func setTaskTags(ctx context.Context, tx *sql.Tx, taskID string, tags []string) 
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?, ?)`, taskID, tagID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) nextOpenIssueID(ctx context.Context) (string, error) {
+	var val int64
+	err := r.db.QueryRowContext(ctx, `INSERT INTO meta (key, value) VALUES ('nextIssueNumber', '1') ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) RETURNING CAST(value AS INTEGER)`).Scan(&val)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("OI%06d", val), nil
+}
+
+func (r *Repository) ensureIssueIDs(ctx context.Context) error {
+	rows, err := r.db.QueryContext(ctx, `SELECT id FROM tasks WHERE open_issue_id = '' AND deleted_at_ms IS NULL ORDER BY created_at_ms ASC`)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	// Get the starting counter value
+	var start int64
+	_ = r.db.QueryRowContext(ctx, `SELECT COALESCE(CAST(COALESCE((SELECT value FROM meta WHERE key='nextIssueNumber'), '0') AS INTEGER), 0)`).Scan(&start)
+	if start == 0 {
+		start = 1
+	}
+	for _, id := range ids {
+		oi, err := r.nextOpenIssueID(ctx)
+		if err != nil {
+			return err
+		}
+		if _, err := r.db.ExecContext(ctx, `UPDATE tasks SET open_issue_id=? WHERE id=?`, oi, id); err != nil {
 			return err
 		}
 	}

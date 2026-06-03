@@ -113,48 +113,23 @@ func (m *Model) View() string {
 }
 
 func (m Model) renderMeta() string {
-	var meta []string
+	type field struct {
+		label string
+		value string
+	}
+	fields := []field{}
 
-	// ID
 	if m.ShowID {
-		idLine := lipgloss.JoinHorizontal(lipgloss.Left,
-			m.styles.Muted.Render("ID:       "),
-			m.styles.DetailValue.Render(m.task.ID),
-		)
-		meta = append(meta, lipgloss.NewStyle().Padding(1, 2, 0, 2).Render(idLine))
+		fields = append(fields, field{"ID", m.task.ID})
 	}
-
-	// Status & Priority in one line
-	status := lipgloss.JoinHorizontal(lipgloss.Left,
-		m.styles.Muted.Render("Status:   "),
-		m.styles.StatusBadge(m.task.Status),
-	)
-	priority := lipgloss.JoinHorizontal(lipgloss.Left,
-		m.styles.Muted.Render("Priority: "),
-		m.styles.PriorityBadge(m.task.Priority),
-	)
-	meta = append(meta, lipgloss.JoinHorizontal(lipgloss.Left,
-		lipgloss.NewStyle().Padding(m.getTopPadding(), 2).Render(status),
-		lipgloss.NewStyle().Padding(m.getTopPadding(), 4).Render(priority),
-	))
-
-	// Deadline & Tags & Project
+	fields = append(fields, field{"Status", m.styles.StatusBadge(m.task.Status)})
+	fields = append(fields, field{"Priority", m.styles.PriorityBadge(m.task.Priority)})
 	if m.task.Deadline != nil {
-		meta = append(meta, lipgloss.NewStyle().Padding(0, 2).Render(
-			lipgloss.JoinHorizontal(lipgloss.Left,
-				m.styles.Muted.Render("Due:      "),
-				m.styles.DetailValue.Render(styles.IconDeadline+m.task.Deadline.Local().Format("Mon, Jan 02 15:04")),
-			)))
+		fields = append(fields, field{"Due", styles.IconDeadline + m.task.Deadline.Local().Format("Mon, Jan 02 15:04")})
 	}
-
 	if m.task.Project != "" {
-		meta = append(meta, lipgloss.NewStyle().Padding(0, 2).Render(
-			lipgloss.JoinHorizontal(lipgloss.Left,
-				m.styles.Muted.Render("Project:  "),
-				m.styles.DetailValue.Render(m.task.Project),
-			)))
+		fields = append(fields, field{"Project", m.task.Project})
 	}
-
 	if len(m.task.Tags) > 0 {
 		tagStr := ""
 		for i, t := range m.task.Tags {
@@ -163,21 +138,43 @@ func (m Model) renderMeta() string {
 			}
 			tagStr += "#" + t
 		}
-		meta = append(meta, lipgloss.NewStyle().Padding(0, 2).Render(
-			lipgloss.JoinHorizontal(lipgloss.Left,
-				m.styles.Muted.Render("Tags:     "),
-				m.styles.DetailValue.Render(tagStr),
-			)))
+		fields = append(fields, field{"Tags", tagStr})
+	}
+	if m.task.OpenIssueID != "" {
+		fields = append(fields, field{"Issue ID", m.task.OpenIssueID})
+	}
+	if m.task.Responsible != "" {
+		fields = append(fields, field{"Resp", m.task.Responsible})
+	}
+	if m.task.Result != "" {
+		fields = append(fields, field{"Result", m.task.Result})
+	}
+
+	maxLabel := 0
+	for _, f := range fields {
+		if n := lipgloss.Width(f.label); n > maxLabel {
+			maxLabel = n
+		}
+	}
+	labelStyle := lipgloss.NewStyle().Width(maxLabel + 1)
+
+	var meta []string
+	for i, f := range fields {
+		line := lipgloss.JoinHorizontal(lipgloss.Left,
+			labelStyle.Render(m.styles.Muted.Render(f.label+":")),
+			m.styles.DetailValue.Render(" "+f.value),
+		)
+		pad := 0
+		if i < 2 && m.ShowID {
+			pad = 0
+		} else if i < 1 && !m.ShowID {
+			pad = 0
+		}
+		_ = pad
+		meta = append(meta, lipgloss.NewStyle().Padding(0, 2).Render(line))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, meta...)
-}
-
-func (m Model) getTopPadding() int {
-	if m.ShowID {
-		return 0
-	}
-	return 1
 }
 
 func (m *Model) renderMarkdown(src string) string {

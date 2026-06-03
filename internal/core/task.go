@@ -81,9 +81,10 @@ type Task struct {
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 	CompletedAt       *time.Time
+	Result            string
+	OpenIssueID       string
+	Responsible       string
 }
-
-// ... update MarshalJSON/UnmarshalJSON accordingly ...
 
 func (t Task) DeepCopy() Task {
 	clone := t
@@ -181,6 +182,8 @@ type TaskPatch struct {
 	ParentID          *string
 	Collapsed         *bool
 	CompletedAt       **time.Time
+	Result            *string
+	Responsible       *string
 }
 
 func (p TaskPatch) ApplyTo(t Task) Task {
@@ -229,6 +232,12 @@ func (p TaskPatch) ApplyTo(t Task) Task {
 	if p.CompletedAt != nil {
 		t.CompletedAt = *p.CompletedAt
 	}
+	if p.Result != nil {
+		t.Result = *p.Result
+	}
+	if p.Responsible != nil {
+		t.Responsible = *p.Responsible
+	}
 	return t
 }
 
@@ -252,6 +261,9 @@ func (t Task) MarshalJSON() ([]byte, error) {
 		CreatedAt         time.Time `json:"created_at"`
 		UpdatedAt         time.Time `json:"updated_at"`
 		CompletedAt       *string   `json:"completed_at,omitempty"`
+		Result            string    `json:"result,omitempty"`
+		OpenIssueID       string    `json:"open_issue_id,omitempty"`
+		Responsible       string    `json:"responsible,omitempty"`
 	}
 	var d *string
 	if t.Deadline != nil {
@@ -292,6 +304,9 @@ func (t Task) MarshalJSON() ([]byte, error) {
 		CreatedAt:         t.CreatedAt.UTC(),
 		UpdatedAt:         t.UpdatedAt.UTC(),
 		CompletedAt:       c,
+		Result:            t.Result,
+		OpenIssueID:       t.OpenIssueID,
+		Responsible:       t.Responsible,
 	})
 }
 
@@ -315,6 +330,9 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 		CreatedAt         time.Time `json:"created_at"`
 		UpdatedAt         time.Time `json:"updated_at"`
 		CompletedAt       *string   `json:"completed_at,omitempty"`
+		Result            string    `json:"result,omitempty"`
+		OpenIssueID       string    `json:"open_issue_id,omitempty"`
+		Responsible       string    `json:"responsible,omitempty"`
 	}
 	var w wire
 	if err := json.Unmarshal(data, &w); err != nil {
@@ -334,6 +352,9 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 	t.Collapsed = w.Collapsed
 	t.CreatedAt = w.CreatedAt
 	t.UpdatedAt = w.UpdatedAt
+	t.Result = w.Result
+	t.OpenIssueID = w.OpenIssueID
+	t.Responsible = w.Responsible
 
 	if w.Deadline != nil {
 		dt, err := time.Parse(time.RFC3339Nano, *w.Deadline)

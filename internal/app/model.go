@@ -105,6 +105,7 @@ const (
 	ModeProjectSwitcher
 	ModeProjectSidebar
 	ModeFocus
+	ModeResultEdit
 )
 
 type Model struct {
@@ -151,6 +152,7 @@ type Model struct {
 	mcpRunning bool
 
 	tagFilterInput textinput.Model // Input field for direct tag filtering in Tag View
+	resultInput    textinput.Model
 
 	palFullIdx      *search.Index
 	palTasksIdx     *search.Index
@@ -241,6 +243,12 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 	tagInput.CharLimit = 64
 	tagInput.Width = 40
 
+	resultInput := textinput.New()
+	resultInput.Prompt = "Result: "
+	resultInput.Placeholder = "Describe task outcome..."
+	resultInput.CharLimit = 500
+	resultInput.Width = 60
+
 	m := &Model{
 		ctx:                    ctx,
 		cfg:                    cfg,
@@ -252,6 +260,7 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 		mode:                   ModeList,
 		activeProject:          cfg.App.ActiveProject,
 		tagFilterInput:         tagInput,
+		resultInput:            resultInput,
 		RainbowAnimationOffset: 0,
 	}
 	m.list = tasklist.New(m.s, cfg.App.VimMode, cfg.App.Animations, m.km, cfg.List.Fields.Due.Minimal)
@@ -432,16 +441,14 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) isInputFocused() bool {
 	switch m.mode {
 	case ModeEditor:
-		// Editor has multiple text input fields that accept user input
 		return true
 	case ModePalette, ModeTagFilter, ModeProjectSwitcher:
-		// Palette, TagFilter, and ProjectSwitcher have search input fields that are focused when active
 		return true
 	case ModeImportExport:
-		// Import/Export menu has a file path input field
+		return true
+	case ModeResultEdit:
 		return true
 	default:
-		// All other modes don't have active text input fields, so keybindings can safely fire
 		return false
 	}
 }
@@ -673,6 +680,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case import_export_menu.SelectMsg:
 		if m.mode == ModeImportExport {
 			m.mode = ModeList
+			m.iem = m.iem.SetScope(x.Scope)
 			var animCmd tea.Cmd
 			if m.cfg.App.Animations {
 				m.transitioning = m.cfg.App.Animations
@@ -1472,6 +1480,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				case keymapMatch(m.km.ToggleStrike, km):
 					selected := m.list.GetSelectedTasks()
+					if len(selected) == 1 && selected[0].Status == core.StatusDone {
+						m.resultInput.SetValue(selected[0].Result)
+						m.mode = ModeResultEdit
+						m.resultInput.Focus()
+						return m, nil
+					}
 					var cmds []tea.Cmd
 					for _, t := range selected {
 						newStatus := core.StatusDone
@@ -1519,6 +1533,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if keymapMatch(m.km.ToggleStrike, km) {
 					t := m.det.Task()
+					if t.Status == core.StatusDone {
+						m.resultInput.SetValue(t.Result)
+						m.mode = ModeResultEdit
+						m.resultInput.Focus()
+						return m, nil
+					}
 					m.animationGen++
 					m.animationReverse = (t.Status == core.StatusDone)
 					m.animatingTaskID = t.ID
@@ -1545,6 +1565,36 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Delegate to active component.
 	switch m.mode {
+	case ModeResultEdit:
+		if km, ok := msg.(tea.KeyMsg); ok {
+			switch km.String() {
+			case "enter":
+				result := m.resultInput.Value()
+				taskID := ""
+				if m.mode == ModeDetail {
+					taskID = m.det.Task().ID
+				} else if item, ok := m.list.Selected(); ok {
+					taskID = item.ID
+				}
+				if taskID != "" {
+					patch := core.TaskPatch{Result: &result}
+					m.mode = ModeList
+					return m, m.updateTaskCmd(taskID, patch)
+				}
+				m.mode = ModeList
+				return m, nil
+			case "esc":
+				m.mode = ModeList
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				m.resultInput, cmd = m.resultInput.Update(msg)
+				return m, cmd
+			}
+		}
+		var cmd tea.Cmd
+		m.resultInput, cmd = m.resultInput.Update(msg)
+		return m, cmd
 	case ModeTagFilter:
 		// Handle text input for tag filtering
 		var cmd tea.Cmd
@@ -1761,6 +1811,8 @@ func (m *Model) renderMainUI() string {
 		body = m.pm.View()
 	case ModeSettings:
 		body = m.set.View()
+	case ModeResultEdit:
+		body = m.renderResultOverlay(availableHeight)
 	case ModeTagFilter:
 		body = m.renderTagFilterOverlay(availableHeight)
 	case ModeEditor:
@@ -1926,15 +1978,8 @@ func (m *Model) stopMCPCmd() tea.Cmd {
 }
 
 func (m *Model) rebuildComponentSizes() {
-	// Component sizing is now handled dynamically in renderMainUI
 }
 
-// Add to Model struct:
-// RainbowAnimationOffset int
-// And inside New():
-// m.RainbowAnimationOffset = 0
-
-// renderHeaderWithWidth renders the header at a specific width.
 func (m *Model) renderHeaderWithWidth(w int) string {
 	saved := m.width
 	m.width = w
@@ -2032,7 +2077,6 @@ func (m *Model) renderHeader() string {
 
 	// Animated Indicator (Bubble effect)
 	if m.transitioning && m.prevActiveIdx != m.activeIdx {
-		// ... (keep the existing logic, just ensure tabRow is constructed correctly)
 		pIdx := m.prevActiveIdx
 		aIdx := m.activeIdx
 		if pIdx >= 0 && pIdx < len(tabOffsets) && aIdx >= 0 && aIdx < len(tabOffsets) {
@@ -2278,6 +2322,26 @@ func (m *Model) renderFooter() string {
 	return render.BarLine(left, right, m.width, m.s.Theme.Bg)
 }
 
+// renderResultOverlay renders the task result input modal
+func (m *Model) renderResultOverlay(h int) string {
+	inputLabel := m.s.Title.Render("Task Result")
+	input := lipgloss.NewStyle().Padding(0, 1).Render(m.resultInput.View())
+
+	modal := lipgloss.JoinVertical(lipgloss.Left,
+		inputLabel,
+		input,
+		m.s.Muted.Render("Describe the outcome of this task"),
+	)
+
+	overlayW := min(60, m.width-4)
+	card := m.s.Overlay.Width(overlayW).Render(modal)
+
+	return lipgloss.Place(m.width, h, lipgloss.Center, lipgloss.Center, card,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceBackground(m.s.Theme.Bg),
+	)
+}
+
 // renderTagFilterOverlay renders the tag filter input modal
 func (m *Model) renderTagFilterOverlay(h int) string {
 	// Create filter input modal
@@ -2314,8 +2378,8 @@ func (m *Model) renderTagFilterOverlay(h int) string {
 		hint,
 	)
 
-	cardStyle := m.s.Overlay.Width(60)
-	card := cardStyle.Render(modal)
+	overlayW := min(60, m.width-4)
+	card := m.s.Overlay.Width(overlayW).Render(modal)
 
 	// Overlay the modal on top of the screen with proper background
 	return lipgloss.Place(m.width, h, lipgloss.Center, lipgloss.Center, card,
@@ -2705,7 +2769,7 @@ func (m *Model) rebuildPaletteIndex() {
 		search.Item{ID: "cmd:view:tag", Kind: search.KindCommand, Title: "View: By Tag", Hint: "f"},
 		search.Item{ID: "cmd:view:priority", Kind: search.KindCommand, Title: "View: By Priority", Hint: "5"},
 		search.Item{ID: "cmd:import-export", Kind: search.KindCommand, Title: "Import/Export", Hint: "x"},
-		search.Item{ID: "cmd:onboarding", Kind: search.KindCommand, Title: "Welcome Tour", Hint: "ctrl+d"},
+		search.Item{ID: "cmd:onboarding", Kind: search.KindCommand, Title: "Welcome Tour", Hint: "ctrl+w"},
 	)
 
 	if m.aiKey != "" {
@@ -2734,7 +2798,17 @@ func (m *Model) rebuildPaletteIndex() {
 		if t.Deadline != nil {
 			hint += " • due " + t.Deadline.Local().Format("Jan 2")
 		}
-		items = append(items, search.Item{ID: t.ID, Kind: search.KindTask, Title: t.Title, Desc: t.Description, Hint: hint})
+		if t.OpenIssueID != "" {
+			hint += " • " + t.OpenIssueID
+		}
+		if t.Responsible != "" {
+			hint += " • @" + t.Responsible
+		}
+		title := t.Title
+		if t.Result != "" {
+			title = t.Title + " [✓ " + t.Result + "]"
+		}
+		items = append(items, search.Item{ID: t.ID, Kind: search.KindTask, Title: title, Desc: t.Description, Hint: hint})
 	}
 
 	m.palFullIdx = search.NewIndex(items)
@@ -2745,7 +2819,17 @@ func (m *Model) rebuildPaletteIndex() {
 		if t.Deadline != nil {
 			hint += " • due " + t.Deadline.Local().Format("Jan 2")
 		}
-		taskItems = append(taskItems, search.Item{ID: t.ID, Kind: search.KindTask, Title: t.Title, Desc: t.Description, Hint: hint})
+		if t.OpenIssueID != "" {
+			hint += " • " + t.OpenIssueID
+		}
+		if t.Responsible != "" {
+			hint += " • @" + t.Responsible
+		}
+		title := t.Title
+		if t.Result != "" {
+			title = t.Title + " [✓ " + t.Result + "]"
+		}
+		taskItems = append(taskItems, search.Item{ID: t.ID, Kind: search.KindTask, Title: title, Desc: t.Description, Hint: hint})
 	}
 	m.palTasksIdx = search.NewIndex(taskItems)
 	m.rebuildProjectsIndex()
@@ -3002,9 +3086,13 @@ func (m *Model) handleImportExportAction(action import_export_menu.Action, path 
 		var resp api.Response
 
 		if action.IsExport() {
+			scope := ""
+			if m.activeProject != "" && m.iem.ScopeValue() == import_export_menu.ScopeCurrentProject {
+				scope = m.activeProject
+			}
 			req := api.Request{
 				Action:  "export",
-				Payload: []byte(fmt.Sprintf(`{"format":"%s"}`, action.Format())),
+				Payload: []byte(fmt.Sprintf(`{"format":"%s","project":"%s"}`, action.Format(), scope)),
 			}
 			resp = taskAPI.Execute(m.ctx, req)
 			if resp.Success {

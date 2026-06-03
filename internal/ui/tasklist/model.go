@@ -512,15 +512,13 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 
 	// Hierarchy indentation and icons
 	indent := strings.Repeat("  ", item.Depth)
-	expandIcon := ""
+	expandIcon := "  "
 	if item.HasChildren {
 		if t.Collapsed {
 			expandIcon = "▶ "
 		} else {
 			expandIcon = "▼ "
 		}
-	} else if item.Depth > 0 {
-		expandIcon = "  "
 	}
 
 	titleStyle := m.styles.RowNormal
@@ -532,7 +530,6 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 
 	titleText := t.Title
 
-	// Bombastic "Glitch & Vaporize" Deletion Animation
 	isDeleting := m.DeletingTaskID == t.ID
 	if isDeleting && m.DeleteProgress > 0 {
 		titleStyle = m.styles.RowDimmed.Foreground(m.styles.Theme.Bad) // Turn text red
@@ -573,33 +570,16 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 		titleText = string(runes[:showCount])
 	}
 
-	var title string
-	if isAnimating {
-		// Clean left-to-right strikethrough wipe
-		title = m.renderStrikeWipe(titleText, animProgress, rowBg)
-	} else {
-		titleWidth := max(20, m.width-40-lipgloss.Width(indicator)-lipgloss.Width(indent)-lipgloss.Width(expandIcon))
-		title = titleStyle.Render(truncate(titleText, titleWidth))
-	}
-
-	// Build left side
-	spaceBg := lipgloss.NewStyle().Background(rowBg).Render(" ")
-	left := indicator + lipgloss.NewStyle().Background(rowBg).Render(indent) + lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Background(rowBg).Render(expandIcon) + statusStyle.Render(statusIcon) + spaceBg + title
-
-	rightParts := []string{}
-
 	order := m.rightOrder
 	if len(order) == 0 {
 		order = []string{"tags", "due", "priority"}
 	}
 
-	// Helper to create a container for fixed-width right-side items
-	// Adjust widths to ensure they don't bleed or stack
+	rightParts := []string{}
 	for _, f := range order {
 		switch f {
 		case "priority":
 			pri := m.styles.PriorityBadge(t.Priority)
-			// Priority badges need fixed width and right alignment to stack perfectly
 			rightParts = append(rightParts, lipgloss.NewStyle().Width(8).Align(lipgloss.Right).Render(pri))
 		case "due":
 			if t.Deadline != nil {
@@ -623,12 +603,9 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 					m.styles.TagRight.Foreground(deadStyleColor).Render(),
 				)
 
-				// Use a flexible width for the container, let's try reducing container width if it's too much.
-				// But we need to keep the 16 width for alignment.
 				styledPill := lipgloss.NewStyle().Width(16).Align(lipgloss.Center).Render(pill)
 				rightParts = append(rightParts, styledPill)
 			} else {
-				// Use a subtle theme-aware dash indicator for missing deadlines, same fixed width
 				dash := lipgloss.NewStyle().
 					Foreground(m.styles.Theme.Muted).
 					Width(16).
@@ -660,6 +637,15 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 				tagStr = strings.Join(tagParts, " ")
 			}
 			rightParts = append(rightParts, tagStr)
+		case "open_issue_id":
+			if t.OpenIssueID != "" {
+				pill := lipgloss.NewStyle().
+					Width(12).
+					Align(lipgloss.Right).
+					Foreground(m.styles.Theme.Muted).
+					Render(t.OpenIssueID)
+				rightParts = append(rightParts, pill)
+			}
 		case "project":
 			var projPill string
 			if t.Project != "" {
@@ -681,20 +667,38 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 	if len(rightParts) == 0 {
 		right = ""
 	} else {
-		// Join parts with a small spacer for consistent professional gap
 		right = rightParts[0]
 		for i := 1; i < len(rightParts); i++ {
 			right = lipgloss.JoinHorizontal(lipgloss.Right, right, lipgloss.NewStyle().Width(1).Render(""), rightParts[i])
 		}
 	}
-	// Use render.BarLine: fills the gap between left and right with bg-styled spaces.
-	// Subtract 2 for the Padding(0,1) applied by rowStyle below.
+
+	rightWidth := lipgloss.Width(right)
 	innerWidth := m.width - 2
 	if innerWidth < 0 {
 		innerWidth = m.width
 	}
-	line := render.BarLine(left, right, innerWidth, rowBg)
 
+	var title string
+	if isAnimating {
+		title = m.renderStrikeWipe(titleText, animProgress, rowBg)
+	} else {
+		leftPrefixWidth := lipgloss.Width(indicator) + lipgloss.Width(indent) + lipgloss.Width(expandIcon) + lipgloss.Width(statusIcon) + 1
+		titleWidth := innerWidth - leftPrefixWidth - rightWidth
+		if titleWidth < 10 {
+			titleWidth = 10
+		}
+		title = titleStyle.Render(truncate(titleText, titleWidth))
+	}
+
+	left := indicator +
+		lipgloss.NewStyle().Background(rowBg).Render(indent) +
+		lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Background(rowBg).Render(expandIcon) +
+		statusStyle.Render(statusIcon) +
+		lipgloss.NewStyle().Background(rowBg).Render(" ") +
+		title
+
+	line := render.BarLine(left, right, innerWidth, rowBg)
 	rowStyle := lipgloss.NewStyle().Width(m.width).Padding(0, 1).Background(rowBg)
 	return rowStyle.Render(line)
 }
@@ -793,18 +797,4 @@ func clamp(x, lo, hi int) int {
 		return hi
 	}
 	return x
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
