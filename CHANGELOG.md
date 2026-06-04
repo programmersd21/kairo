@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] (2026-06-04)
+
+### Added
+- **Project Selection Dialog**: When entering a project name, users can now choose from a list of existing projects or type a new one, preventing typos that would create duplicate project entries.
+
 ## [1.7.0] (2026-06-03)
 
 ### Added
