@@ -80,10 +80,12 @@ Press `n` to create your first task. `ctrl+s` to save. That's it.
 Sub-millisecond fuzzy search. Vim bindings (`j/k/gg/G`). Natural language deadlines like `tomorrow 10am` or `next friday`. Full keyboard control — you never touch the mouse.
 
 ### 🗂 Project Sidebar & Hierarchy
-Organize work into deep hierarchies and separate projects. Toggle the **Project Sidebar** with `ctrl+e` for quick navigation, fuzzy find projects by name, and switch between projects using arrow keys. Project ordering is customizable via `config.toml` (e.g., `[projects] order = "alphabetical"|"recent"`). Nest tasks via the **Parent** field in the editor, and export/import with full structure preserved — across JSON, CSV, Markdown, and plain text.
+Organize work into deep hierarchies and separate projects. Toggle the **Project Sidebar** with `ctrl+e` for quick navigation, fuzzy find projects by name, and switch between projects using arrow keys. Project ordering is customizable via `config.toml` (e.g., `[projects] order = "alphabetical"|"recent"`). Nest tasks via the **Parent** field in the editor, and select projects from an interactive list by pressing `Enter` on the **Project** field.
 
-### 🔁 Recurring Tasks
+### 🔁 Recurring Tasks & Results
 Tasks reappear automatically on a schedule. Weekly (`mon,wed,fri`) or monthly (`15`). When completed, Kairo generates the next instance immediately with a smart due-date preview.
+
+**Task Results**: Document the outcome of your work with completion notes (countermeasures). Kairo now prompts for a result whenever you mark a task as finished, ensuring you capture important insights and review your productivity.
 
 ### 🔒 Your Data, Locally
 SQLite with WAL mode. Fully offline. Optional Git-backed sync — no backend, no account, no lock-in. Export to JSON, CSV, Markdown, or plain text on demand. Project organization is preserved in your database.

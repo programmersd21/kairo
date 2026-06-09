@@ -32,6 +32,7 @@ type SavePatchMsg struct {
 }
 type CloseMsg struct{}
 type SelectParentMsg struct{}
+type SelectProjectMsg struct{}
 
 type Model struct {
 	styles styles.Styles
@@ -53,6 +54,7 @@ type Model struct {
 	project     textinput.Model
 	parentID    textinput.Model
 	responsible textinput.Model
+	result      textinput.Model
 	desc        textarea.Model
 
 	focus int
@@ -170,6 +172,12 @@ func New(s styles.Styles, mode Mode, t core.Task, preview bool) Model {
 	resp.SetValue(t.Responsible)
 	applyFieldStyles(&resp)
 
+	res := textinput.New()
+	res.Prompt = ""
+	res.CharLimit = 200
+	res.SetValue(t.Result)
+	applyFieldStyles(&res)
+
 	d := textarea.New()
 	d.Placeholder = "Description (Markdown)…"
 	d.SetValue(t.Description)
@@ -192,6 +200,7 @@ func New(s styles.Styles, mode Mode, t core.Task, preview bool) Model {
 		project:     pj,
 		parentID:    pid,
 		responsible: resp,
+		result:      res,
 		desc:        d,
 		focus:       0,
 		showPreview: preview,
@@ -229,6 +238,7 @@ func (m *Model) SetSize(w, h int) {
 	m.project.Width = max(20, editorW-20)
 	m.parentID.Width = max(20, editorW-20)
 	m.responsible.Width = max(20, editorW-20)
+	m.result.Width = max(20, editorW-20)
 	style := "dark"
 	if m.styles.Theme.IsLight {
 		style = "light"
@@ -250,6 +260,10 @@ func (m *Model) SetParentID(id string) {
 	m.parentID.SetValue(id)
 }
 
+func (m *Model) SetProject(p string) {
+	m.project.SetValue(p)
+}
+
 func (m Model) Init() tea.Cmd { return nil }
 
 func (m *Model) SetPreview(preview bool) {
@@ -264,14 +278,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, func() tea.Msg { return CloseMsg{} }
 		case "tab":
 			m.blurAll()
-			m.focus = (m.focus + 1) % 12
+			m.focus = (m.focus + 1) % 13
 			m.focusField()
 			return m, nil
 		case "shift+tab":
 			m.blurAll()
 			m.focus--
 			if m.focus < 0 {
-				m.focus = 11
+				m.focus = 12
 			}
 			m.focusField()
 			return m, nil
@@ -282,6 +296,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.SetSize(m.width, m.height)
 			return m, nil
 		case "enter":
+			if m.focus == 8 {
+				return m, func() tea.Msg { return SelectProjectMsg{} }
+			}
 			if m.focus == 9 {
 				return m, func() tea.Msg { return SelectParentMsg{} }
 			}
@@ -329,6 +346,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case 10:
 		m.responsible, cmd = m.responsible.Update(msg)
 	case 11:
+		m.result, cmd = m.result.Update(msg)
+	case 12:
 		m.desc, cmd = m.desc.Update(msg)
 	}
 	return m, cmd
@@ -415,6 +434,7 @@ func (m Model) View() string {
 
 	fields = append(fields, renderField("󱓡 ", "Project:", m.project.View(), m.focus == 8))
 	fields = append(fields, renderField("󰓆 ", "Resp:", m.responsible.View(), m.focus == 10))
+	fields = append(fields, renderField("󰄬 ", "Result:", m.result.View(), m.focus == 11))
 
 	parentIDDisplay := m.parentID.Value()
 	if parentIDDisplay == "" {
@@ -477,6 +497,7 @@ func (m *Model) blurAll() {
 	m.project.Blur()
 	m.parentID.Blur()
 	m.responsible.Blur()
+	m.result.Blur()
 	m.desc.Blur()
 }
 
@@ -505,6 +526,8 @@ func (m *Model) focusField() {
 	case 10:
 		m.responsible.Focus()
 	case 11:
+		m.result.Focus()
+	case 12:
 		m.desc.Focus()
 	}
 }
@@ -618,6 +641,7 @@ func (m Model) saveCmd() tea.Cmd {
 	title := strings.TrimSpace(m.title.Value())
 	desc := strings.TrimSpace(m.desc.Value())
 	prj := strings.TrimSpace(m.project.Value())
+	res := strings.TrimSpace(m.result.Value())
 	tags := core.ParseTags(m.tags.Value())
 	priRaw := strings.TrimSpace(m.priority.Value())
 	priInt, _ := strconv.Atoi(priRaw)
@@ -667,6 +691,7 @@ func (m Model) saveCmd() tea.Cmd {
 			RecurrenceMonthly: monthly,
 			ParentID:          strings.TrimSpace(m.parentID.Value()),
 			Responsible:       strings.TrimSpace(m.responsible.Value()),
+			Result:            res,
 		}
 		return func() tea.Msg { return SaveNewMsg{Task: task} }
 	}
@@ -720,6 +745,9 @@ func (m Model) saveCmd() tea.Cmd {
 	resp := strings.TrimSpace(m.responsible.Value())
 	if resp != m.orig.Responsible {
 		patch.Responsible = &resp
+	}
+	if res != m.orig.Result {
+		patch.Result = &res
 	}
 	return func() tea.Msg { return SavePatchMsg{ID: m.orig.ID, Patch: patch} }
 }

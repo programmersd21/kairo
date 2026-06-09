@@ -15,7 +15,9 @@ Press `ctrl+e` to open the project switcher. You can:
 - View "All Projects" for a global view.
 
 ### Moving Tasks to Projects
-In the task editor, you can assign a task to a project via the **Project** field. If the project doesn't exist, Kairo will create it for you.
+In the task editor, you can assign a task to a project via the **Project** field. 
+
+**Pro Tip:** Press `Enter` on the Project field in the editor to open an interactive list of your existing projects. This prevents typos and makes it easy to stay organized. If you type a new project name and save, Kairo will create it for you.
 
 ## Task Nesting (Hierarchy)
 

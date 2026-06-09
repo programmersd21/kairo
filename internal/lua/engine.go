@@ -61,7 +61,7 @@ func (e *Engine) SetupKairoAPI(L *lua.LState) {
 	L.SetField(kairo, "notify", L.NewFunction(e.luaNotify))
 
 	// Meta
-	L.SetField(kairo, "version", lua.LString("1.7.1"))
+	L.SetField(kairo, "version", lua.LString("1.7.2"))
 
 	// Set as global
 	L.SetGlobal("kairo", kairo)

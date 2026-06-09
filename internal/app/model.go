@@ -154,11 +154,12 @@ type Model struct {
 	tagFilterInput textinput.Model // Input field for direct tag filtering in Tag View
 	resultInput    textinput.Model
 
-	palFullIdx      *search.Index
-	palTasksIdx     *search.Index
-	palProjectsIdx  *search.Index
-	palTasksOnly    bool
-	selectingParent bool
+	palFullIdx       *search.Index
+	palTasksIdx      *search.Index
+	palProjectsIdx   *search.Index
+	palTasksOnly     bool
+	selectingParent  bool
+	selectingProject bool
 
 	tasks    []core.Task
 	all      []core.Task
@@ -763,6 +764,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if m.selectingProject {
+			m.selectingProject = false
+			if m.edit != nil && x.Item.Kind == search.KindProject {
+				m.edit.SetProject(x.Item.ID)
+			}
+			m.mode = ModeEditor
+			return m, nil
+		}
+
 		m.mode = ModeList
 		switch x.Item.Kind {
 		case search.KindTask:
@@ -775,6 +785,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.transitionStarted = time.Now()
 			}
 			return m, tea.Batch(m.loadTasksCmd(), m.viewTransitionTickCmd())
+		case search.KindProject:
+			id := strings.TrimPrefix(x.Item.ID, "proj:")
+			m.activeProject = id
+			m.updateRecentProject(m.activeProject)
+			m.cfg.App.ActiveProject = m.activeProject
+			_ = m.cfg.Save()
+			m.side.SetProjects(m.projects, m.cfg.Projects.Order, m.cfg.App.RecentProjects)
+			m.side.SetActive(m.activeProject)
+			var animCmd tea.Cmd
+			if m.cfg.App.Animations {
+				m.transitioning = m.cfg.App.Animations
+				m.transitionStarted = time.Now()
+				m.animationGen++
+				animCmd = m.viewTransitionTickCmd()
+			}
+			return m, tea.Batch(m.loadTasksCmd(), animCmd)
 		case search.KindCommand:
 			return m, m.runCommand(x.Item.ID)
 		}
@@ -815,12 +841,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editor.SavePatchMsg:
 		return m, tea.Batch(m.updateTaskCmd(x.ID, x.Patch), func() tea.Msg { return editor.CloseMsg{} })
 
+	case editor.SelectProjectMsg:
+		m.palTasksOnly = false
+		m.selectingProject = true
+		m.mode = ModeProjectSwitcher
+		m.applyPaletteIndex()
+		m.pal.SetPlaceholder("Select project…")
+		var animCmd tea.Cmd
+		if m.cfg.App.Animations {
+			m.transitioning = m.cfg.App.Animations
+			m.transitionStarted = time.Now()
+			animCmd = m.viewTransitionTickCmd()
+		}
+		return m, tea.Batch(m.pal.Open(), animCmd)
+
 	case editor.SelectParentMsg:
 		m.palTasksOnly = true
 		m.selectingParent = true
+		m.mode = ModePalette
 		m.applyPaletteIndex()
 		m.pal.SetPlaceholder("Select parent task…")
-		m.mode = ModePalette
 		var animCmd tea.Cmd
 		if m.cfg.App.Animations {
 			m.transitioning = m.cfg.App.Animations
@@ -1480,8 +1520,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				case keymapMatch(m.km.ToggleStrike, km):
 					selected := m.list.GetSelectedTasks()
-					if len(selected) == 1 && selected[0].Status == core.StatusDone {
-						m.resultInput.SetValue(selected[0].Result)
+					if len(selected) == 1 {
+						t := selected[0]
+						m.resultInput.SetValue(t.Result)
 						m.mode = ModeResultEdit
 						m.resultInput.Focus()
 						return m, nil
@@ -1533,25 +1574,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if keymapMatch(m.km.ToggleStrike, km) {
 					t := m.det.Task()
-					if t.Status == core.StatusDone {
-						m.resultInput.SetValue(t.Result)
-						m.mode = ModeResultEdit
-						m.resultInput.Focus()
-						return m, nil
-					}
-					m.animationGen++
-					m.animationReverse = (t.Status == core.StatusDone)
-					m.animatingTaskID = t.ID
-					m.animationStarted = time.Now()
-					m.animationDuration = 600 * time.Millisecond
-					if m.cfg.App.Animations {
-						return m, m.strikeAnimationTickCmd(t.ID)
-					}
-					newStatus := core.StatusDone
-					if t.Status == core.StatusDone {
-						newStatus = core.StatusTodo
-					}
-					return m, m.updateTaskCmd(t.ID, core.TaskPatch{Status: &newStatus})
+					m.resultInput.SetValue(t.Result)
+					m.mode = ModeResultEdit
+					m.resultInput.Focus()
+					return m, nil
 				}
 				if keymapMatch(m.km.ToggleCollapse, km) {
 					t := m.det.Task()
@@ -1570,16 +1596,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch km.String() {
 			case "enter":
 				result := m.resultInput.Value()
-				taskID := ""
-				if m.mode == ModeDetail {
-					taskID = m.det.Task().ID
+				var task core.Task
+				found := false
+
+				if m.det.Task().ID != "" {
+					task = m.det.Task()
+					found = true
 				} else if item, ok := m.list.Selected(); ok {
-					taskID = item.ID
+					task = item.Task
+					found = true
 				}
-				if taskID != "" {
+
+				if found {
 					patch := core.TaskPatch{Result: &result}
+					if task.Status != core.StatusDone {
+						st := core.StatusDone
+						patch.Status = &st
+					}
 					m.mode = ModeList
-					return m, m.updateTaskCmd(taskID, patch)
+					return m, m.updateTaskCmd(task.ID, patch)
 				}
 				m.mode = ModeList
 				return m, nil
@@ -2784,6 +2819,10 @@ func (m *Model) rebuildPaletteIndex() {
 		items = append(items, search.Item{ID: fmt.Sprintf("pri:%d", int(p)), Kind: search.KindCommand, Title: fmt.Sprintf("Priority: P%d", int(p)), Hint: "set priority view"})
 	}
 
+	for _, p := range m.projects {
+		items = append(items, search.Item{ID: "proj:" + p, Kind: search.KindProject, Title: "Project: " + p, Hint: "switch project"})
+	}
+
 	if m.plugHost != nil {
 		for _, c := range m.plugHost.Commands() {
 			items = append(items, search.Item{ID: c.ID, Kind: search.KindCommand, Title: c.Title, Hint: "plugin • " + c.PluginID})
@@ -2837,21 +2876,10 @@ func (m *Model) rebuildPaletteIndex() {
 }
 
 func (m *Model) rebuildProjectsIndex() {
-	// Filter projects to only include those with tasks
-	projectHasTasks := make(map[string]bool)
-	for _, task := range m.all {
-		if task.Project != "" {
-			projectHasTasks[task.Project] = true
-		}
-	}
-
 	items := make([]search.Item, 0, len(m.projects)+1)
 	items = append(items, search.Item{ID: "", Kind: search.KindProject, Title: "<All Projects>", Hint: "show all tasks"})
 	for _, p := range m.projects {
-		// Only add project to switcher if it has tasks
-		if projectHasTasks[p] {
-			items = append(items, search.Item{ID: p, Kind: search.KindProject, Title: p, Hint: "project"})
-		}
+		items = append(items, search.Item{ID: p, Kind: search.KindProject, Title: p, Hint: "project"})
 	}
 	m.palProjectsIdx = search.NewIndex(items)
 }
