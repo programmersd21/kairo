@@ -85,7 +85,7 @@ Organize work into deep hierarchies and separate projects. Toggle the **Project 
 ### 🔁 Recurring Tasks & Results
 Tasks reappear automatically on a schedule. Weekly (`mon,wed,fri`) or monthly (`15`). When completed, Kairo generates the next instance immediately with a smart due-date preview.
 
-**Task Results**: Document the outcome of your work with completion notes (countermeasures). Kairo now prompts for a result whenever you mark a task as finished, ensuring you capture important insights and review your productivity.
+**Task Results**: Document the outcome of your work with completion notes (countermeasures). Press `z` on a task to open the interactive status selection popup — choose from `todo`, `doing`, or `done`. Selecting `done` prompts you for a completion note, ensuring you capture important insights and review your productivity.
 
 ### 🔒 Your Data, Locally
 SQLite with WAL mode. Fully offline. Optional Git-backed sync — no backend, no account, no lock-in. Export to JSON, CSV, Markdown, or plain text on demand. Project organization is preserved in your database.
@@ -301,7 +301,7 @@ Prefer not to edit files? `ctrl+s` opens the in-app settings menu.
 
 PRs are welcome — especially for themes, plugins, performance, and docs. If something bugs you, fix it.
 
-Huge thanks to [@Tornado300](https://github.com/Tornado300) and [@riodelphino](https://github.com/riodelphino) for key bug fixes and improvements that made Kairo better for everyone.
+Huge thanks to [@Tornado300](https://github.com/Tornado300), [@riodelphino](https://github.com/riodelphino) and [@FuryRacer](https://github.com/FuryRacer) for key bug fixes and improvements that made Kairo better for everyone.
 
 ---
 

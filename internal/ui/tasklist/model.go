@@ -645,6 +645,11 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 					Foreground(m.styles.Theme.Muted).
 					Render(t.OpenIssueID)
 				rightParts = append(rightParts, pill)
+			} else {
+				pill := lipgloss.NewStyle().
+					Width(12).
+					Render("")
+				rightParts = append(rightParts, pill)
 			}
 		case "project":
 			var projPill string

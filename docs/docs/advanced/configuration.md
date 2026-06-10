@@ -33,9 +33,9 @@ You can control what fields are shown on the right side of the task list:
 
 ```toml
 [list.order]
-right = ["tags", "due", "priority"]
+right = ["project", "tags", "due", "priority", "open_issue_id"]
 ```
-Valid values: `tags`, `due`, `priority`.
+Valid values: `tags`, `due`, `priority`, `project`, `open_issue_id`. Columns with no content are rendered as fixed-width placeholders, maintaining alignment regardless of order.
 
 ### Field Settings
 ```toml

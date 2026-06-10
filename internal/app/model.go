@@ -42,6 +42,7 @@ import (
 	"github.com/programmersd21/kairo/internal/ui/settings"
 	"github.com/programmersd21/kairo/internal/ui/sidebar"
 	"github.com/programmersd21/kairo/internal/ui/stats"
+	"github.com/programmersd21/kairo/internal/ui/status_menu"
 	"github.com/programmersd21/kairo/internal/ui/styles"
 	"github.com/programmersd21/kairo/internal/ui/tasklist"
 	"github.com/programmersd21/kairo/internal/ui/theme"
@@ -106,6 +107,7 @@ const (
 	ModeProjectSidebar
 	ModeFocus
 	ModeResultEdit
+	ModeStatusSelect
 )
 
 type Model struct {
@@ -139,6 +141,7 @@ type Model struct {
 	hlp        help.Model
 	onb        onboarding.Model
 	tm         theme_menu.Model
+	stm        status_menu.Model
 	pm         plugin_menu.Model
 	set        settings.Model
 	iem        import_export_menu.Model
@@ -203,6 +206,11 @@ type Model struct {
 	// Tick messages carry the generation they were spawned under;
 	// stale ticks (gen mismatch) are silently dropped in Update().
 	animationGen int
+
+	// pendingTaskID stores the task ID when entering result edit mode,
+	// ensuring the result is applied to the correct task even if the
+	// task list selection changes before Enter is pressed.
+	pendingTaskID string
 }
 
 type statsLoadedMsg struct {
@@ -275,6 +283,7 @@ func New(ctx context.Context, cfg config.Config, svc service.TaskService) (tea.M
 	m.hlp = help.New(m.s, m.km)
 	m.onb = onboarding.New(m.s, m.km)
 	m.tm = theme_menu.New(m.s, nil)
+	m.stm = status_menu.New(m.s)
 	m.pm = plugin_menu.New(m.s)
 	m.set = settings.New(m.s, cfg)
 	m.iem = import_export_menu.New(m.s)
@@ -651,6 +660,42 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.transitioning = m.cfg.App.Animations
 			m.transitionStarted = time.Now()
 			return m, m.viewTransitionTickCmd()
+		}
+		return m, nil
+
+	case status_menu.CloseMsg:
+		if m.mode == ModeStatusSelect {
+			m.pendingTaskID = ""
+			m.mode = ModeList
+			if m.cfg.App.Animations {
+				m.transitioning = m.cfg.App.Animations
+				m.transitionStarted = time.Now()
+				return m, m.viewTransitionTickCmd()
+			}
+			return m, nil
+		}
+		return m, nil
+
+	case status_menu.SelectMsg:
+		if m.mode == ModeStatusSelect && m.pendingTaskID != "" {
+			taskID := m.pendingTaskID
+			m.pendingTaskID = ""
+			newStatus := x.Status
+			if newStatus == core.StatusDone {
+				// Find task to pre-fill result input
+				for _, t := range m.tasks {
+					if t.ID == taskID {
+						m.resultInput.SetValue(t.Result)
+						break
+					}
+				}
+				m.pendingTaskID = taskID
+				m.mode = ModeResultEdit
+				m.resultInput.Focus()
+				return m, nil
+			}
+			m.mode = ModeList
+			return m, m.updateTaskCmd(taskID, core.TaskPatch{Status: &newStatus})
 		}
 		return m, nil
 
@@ -1521,10 +1566,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case keymapMatch(m.km.ToggleStrike, km):
 					selected := m.list.GetSelectedTasks()
 					if len(selected) == 1 {
-						t := selected[0]
-						m.resultInput.SetValue(t.Result)
-						m.mode = ModeResultEdit
-						m.resultInput.Focus()
+						m.pendingTaskID = selected[0].ID
+						m.mode = ModeStatusSelect
 						return m, nil
 					}
 					var cmds []tea.Cmd
@@ -1574,9 +1617,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if keymapMatch(m.km.ToggleStrike, km) {
 					t := m.det.Task()
-					m.resultInput.SetValue(t.Result)
-					m.mode = ModeResultEdit
-					m.resultInput.Focus()
+					m.pendingTaskID = t.ID
+					m.mode = ModeStatusSelect
 					return m, nil
 				}
 				if keymapMatch(m.km.ToggleCollapse, km) {
@@ -1596,27 +1638,40 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch km.String() {
 			case "enter":
 				result := m.resultInput.Value()
-				var task core.Task
-				found := false
+				m.mode = ModeList
 
-				if m.det.Task().ID != "" {
-					task = m.det.Task()
-					found = true
-				} else if item, ok := m.list.Selected(); ok {
-					task = item.Task
-					found = true
+				if m.pendingTaskID == "" {
+					return m, nil
 				}
 
-				if found {
+				// Find the task from the tasks slice by ID.
+				var task *core.Task
+				for i := range m.tasks {
+					if m.tasks[i].ID == m.pendingTaskID {
+						task = &m.tasks[i]
+						break
+					}
+				}
+				// Also check all tasks if not found in current view.
+				if task == nil {
+					for i := range m.all {
+						if m.all[i].ID == m.pendingTaskID {
+							task = &m.all[i]
+							break
+						}
+					}
+				}
+
+				if task != nil {
 					patch := core.TaskPatch{Result: &result}
 					if task.Status != core.StatusDone {
 						st := core.StatusDone
 						patch.Status = &st
 					}
-					m.mode = ModeList
+					m.pendingTaskID = ""
 					return m, m.updateTaskCmd(task.ID, patch)
 				}
-				m.mode = ModeList
+				m.pendingTaskID = ""
 				return m, nil
 			case "esc":
 				m.mode = ModeList
@@ -1693,6 +1748,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ModeThemeMenu:
 		var cmd tea.Cmd
 		m.tm, cmd = m.tm.Update(msg)
+		return m, cmd
+	case ModeStatusSelect:
+		var cmd tea.Cmd
+		m.stm, cmd = m.stm.Update(msg)
 		return m, cmd
 	case ModePluginMenu:
 		var cmd tea.Cmd
@@ -1812,6 +1871,7 @@ func (m *Model) renderMainUI() string {
 	m.hlp.SetSize(mainW, availableHeight)
 	m.hlp.AIEnabled = m.aiKey != ""
 	m.tm.SetSize(mainW, availableHeight)
+	m.stm.SetSize(mainW, availableHeight)
 	m.iem.SetSize(mainW, availableHeight)
 	m.stats.SetSize(mainW, availableHeight)
 	m.foc.SetSize(mainW, availableHeight)
@@ -1846,6 +1906,8 @@ func (m *Model) renderMainUI() string {
 		body = m.pm.View()
 	case ModeSettings:
 		body = m.set.View()
+	case ModeStatusSelect:
+		body = m.stm.View()
 	case ModeResultEdit:
 		body = m.renderResultOverlay(availableHeight)
 	case ModeTagFilter:
@@ -2262,6 +2324,8 @@ func (m *Model) renderFooter() string {
 				left = " " + makePill("esc/q/"+fk(m.km.Help)+" cancel")
 			case ModeThemeMenu:
 				left = " " + makePill("enter select") + sep + makePill("esc/q/"+fk(m.km.CycleTheme)+" cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
+			case ModeStatusSelect:
+				left = " " + makePill("enter select") + sep + makePill("esc cancel") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
 			case ModeSettings:
 				left = " " + makePill("esc/ctrl+s close") + sep + makePill("enter toggle") + sep + makePill(styles.IconUp+styles.IconDown+" nav")
 			case ModePluginMenu:

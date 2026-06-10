@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.2] (2026-06-09)
+## [1.7.2] (2026-06-10)
 
 ### Added
 - **Enhanced Task Note Field**: Added a dedicated `result` field to the task editor for documenting outcomes and countermeasures during both creation and editing.
@@ -14,10 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The project field in the editor now features an interactive selection list (press `Enter` on the project field) to choose from existing projects.
   - All projects (including those without tasks) are now visible in the project switcher palette.
   - Projects are now searchable via the main command palette (`ctrl+p`).
+- **Status Selection Popup**: Pressing `z` now shows an interactive status selection menu (todo/doing/done) before prompting for a completion note. Selecting `todo` or `doing` updates the task immediately; selecting `done` opens the result input.
 
 ### Fixed
 - **Project Switcher Logic**: Resolved an issue where newly created projects or projects without tasks were hidden from the selection list.
 - **Task Note Editing**: Fixed a UI bug in the result editor that prevented proper task identification in detail view mode.
+- **List Order Alignment**: Fixed misalignment in the task overview when customizing `[list.order]` — columns with no content now render a fixed-width placeholder, preserving alignment across rows regardless of column order.
+- **Sub-task Status Toggle**: Fixed a bug where pressing `z` on a sub-task would apply the status change and outcome note to a different task. The result editor now correctly targets the originally selected task.
 
 ## [1.7.1] (2026-06-04)
 

@@ -41,9 +41,10 @@ Kairo features a powerful NLP engine for deadlines. You can type:
 ## Status Management & Completion Notes
 
 You can quickly change task status from the list view:
-- Press `z` to toggle completion.
-- **Completion Notes (Countermeasures):** When you mark a task as **Done**, Kairo will prompt you for a **Result** note. This is a great place to document what was achieved, any obstacles encountered, or a "countermeasure" to prevent future issues. 
-- You can edit the result note later by pressing `z` on a task that is already completed.
+- Press `z` to open the interactive **status selection popup**, where you can choose from `todo`, `doing`, or `done`.
+- Selecting **Done** will prompt you for a **Result** note (completion note / countermeasure).
+- Selecting **Todo** or **Doing** updates the task immediately without prompting.
+- You can also edit the result note by pressing `z` on a completed task and selecting **Done** again.
 - Tasks in `doing` state are highlighted to indicate active focus.
 
 ## Bulk Actions
