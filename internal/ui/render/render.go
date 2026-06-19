@@ -3,7 +3,7 @@
 //
 // The core problem: Lip Gloss styled text emits ANSI SGR reset sequences
 // (\x1b[0m) at the end of each styled segment. These resets clear ALL
-// formatting—including background color—causing the terminal's default
+// formatting-including background color-causing the terminal's default
 // background to bleed through between styled segments.
 //
 // This package solves it with two complementary strategies:

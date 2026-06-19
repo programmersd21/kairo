@@ -28,7 +28,7 @@ If you're in a specific project, the dashboard shows:
 ### Behavioral Insights
 Kairo analyzes your data to provide smart tips, such as:
 - "You're most productive between 10 AM and 12 PM."
-- "You have 5 high-priority tasks overdue — focus on those first."
+- "You have 5 high-priority tasks overdue - focus on those first."
 
 ## Bentham-Style Layout
 The dashboard uses a clean, module-based layout (inspired by Bento grids) that stays readable even in smaller terminal windows.

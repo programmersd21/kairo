@@ -10,7 +10,7 @@ A premium, minimalist task manager designed for focus, Kairo strips away the noi
 
 Kairo is built on the philosophy of **Calm Tech**. We believe your tools should augment your focus, not compete for it.
 
-- **Data-First UI**: No borders, no clutter — just your content.
+- **Data-First UI**: No borders, no clutter - just your content.
 - **Monochrome by Default**: Neutral core, using color only for semantic highlights (priority, deadlines).
 - **Typography Hierarchy**: Clear visual focus through deliberate font weight and scale.
 - **Fluid Motion**: Sub-300ms transitions that make the TUI feel "alive" without being distracting.

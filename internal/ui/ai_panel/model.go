@@ -133,7 +133,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		} else if msg.Chunk.ToolUse != nil {
 			m.appendRaw("TOOL", msg.Chunk.ToolUse.ToolName)
 		} else {
-			// Stream AI text — append raw, rebuild with wrapping
+			// Stream AI text - append raw, rebuild with wrapping
 			m.buf.WriteString(msg.Chunk.Text)
 			m.rebuildContent()
 		}
@@ -187,7 +187,7 @@ func (m *Model) rebuildContent() {
 			wrapped := lipgloss.NewStyle().Width(m.wrapW).Render(line)
 			styled = m.Styles.Tool.Render(wrapped)
 		default:
-			// AI response text — wrap to viewport width
+			// AI response text - wrap to viewport width
 			styled = m.Styles.AI.Width(m.wrapW).Render(line)
 		}
 		out.WriteString(styled + "\n")

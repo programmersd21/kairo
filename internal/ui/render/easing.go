@@ -26,7 +26,7 @@ func EaseOutQuad(t float64) float64 {
 
 // EaseOutCubic is the primary animation easing for production UI.
 // Smooth deceleration with a natural, polished feel.
-// Strictly monotonic — never overshoots 1.0.
+// Strictly monotonic - never overshoots 1.0.
 func EaseOutCubic(t float64) float64 {
 	t = Clamp01(t)
 	t -= 1

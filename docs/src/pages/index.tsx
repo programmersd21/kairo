@@ -30,7 +30,7 @@ const FeatureList = [
     title: 'Premium Minimalist',
     description: (
       <>
-        Kairo strips away the noise. No borders, no clutter — just structured whitespace 
+        Kairo strips away the noise. No borders, no clutter - just structured whitespace 
          and refined typography to keep you in your flow.
       </>
     ),

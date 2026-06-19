@@ -34,7 +34,7 @@ type Model struct {
 	allTasks []core.Task // All tasks for stats calculation
 	sel      int
 
-	// Animation state — set by the app model, read-only during render.
+	// Animation state - set by the app model, read-only during render.
 	animatingTaskID  string
 	animationStart   time.Time
 	animationDur     time.Duration
@@ -453,7 +453,7 @@ func (m Model) renderEmpty() string {
 func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 	t := item.Task
 	// Compute animation progress for strike (completion toggle).
-	// Progress is always clamped to [0, 1] — no overshoot.
+	// Progress is always clamped to [0, 1] - no overshoot.
 	isAnimating := m.Animations && m.animatingTaskID == t.ID && m.animatingTaskID != ""
 	animProgress := 0.0
 	if isAnimating {
@@ -496,7 +496,7 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 		statusStyle = lipgloss.NewStyle().Foreground(m.styles.Theme.Good).Background(rowBg)
 	}
 
-	// Selection indicator — render only for selected task
+	// Selection indicator - render only for selected task
 	indicator := " "
 	if selected || m.selectedIDs[t.ID] {
 		indicatorStyle := m.styles.Theme.Muted
@@ -610,7 +610,7 @@ func (m Model) renderRow(item TaskItem, selected bool, maxDueWidth int) string {
 					Foreground(m.styles.Theme.Muted).
 					Width(16).
 					Align(lipgloss.Center).
-					Render("—")
+					Render("-")
 				rightParts = append(rightParts, dash)
 			}
 		case "tags":

@@ -400,7 +400,7 @@ func runUpdate(ctx context.Context) error {
 
 func runHelp(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Kairo — Minimal, powerful task management.")
+		fmt.Println("Kairo - Minimal, powerful task management.")
 		fmt.Println("\nUsage:")
 		fmt.Println("  kairo [command]")
 		fmt.Println("\nAvailable Commands:")

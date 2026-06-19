@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Project Switcher Logic**: Resolved an issue where newly created projects or projects without tasks were hidden from the selection list.
 - **Task Note Editing**: Fixed a UI bug in the result editor that prevented proper task identification in detail view mode.
-- **List Order Alignment**: Fixed misalignment in the task overview when customizing `[list.order]` — columns with no content now render a fixed-width placeholder, preserving alignment across rows regardless of column order.
+- **List Order Alignment**: Fixed misalignment in the task overview when customizing `[list.order]` - columns with no content now render a fixed-width placeholder, preserving alignment across rows regardless of column order.
 - **Sub-task Status Toggle**: Fixed a bug where pressing `z` on a sub-task would apply the status change and outcome note to a different task. The result editor now correctly targets the originally selected task.
 
 ## [1.7.1] (2026-06-04)
@@ -33,14 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task Result / Completion Report**: New `result` field for documenting task outcomes. Press `z` on a completed task to open the result editor dialog; results are visible in the detail view and included in exports.
 - **Open Issue ID System**: Every task now receives a human-friendly ID (`OI000001`, `OI000002`…) in addition to the internal hash ID. Displayed in the detail view and configurable as a list column via `open_issue_id` in `[list.order] right`.
 - **Responsible Person Assignment**: New `responsible` text field in the task editor for tracking task ownership. Visible in the detail view and included in exports.
-- **Project-Scoped Export**: The export dialog now offers a scope selection — export all projects or limit to the current project.
+- **Project-Scoped Export**: The export dialog now offers a scope selection - export all projects or limit to the current project.
 - **Parent Project Inheritance**: Child tasks automatically inherit the project from their parent task when no project is explicitly assigned.
 
 ### Changed
 - **Config**: Added `open_issue_id` to the default right-side column order and allowed field list.
-- **Storage**: Database schema migration v7 — adds `result`, `open_issue_id`, `responsible` columns and `meta` table.
+- **Storage**: Database schema migration v7 - adds `result`, `open_issue_id`, `responsible` columns and `meta` table.
 - **Code Cleanup**: Removed redundant comments, dead stub code, and developer notes across the codebase.
-- **UI Layout Engine**: Complete redesign of task list row layout — title width is now computed dynamically from actual rendered content widths instead of hardcoded magic number (`-40`).
+- **UI Layout Engine**: Complete redesign of task list row layout - title width is now computed dynamically from actual rendered content widths instead of hardcoded magic number (`-40`).
 - **Detail View**: Metadata labels now use computed widths based on actual label content instead of hardcoded 10-character padding, ensuring alignment is maintained regardless of field name lengths.
 - **Modal Overlays**: Result editor and tag filter modals now use responsive widths (`min(60, width-4)`) instead of fixed 60 characters.
 - **FillViewport**: Removed `width+1` off-by-one guard hack and extra bottom padding line. Background filling now uses exact terminal dimensions.
