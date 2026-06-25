@@ -6,23 +6,13 @@ import (
 )
 
 func AppDataDir(appName string) (string, error) {
-	if d, err := os.UserConfigDir(); err == nil && d != "" {
-		return filepath.Join(d, appName), nil
-	}
-	home, err := os.UserHomeDir()
+	d, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".config", appName), nil
+	return filepath.Join(d, "."+appName), nil
 }
 
 func AppStateDir(appName string) (string, error) {
-	if d, err := os.UserCacheDir(); err == nil && d != "" {
-		return filepath.Join(d, appName), nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".local", "share", appName), nil
+	return AppDataDir(appName)
 }

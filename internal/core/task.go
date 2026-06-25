@@ -183,6 +183,7 @@ type TaskPatch struct {
 	Collapsed         *bool
 	CompletedAt       **time.Time
 	Result            *string
+	OpenIssueID       *string
 	Responsible       *string
 }
 
@@ -234,6 +235,9 @@ func (p TaskPatch) ApplyTo(t Task) Task {
 	}
 	if p.Result != nil {
 		t.Result = *p.Result
+	}
+	if p.OpenIssueID != nil {
+		t.OpenIssueID = *p.OpenIssueID
 	}
 	if p.Responsible != nil {
 		t.Responsible = *p.Responsible

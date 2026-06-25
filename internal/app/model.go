@@ -2335,7 +2335,7 @@ func (m *Model) renderFooter() string {
 					makePill(fk(m.km.Palette) + " " + styles.IconPalette + "palette"),
 					makePill(fk(m.km.ProjectSwitcher) + " project"),
 					makePill(fk(m.km.NewTask) + " " + styles.IconNew + "new"),
-					makePill("f " + styles.IconTag + "tag"),
+					makePill(fk(m.km.ViewTag) + " " + styles.IconTag + "tag"),
 					makePill(fk(m.km.ToggleStrike) + " " + styles.IconStrike + "done"),
 					makePill(fk(m.km.Stats) + " stats"),
 					makePill(fk(m.km.DeleteTask) + " " + styles.IconDelete + "delete"),

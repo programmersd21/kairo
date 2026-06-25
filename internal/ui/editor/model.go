@@ -55,6 +55,7 @@ type Model struct {
 	parentID    textinput.Model
 	responsible textinput.Model
 	result      textinput.Model
+	openIssueID textinput.Model
 	desc        textarea.Model
 
 	focus int
@@ -178,6 +179,12 @@ func New(s styles.Styles, mode Mode, t core.Task, preview bool) Model {
 	res.SetValue(t.Result)
 	applyFieldStyles(&res)
 
+	oi := textinput.New()
+	oi.Prompt = ""
+	oi.CharLimit = 16
+	oi.SetValue(t.OpenIssueID)
+	applyFieldStyles(&oi)
+
 	d := textarea.New()
 	d.Placeholder = "Description (Markdown)…"
 	d.SetValue(t.Description)
@@ -201,6 +208,7 @@ func New(s styles.Styles, mode Mode, t core.Task, preview bool) Model {
 		parentID:    pid,
 		responsible: resp,
 		result:      res,
+		openIssueID: oi,
 		desc:        d,
 		focus:       0,
 		showPreview: preview,
@@ -239,6 +247,7 @@ func (m *Model) SetSize(w, h int) {
 	m.parentID.Width = max(20, editorW-20)
 	m.responsible.Width = max(20, editorW-20)
 	m.result.Width = max(20, editorW-20)
+	m.openIssueID.Width = max(20, editorW-20)
 	style := "dark"
 	if m.styles.Theme.IsLight {
 		style = "light"
@@ -278,14 +287,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, func() tea.Msg { return CloseMsg{} }
 		case "tab":
 			m.blurAll()
-			m.focus = (m.focus + 1) % 13
+			m.focus = (m.focus + 1) % 14
 			m.focusField()
 			return m, nil
 		case "shift+tab":
 			m.blurAll()
 			m.focus--
 			if m.focus < 0 {
-				m.focus = 12
+				m.focus = 13
 			}
 			m.focusField()
 			return m, nil
@@ -348,6 +357,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case 11:
 		m.result, cmd = m.result.Update(msg)
 	case 12:
+		m.openIssueID, cmd = m.openIssueID.Update(msg)
+	case 13:
 		m.desc, cmd = m.desc.Update(msg)
 	}
 	return m, cmd
@@ -435,6 +446,7 @@ func (m Model) View() string {
 	fields = append(fields, renderField("󱓡 ", "Project:", m.project.View(), m.focus == 8))
 	fields = append(fields, renderField("󰓆 ", "Resp:", m.responsible.View(), m.focus == 10))
 	fields = append(fields, renderField("󰄬 ", "Result:", m.result.View(), m.focus == 11))
+	fields = append(fields, renderField("󰋼 ", "Issue:", m.openIssueID.View(), m.focus == 12))
 
 	parentIDDisplay := m.parentID.Value()
 	if parentIDDisplay == "" {
@@ -498,6 +510,7 @@ func (m *Model) blurAll() {
 	m.parentID.Blur()
 	m.responsible.Blur()
 	m.result.Blur()
+	m.openIssueID.Blur()
 	m.desc.Blur()
 }
 
@@ -528,6 +541,8 @@ func (m *Model) focusField() {
 	case 11:
 		m.result.Focus()
 	case 12:
+		m.openIssueID.Focus()
+	case 13:
 		m.desc.Focus()
 	}
 }
@@ -692,6 +707,7 @@ func (m Model) saveCmd() tea.Cmd {
 			ParentID:          strings.TrimSpace(m.parentID.Value()),
 			Responsible:       strings.TrimSpace(m.responsible.Value()),
 			Result:            res,
+			OpenIssueID:       strings.TrimSpace(m.openIssueID.Value()),
 		}
 		return func() tea.Msg { return SaveNewMsg{Task: task} }
 	}
@@ -748,6 +764,10 @@ func (m Model) saveCmd() tea.Cmd {
 	}
 	if res != m.orig.Result {
 		patch.Result = &res
+	}
+	oi := strings.TrimSpace(m.openIssueID.Value())
+	if oi != m.orig.OpenIssueID {
+		patch.OpenIssueID = &oi
 	}
 	return func() tea.Msg { return SavePatchMsg{ID: m.orig.ID, Patch: patch} }
 }

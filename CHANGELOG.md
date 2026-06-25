@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] (2026-06-25)
+
+### Added
+- **Open Issue ID Editor**: The task editor now includes an editable `Issue ID` field, allowing users to modify the open issue identifier (e.g., `OI00008` to `OI102872`).
+- **Local Config Storage**: All configuration, database, and plugin data is now stored in a `.kairo` directory in the current working directory instead of `%APPDATA%\kairo` on Windows (or `~/.config/kairo` on Unix). This keeps everything self-contained in one folder.
+
+### Fixed
+- **Tag View Keybinding Display**: The footer now correctly shows `ctrl+f` instead of `f` for the tag view action, matching the actual keybinding.
+- **Focus Mode Keybinding**: The `f` key now exclusively triggers focus mode without conflicting with the tag view.
+
 ## [1.7.2] (2026-06-10)
 
 ### Added

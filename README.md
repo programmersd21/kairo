@@ -273,9 +273,8 @@ minimal = true
 
 Auto-generated on first run at:
 
-* **Linux:** `~/.config/kairo/config.toml`
-* **macOS:** `~/Library/Application Support/kairo/config.toml`
-* **Windows:** `%APPDATA%\kairo\config.toml`
+* **All platforms:** `./.kairo/config.toml` (relative to the working directory)
+* *Legacy fallbacks:* `~/.kairo/config.toml` and `~/.config/kairo/config.toml`
 
 | Option       | Description             | Default      |
 | ------------ | ----------------------- | ------------ |
